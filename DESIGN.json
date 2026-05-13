@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-12T00:00:00Z",
+  "title": "Design System: Job Page Draft Assistant",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Slate Tide",
+        "canonical": "oklch(46% 0.10 195)",
+        "tonalRamp": ["#0a1e22", "#0f2d34", "#163d47", "#1f5465", "#2e7585", "#4a9aab", "#7abec8", "#b8dde2"]
+      },
+      "accent-subtle": {
+        "role": "primary-container",
+        "displayName": "Slate Mist",
+        "canonical": "oklch(93% 0.05 195)",
+        "tonalRamp": ["#0a1e22", "#163d47", "#2e7585", "#4a9aab", "#7abec8", "#b8dde2", "#d5edf0", "#e0f2f4"]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Warm Parchment",
+        "canonical": "oklch(97.5% 0.007 85)",
+        "tonalRamp": ["#2b2820", "#413d32", "#5f5a4a", "#837d6d", "#aaa498", "#cfcabe", "#e9e5dc", "#faf9f4"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Clean Sheet",
+        "canonical": "oklch(99.5% 0.004 85)",
+        "tonalRamp": ["#2b2820", "#413d32", "#625d4e", "#898375", "#b0aba0", "#cec9c0", "#e8e5df", "#fefdfb"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(18% 0.007 240)",
+        "tonalRamp": ["#1d2330", "#2d3647", "#404d61", "#5a6478", "#778494", "#97a0ad", "#bec5cf", "#dde1e7"]
+      },
+      "success": {
+        "role": "success",
+        "displayName": "Confirmed Green",
+        "canonical": "oklch(56% 0.13 145)",
+        "tonalRamp": ["#0b2017", "#143321", "#1e4a30", "#236740", "#2d8e5f", "#42b07a", "#6dcc9b", "#a8e5c4"]
+      },
+      "danger": {
+        "role": "danger",
+        "displayName": "Caution Red",
+        "canonical": "oklch(54% 0.17 25)",
+        "tonalRamp": ["#200d0d", "#3a1414", "#5c2020", "#8a3030", "#b44040", "#cc6464", "#e09090", "#f5c8c8"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Settings section headings, overlay titles. One per major view." },
+      "headline": { "displayName": "Headline", "purpose": "Card section sub-titles in settings. Group anchors." },
+      "title": { "displayName": "Title", "purpose": "Card headers and navigation labels in the dashboard." },
+      "body": { "displayName": "Body", "purpose": "Form content, descriptions, job description text." },
+      "label": { "displayName": "Label", "purpose": "Form field labels, settings field names. Not uppercase." },
+      "caption": { "displayName": "Caption", "purpose": "Hints, metadata, secondary descriptors." }
+    },
+    "shadows": [
+      {
+        "name": "ambient-card",
+        "value": "0 1px 4px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04)",
+        "purpose": "Light mode only. Separates surface-colored cards from the warm canvas. Invisible in dark mode."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px var(--color-accent-subtle, #e0f2f4)",
+        "purpose": "Applied on :focus-visible. Accent-subtle tint, not a glow. Used on all interactive elements."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-quart",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default easing for entrances and state changes. Exponential ease-out — starts fast, settles with authority."
+      },
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Hover state micro-transitions. Background and color changes."
+      },
+      {
+        "name": "dur-fast",
+        "value": "150ms",
+        "purpose": "Hover transitions, color changes."
+      },
+      {
+        "name": "dur-standard",
+        "value": "200ms",
+        "purpose": "Panel entrances, toast, overlay transitions."
+      }
+    ],
+    "breakpoints": [
+      { "name": "two-col", "value": "720px", "purpose": "Dashboard switches from single-column to two-column layout." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Used for primary generate actions and terminal save actions. Slate Tide background, no gradient.",
+      "html": "<button class=\"ds-btn-primary\">Generate Resume + Cover Letter</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 18px; background: var(--color-accent, #2e7585); color: var(--color-accent-on, #f8fdfe); border: 1px solid transparent; border-radius: 6px; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover:not(:disabled) { background: #236a79; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-surface, #fefdfb), 0 0 0 4px var(--color-accent, #2e7585); } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Supporting actions alongside the primary. Raised background, bordered.",
+      "html": "<button class=\"ds-btn-secondary\">Resume Only</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 18px; background: var(--color-raised, #f2efea); color: var(--color-ink-2, #686f7d); border: 1px solid var(--color-border, #d6d9e4); border-radius: 6px; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 600; line-height: 1; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-secondary:hover:not(:disabled) { background: var(--color-border-subtle, #eaecf0); color: var(--color-ink, #1d2330); border-color: var(--color-accent, #2e7585); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-surface, #fefdfb), 0 0 0 4px var(--color-accent, #2e7585); } .ds-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Confirm Button",
+      "kind": "button",
+      "refersTo": "button-confirm",
+      "description": "Terminal actions: export, save. Confirmed Green background. Reserved for completion moments.",
+      "html": "<button class=\"ds-btn-confirm\">Save as PDF</button>",
+      "css": ".ds-btn-confirm { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 18px; background: var(--color-success, #2d8e5f); color: var(--color-accent-on, #f8fdfe); border: 1px solid transparent; border-radius: 6px; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 700; line-height: 1; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-confirm:hover:not(:disabled) { background: #257350; } .ds-btn-confirm:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-surface, #fefdfb), 0 0 0 4px var(--color-success, #2d8e5f); } .ds-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Form input for job info, profile fields, API keys. Raised background at rest, brightens on focus.",
+      "html": "<div class=\"ds-field-group\"><label class=\"ds-label\" for=\"ds-input-example\">Job Title</label><input class=\"ds-input\" id=\"ds-input-example\" type=\"text\" placeholder=\"e.g. Case Worker\" /></div>",
+      "css": ".ds-field-group { display: flex; flex-direction: column; gap: 5px; } .ds-label { font-family: 'Inter', system-ui, sans-serif; font-size: 12px; font-weight: 500; color: var(--color-ink-2, #686f7d); line-height: 1.4; } .ds-input { width: 100%; background: var(--color-raised, #f2efea); border: 1px solid var(--color-border, #d6d9e4); border-radius: 6px; color: var(--color-ink, #1d2330); font-family: 'Inter', system-ui, sans-serif; font-size: 13px; padding: 8px 12px; outline: none; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-input:focus { background: var(--color-surface, #fefdfb); border-color: var(--color-accent, #2e7585); box-shadow: 0 0 0 3px var(--color-accent-subtle, #e0f2f4); } .ds-input::placeholder { color: var(--color-ink-3, #97a0ad); }"
+    },
+    {
+      "name": "Card Panel",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Document-section containers for the dashboard and settings. Border-defined, minimal shadow in light mode.",
+      "html": "<section class=\"ds-card\"><div class=\"ds-card-header\"><span class=\"ds-card-title\">Job Info</span></div><p class=\"ds-card-body\">Card body content goes here.</p></section>",
+      "css": ".ds-card { background: var(--color-surface, #fefdfb); border: 1px solid var(--color-border, #d6d9e4); border-radius: 14px; padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04); } .ds-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 6px; } .ds-card-title { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 13.5px; font-weight: 600; color: var(--color-ink, #1d2330); letter-spacing: -0.005em; } .ds-card-body { font-family: 'Inter', system-ui, sans-serif; font-size: 13.5px; color: var(--color-ink-2, #686f7d); line-height: 1.6; } @media (prefers-color-scheme: dark) { .ds-card { box-shadow: none; } }"
+    },
+    {
+      "name": "Step Badge",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Sequential step indicators in the dashboard left column. Numbered circles that anchor the guided flow.",
+      "html": "<span class=\"ds-step-badge\">1</span>",
+      "css": ".ds-step-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--color-accent-subtle, #e0f2f4); border: 1.5px solid var(--color-accent, #2e7585); border-radius: 9999px; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 11px; font-weight: 700; color: var(--color-accent, #2e7585); flex-shrink: 0; }"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Preview tabs switching between Resume, Cover Letter, and Merged views.",
+      "html": "<div class=\"ds-tab-bar\"><button class=\"ds-tab-btn ds-tab-btn--active\">Resume</button><button class=\"ds-tab-btn\">Cover Letter</button></div>",
+      "css": ".ds-tab-bar { display: flex; gap: 2px; } .ds-tab-btn { background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--color-ink-3, #97a0ad); cursor: pointer; padding: 4px 10px 6px; font-family: 'Inter', system-ui, sans-serif; font-size: 12.5px; font-weight: 600; transition: color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-tab-btn:hover { color: var(--color-ink-2, #686f7d); } .ds-tab-btn--active { color: var(--color-accent, #2e7585); border-bottom-color: var(--color-accent, #2e7585); } .ds-tab-btn:focus-visible { outline: none; border-radius: 4px 4px 0 0; box-shadow: 0 0 0 2px var(--color-accent-subtle, #e0f2f4); }"
+    },
+    {
+      "name": "Toast Notification",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Transient status messages. Pill-shaped, bottom-center. Ease-out-quart entry, no bounce.",
+      "html": "<div class=\"ds-toast ds-toast--show\">Settings saved</div>",
+      "css": ".ds-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(12px); background: var(--color-surface, #fefdfb); border: 1px solid var(--color-border, #d6d9e4); color: var(--color-ink, #1d2330); padding: 9px 20px; border-radius: 9999px; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.10); opacity: 0; visibility: hidden; transition: opacity 200ms cubic-bezier(0.16,1,0.3,1), transform 200ms cubic-bezier(0.16,1,0.3,1), visibility 0s 200ms; pointer-events: none; z-index: 10000; } .ds-toast--show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); transition: opacity 200ms cubic-bezier(0.16,1,0.3,1), transform 200ms cubic-bezier(0.16,1,0.3,1); } @media (prefers-reduced-motion: reduce) { .ds-toast { transition: opacity 0ms; } }"
+    },
+    {
+      "name": "Upload Area",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Drag-and-drop file input for source resume and templates. Dashed border, tinted on hover.",
+      "html": "<div class=\"ds-upload-area\"><input type=\"file\" id=\"ds-upload\" class=\"ds-upload-input\" /><label for=\"ds-upload\" class=\"ds-upload-label\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"17 8 12 3 7 8\"/><line x1=\"12\" y1=\"3\" x2=\"12\" y2=\"15\"/></svg><span>Click to upload your resume (.docx or .pdf)</span></label></div>",
+      "css": ".ds-upload-area { border: 2px dashed var(--color-border, #d6d9e4); border-radius: 10px; transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-upload-area:hover { border-color: var(--color-accent, #2e7585); background-color: var(--color-accent-subtle, #e0f2f4); } .ds-upload-input { display: none; } .ds-upload-label { display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; color: var(--color-ink-2, #686f7d); font-family: 'Inter', system-ui, sans-serif; font-size: 13px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Advisor",
+    "overview": "A skilled career coach who never raises their voice. Warm, unhurried, competent. The tool recedes so the work can breathe: the document being drafted is always the hero, the interface never is. This system trusts restraint. Every element earns its place by serving the user's task, not by decorating the screen.\n\nThe physical scene driving every decision: a job seeker at a desk, morning or evening, focused and slightly anxious, wanting to feel capable and ready. The interface should feel like the right tool for an important moment — composed, credible, professional without being corporate.\n\nThis system explicitly rejects: dark mode with purple or indigo gradients and glowing accents; corporate job-board coldness; colorful gamified resume builders; generic productivity-app softness.",
+    "keyCharacteristics": [
+      "System-adaptive: follows OS light/dark preference with consistent tokens in both modes",
+      "Restrained color strategy: warm-buff or cool-dark neutrals with one deliberate slate-teal accent",
+      "Typographic contrast through weight and size — Plus Jakarta Sans for structure, Inter for content",
+      "Flat-first elevation: cards defined by border and tonal background, not shadow drama",
+      "Progressive confidence: the interface becomes more alive as the user's work progresses"
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "The accent appears only on interactive targets: buttons, links, focus rings, active states. Never decorative.", "section": "colors" },
+      { "name": "The No-Pure Rule", "body": "Pure white (#ffffff) and pure black (#000000) are forbidden. Every neutral carries a micro-tint.", "section": "colors" },
+      { "name": "The Tonal Rule", "body": "In dark mode, shadows are invisible. Use background lightness steps to convey elevation hierarchy.", "section": "elevation" },
+      { "name": "The Floor Rule", "body": "No text below 11.5px. Step badges at 10px are the documented exception and carry no critical information.", "section": "typography" },
+      { "name": "The Weight Rule", "body": "Hierarchy is established through size and weight contrast, never color alone.", "section": "typography" }
+    ],
+    "dos": [
+      "Use OKLCH for all color values",
+      "Tint every neutral toward its brand hue — warm (85°) for backgrounds, cool (240–250°) for text and borders",
+      "Use Plus Jakarta Sans 600–700 for headings, Inter for body and form fields",
+      "Apply the accent color only to interactive targets",
+      "Use prefers-reduced-motion to disable or reduce all animations",
+      "Write export button copy with confidence — 'Save as PDF' not '⚠️ Quick PDF'",
+      "Keep the document preview as the visual hero"
+    ],
+    "donts": [
+      "Don't use dark mode with purple or indigo gradients, glow effects, or glassmorphism",
+      "Don't use corporate job-board / recruiter aesthetics",
+      "Don't use colorful gamified resume-builder patterns",
+      "Don't use transition: all — specify exact properties",
+      "Don't use bounce or spring easing",
+      "Don't apply border-left or border-top greater than 1px as a colored accent stripe",
+      "Don't use gradient fills on buttons or logo marks",
+      "Don't add glow-colored box-shadows to interactive elements",
+      "Don't use text below 11.5px",
+      "Don't place developer debug controls in the production user interface",
+      "Don't use warning icons on primary action buttons",
+      "Don't use #000000 or #ffffff"
+    ]
+  }
+}

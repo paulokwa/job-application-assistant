@@ -34,16 +34,41 @@ export function mapError(error) {
     return {
       type: 'validation',
       message: 'Your profile is missing. Please go to Settings → My Profile and add your professional details (or upload your resume for auto-fill) before generating.',
-      action: 'settings'
+      action: 'settings',
+      settingsSection: 'profile',
     };
   }
-  
-  // 1. Billing / Payment
+
+  // 1. Ollama-specific errors (must come before generic 401/403 check)
+  if (msg.includes('ollama error')) {
+    if (msg.includes('403') || msg.includes('forbidden')) {
+      return {
+        type: 'ollama_cors',
+        message: 'Ollama blocked the request (CORS). To allow the extension to reach Ollama, set OLLAMA_ORIGINS=chrome-extension://* as an environment variable and restart Ollama.',
+        action: 'retry',
+      };
+    }
+    if (msg.includes('404')) {
+      return {
+        type: 'ollama_model',
+        message: 'Ollama is running but the selected model is not installed. Open a terminal and run `ollama pull <model-name>`, or choose a different model in Settings → AI Provider.',
+        action: 'retry',
+      };
+    }
+    return {
+      type: 'ollama_error',
+      message: error?.message || 'Could not reach Ollama. Make sure it is running and the endpoint in Settings is correct.',
+      action: 'retry',
+    };
+  }
+
+  // 2. Billing / Payment
   if (msg.includes('billing') || msg.includes('payment')) {
     return {
       type: ErrorType.BILLING,
       message: 'The AI service is not available right now because billing appears to be disabled on the connected API project.',
-      action: 'settings'
+      action: 'settings',
+      settingsSection: 'provider',
     };
   }
 
@@ -52,7 +77,8 @@ export function mapError(error) {
     return {
       type: ErrorType.UNAUTHORIZED,
       message: 'The API key appears to be missing or invalid. Please check your extension settings.',
-      action: 'settings'
+      action: 'settings',
+      settingsSection: 'provider',
     };
   }
 
@@ -100,7 +126,8 @@ export function mapError(error) {
     return {
       type: ErrorType.MODEL_NOT_FOUND,
       message: error?.message || 'The selected AI model was not found or is invalid. Please check your model settings.',
-      action: 'settings'
+      action: 'settings',
+      settingsSection: 'provider',
     };
   }
 

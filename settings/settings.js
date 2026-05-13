@@ -10,18 +10,38 @@ let profile = null;
 let settings = {};
 let docSettings = {};
 
+const ALL_CHIPS = ['{docType}', '{company}', '{jobTitle}', '{date}'];
+let activeChips = ['{docType}', '{company}', '{jobTitle}'];
+
 const PROVIDER_MODELS = {
   mock: ['mock-basic'],
   openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-  gemini: ['gemini-2.5-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-pro', 'gemini-2.0-pro', 'gemini-1.5-pro'],
+  gemini: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'],
+  openrouter: [
+    'anthropic/claude-3.5-haiku',
+    'anthropic/claude-3.5-sonnet',
+    'anthropic/claude-3-opus',
+    'openai/gpt-4o-mini',
+    'openai/gpt-4o',
+    'google/gemini-2.0-flash-001',
+    'meta-llama/llama-3.3-70b-instruct',
+    'deepseek/deepseek-chat',
+  ],
   ollama: ['llama3', 'mistral', 'gemma', 'phi3']
 };
 
 const DEFAULT_MODELS = {
   mock: 'mock-basic',
   openai: 'gpt-4o-mini',
-  gemini: 'gemini-2.0-flash-001',
+  gemini: 'gemini-2.5-flash',
+  openrouter: 'anthropic/claude-3.5-haiku',
   ollama: 'llama3'
+};
+
+const PROVIDER_API_LINKS = {
+  openai:      { label: 'Get your OpenAI API key at platform.openai.com/api-keys', url: 'https://platform.openai.com/api-keys' },
+  gemini:      { label: 'Get your Gemini API key at aistudio.google.com/app/apikey', url: 'https://aistudio.google.com/app/apikey' },
+  openrouter:  { label: 'Get your OpenRouter key at openrouter.ai/keys — one key for Claude, GPT-4, Gemini, Llama and more', url: 'https://openrouter.ai/keys' },
 };
 
 const $ = id => document.getElementById(id);
@@ -33,7 +53,7 @@ async function init() {
 
   // Load saved data
   const stored = await chrome.storage.sync.get(['providerSettings', 'docSettings']);
-  settings = stored.providerSettings || {};
+  settings = migrateSettings(stored.providerSettings);
   docSettings = stored.docSettings || { templateMode: 'smart' };
   profile = await loadProfile();
 
@@ -44,7 +64,7 @@ async function init() {
   await populateSourceStatus();
 
   // Navigation
-  document.querySelectorAll('.nav-btn').forEach(btn => {
+  document.querySelectorAll('.nav-btn[data-section]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
@@ -57,13 +77,39 @@ async function init() {
   $('btn-save-provider').addEventListener('click', saveProvider);
   $('btn-save-documents').addEventListener('click', saveDocuments);
   $('btn-save-profile').addEventListener('click', saveProfileData);
+  $('btn-clear-profile').addEventListener('click', clearProfile);
+
+  // Tour
+  $('btn-settings-tour').addEventListener('click', startSettingsTour);
+  $('settings-tour-btn-skip').addEventListener('click', endSettingsTour);
+  $('settings-tour-btn-prev').addEventListener('click', () => { if (settingsTourIndex > 0) showSettingsTourStep(settingsTourIndex - 1); });
+  $('settings-tour-btn-next').addEventListener('click', () => {
+    if (settingsTourIndex < SETTINGS_TOUR_STEPS.length - 1) showSettingsTourStep(settingsTourIndex + 1);
+    else endSettingsTour();
+  });
+
+  // API key toggle
+  $('btn-toggle-key').addEventListener('click', () => {
+    const inp = $('inp-apikey');
+    const btn = $('btn-toggle-key');
+    const revealing = inp.type === 'password';
+    inp.type = revealing ? 'text' : 'password';
+    btn.textContent = revealing ? 'Hide' : 'Show';
+    btn.setAttribute('aria-label', revealing ? 'Hide API key' : 'Show API key');
+  });
+  $('inp-apikey').addEventListener('input', () => $('hint-saved-key').classList.add('hidden'));
+
+  // Ollama help modal
+  $('btn-ollama-help').addEventListener('click', showOllamaHelp);
+  $('btn-close-ollama-help').addEventListener('click', hideOllamaHelp);
+  $('ollama-help-overlay').addEventListener('click', e => { if (e.target === $('ollama-help-overlay')) hideOllamaHelp(); });
   
   $('sel-provider').addEventListener('change', () => updateProviderVisibility(true));
   $('sel-model').addEventListener('change', () => {
     $('inp-custom-model').classList.toggle('hidden', $('sel-model').value !== 'custom');
   });
   
-  $('inp-filename-pattern').addEventListener('input', updateFilenamePreview);
+  $('inp-separator').addEventListener('input', syncPatternInput);
   $('btn-test-provider').addEventListener('click', testConnection);
   $('inp-source-resume').addEventListener('change', handleSourceResumeUpload);
 
@@ -77,10 +123,26 @@ async function init() {
 }
 
 // ── Provider Section ──────────────────────────────────────────────────────
+
+// Migrate old flat format { provider, apiKey, ... } to per-provider configs format
+function migrateSettings(raw) {
+  if (!raw) return { activeProvider: '', configs: {}, simulateFailure: 'none' };
+  if (raw.configs !== undefined) return raw; // already new format
+  const provider = raw.provider || '';
+  const configs = {};
+  if (provider) {
+    configs[provider] = {
+      apiKey:    raw.apiKey    || '',
+      modelName: raw.modelName || '',
+      endpoint:  raw.endpoint  || '',
+    };
+  }
+  return { activeProvider: provider, configs, simulateFailure: raw.simulateFailure || 'none' };
+}
+
 function populateProviderSection(s) {
-  if (s.provider)  $('sel-provider').value  = s.provider;
-  if (s.apiKey)    $('inp-apikey').value     = s.apiKey;
-  if (s.endpoint)  $('inp-endpoint').value   = s.endpoint;
+  const provider = s.activeProvider || '';
+  if (provider) $('sel-provider').value = provider;
   if (s.simulateFailure) $('sel-simulate-failure').value = s.simulateFailure;
   updateProviderVisibility(false);
 }
@@ -90,16 +152,41 @@ function updateProviderVisibility(providerChanged = false) {
   const isMock = p === 'mock';
   $('group-apikey').classList.toggle('hidden', isMock || p === 'ollama' || !p);
   $('group-endpoint').classList.toggle('hidden', p !== 'ollama');
+
+  // Restore saved config for this provider when switching
+  const config = (settings.configs || {})[p] || {};
+  $('inp-apikey').value   = config.apiKey   || '';
+  $('inp-endpoint').value = config.endpoint || '';
+  // Reset toggle to masked state and update saved-key hint
+  $('inp-apikey').type = 'password';
+  $('btn-toggle-key').textContent = 'Show';
+  $('btn-toggle-key').setAttribute('aria-label', 'Show API key');
+  updateSavedKeyHint(config.apiKey || '');
+
+  const linkData = PROVIDER_API_LINKS[p];
+  const hintEl = $('hint-api-link');
+  hintEl.textContent = '';
+  if (linkData) {
+    const a = document.createElement('a');
+    a.href = linkData.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = linkData.label;
+    hintEl.appendChild(a);
+    hintEl.classList.remove('hidden');
+  } else {
+    hintEl.classList.add('hidden');
+  }
   $('provider-test-area').style.display = isMock ? 'none' : '';
-  updateModelDropdown(p, providerChanged);
+  updateModelDropdown(p);
 }
 
-function updateModelDropdown(provider, providerChanged) {
+function updateModelDropdown(provider) {
   if (!provider) return;
   const selModel = $('sel-model');
-  const inpCustom = $('inp-custom-model');
-  const currentVal = providerChanged ? DEFAULT_MODELS[provider] : (settings.modelName || DEFAULT_MODELS[provider]);
-  
+  const storedModel = (settings.configs || {})[provider]?.modelName;
+  const currentVal = storedModel || DEFAULT_MODELS[provider] || '';
+
   selModel.innerHTML = '';
   (PROVIDER_MODELS[provider] || []).forEach(m => {
     const opt = document.createElement('option');
@@ -107,24 +194,39 @@ function updateModelDropdown(provider, providerChanged) {
     if (m === currentVal) opt.selected = true;
     selModel.appendChild(opt);
   });
-  
+
   const customOpt = document.createElement('option');
   customOpt.value = 'custom'; customOpt.textContent = 'Custom...';
+  if (!PROVIDER_MODELS[provider]?.includes(currentVal) && currentVal) {
+    customOpt.selected = true;
+    $('inp-custom-model').value = currentVal;
+    $('inp-custom-model').classList.remove('hidden');
+  } else {
+    $('inp-custom-model').classList.add('hidden');
+  }
   selModel.appendChild(customOpt);
 }
 
 async function saveProvider() {
   const provider = $('sel-provider').value;
   const modelVal = $('sel-model').value;
-  settings = {
-    ...settings,
-    provider,
-    apiKey: $('inp-apikey').value.trim(),
-    modelName: modelVal === 'custom' ? $('inp-custom-model').value.trim() : modelVal,
+  const modelName = modelVal === 'custom' ? $('inp-custom-model').value.trim() : modelVal;
+
+  const configs = { ...(settings.configs || {}) };
+  configs[provider] = {
+    apiKey:    $('inp-apikey').value.trim(),
+    modelName,
     endpoint:  $('inp-endpoint').value.trim(),
-    simulateFailure: $('sel-simulate-failure').value,
   };
+
+  settings = { ...settings, activeProvider: provider, configs, simulateFailure: $('sel-simulate-failure').value };
   await chrome.storage.sync.set({ providerSettings: settings });
+
+  const btn = $('btn-save-provider');
+  const original = btn.textContent;
+  btn.textContent = '✓ Saved';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
   showToast('✅ AI settings saved');
 }
 
@@ -154,11 +256,244 @@ async function testConnection() {
   }
 }
 
+// ── Autofill Helpers ──────────────────────────────────────────────────────
+function getEffectiveSettings() {
+  const provider = $('sel-provider').value || settings.activeProvider;
+  if (!provider) return { provider: '', apiKey: '', modelName: '', endpoint: '' };
+  const storedConfig = (settings.configs || {})[provider] || {};
+  const modelVal = $('sel-model').value;
+  return {
+    provider,
+    apiKey:    $('inp-apikey').value.trim()   || storedConfig.apiKey    || '',
+    modelName: modelVal === 'custom'
+      ? ($('inp-custom-model').value.trim()   || storedConfig.modelName || '')
+      : (modelVal                             || storedConfig.modelName || ''),
+    endpoint:  $('inp-endpoint').value.trim() || storedConfig.endpoint  || '',
+    simulateFailure: $('sel-simulate-failure').value || settings.simulateFailure || 'none',
+  };
+}
+
+async function attemptAutofill(statusEl) {
+  const effectiveSettings = getEffectiveSettings();
+
+  if (!effectiveSettings.provider || effectiveSettings.provider === 'mock') {
+    renderNoProviderStatus(statusEl);
+    return;
+  }
+
+  const localData = await chrome.storage.local.get(['sourceResumeText']);
+  const plainText = localData.sourceResumeText;
+  if (!plainText) {
+    statusEl.textContent = 'No resume text found. Please re-upload your resume.';
+    return;
+  }
+
+  statusEl.textContent = '';
+  const spinner = document.createElement('div');
+  spinner.className = 'autofill-spinner';
+  const loadingMsg = document.createElement('span');
+  loadingMsg.textContent = 'AI is analyzing your resume…';
+  statusEl.appendChild(spinner);
+  statusEl.appendChild(loadingMsg);
+
+  try {
+    const extractedData = await extractProfileFromResume(plainText, effectiveSettings);
+    profile = {
+      ...profile,
+      personalInfo: { ...profile.personalInfo, ...(extractedData.personalInfo || extractedData.personal || {}) },
+      skills: extractedData.skills || profile.skills,
+      experience: extractedData.experience || profile.experience,
+      education: extractedData.education || profile.education,
+      certifications: extractedData.certifications || profile.certifications,
+    };
+    populateProfile(profile);
+    await saveProfile(profile);
+    renderSuccessStatus(statusEl);
+  } catch (e) {
+    renderErrorStatus(statusEl, e.message);
+  }
+}
+
+function renderNoProviderStatus(statusEl) {
+  statusEl.textContent = '';
+
+  const msg = document.createElement('span');
+  msg.textContent = 'Resume saved. Add an AI provider to enable auto-fill.';
+  statusEl.appendChild(msg);
+
+  const goBtn = document.createElement('button');
+  goBtn.className = 'btn-secondary btn-sm';
+  goBtn.type = 'button';
+  goBtn.textContent = 'Go to AI Provider';
+  goBtn.addEventListener('click', () => {
+    document.querySelector('.nav-btn[data-section="provider"]').click();
+  });
+  statusEl.appendChild(goBtn);
+
+  const retryBtn = document.createElement('button');
+  retryBtn.className = 'btn-secondary btn-sm';
+  retryBtn.type = 'button';
+  retryBtn.textContent = 'Retry Auto-fill';
+  retryBtn.addEventListener('click', () => attemptAutofill(statusEl));
+  statusEl.appendChild(retryBtn);
+}
+
+function renderSuccessStatus(statusEl) {
+  statusEl.textContent = '';
+
+  const msg = document.createElement('span');
+  msg.textContent = '✨ Profile saved from your resume. You can review and edit any field.';
+  statusEl.appendChild(msg);
+
+  const retryBtn = document.createElement('button');
+  retryBtn.className = 'btn-secondary btn-sm';
+  retryBtn.type = 'button';
+  retryBtn.textContent = 'Re-run Auto-fill';
+  retryBtn.addEventListener('click', () => attemptAutofill(statusEl));
+  statusEl.appendChild(retryBtn);
+}
+
+function renderErrorStatus(statusEl, message) {
+  statusEl.textContent = '';
+
+  const msg = document.createElement('span');
+  msg.textContent = `❌ Auto-fill failed: ${message}`;
+  statusEl.appendChild(msg);
+
+  const goBtn = document.createElement('button');
+  goBtn.className = 'btn-secondary btn-sm';
+  goBtn.type = 'button';
+  goBtn.textContent = 'Go to AI Provider';
+  goBtn.addEventListener('click', () => {
+    document.querySelector('.nav-btn[data-section="provider"]').click();
+  });
+  statusEl.appendChild(goBtn);
+
+  const retryBtn = document.createElement('button');
+  retryBtn.className = 'btn-secondary btn-sm';
+  retryBtn.type = 'button';
+  retryBtn.textContent = 'Retry Auto-fill';
+  retryBtn.addEventListener('click', () => attemptAutofill(statusEl));
+  statusEl.appendChild(retryBtn);
+}
+
+// ── Chip Builder ──────────────────────────────────────────────────────────
+function initChipBuilder(patternString) {
+  const found = [...patternString.matchAll(/\{[^}]+\}/g)].map(m => m[0]);
+  activeChips = found.filter(c => ALL_CHIPS.includes(c));
+  if (activeChips.length === 0) activeChips = ['{docType}', '{company}', '{jobTitle}'];
+
+  let sep = ' - ';
+  if (found.length >= 2) {
+    const idx1 = patternString.indexOf(found[0]) + found[0].length;
+    const idx2 = patternString.indexOf(found[1]);
+    if (idx1 < idx2) sep = patternString.slice(idx1, idx2);
+  }
+  $('inp-separator').value = sep;
+
+  renderChipBuilder();
+  syncPatternInput();
+}
+
+function syncPatternInput() {
+  $('inp-filename-pattern').value = activeChips.join($('inp-separator').value);
+  updateFilenamePreview();
+}
+
+function renderChipBuilder() {
+  const track = $('chip-track');
+  const palette = $('chip-palette');
+
+  track.innerHTML = '';
+  if (activeChips.length === 0) {
+    const empty = document.createElement('span');
+    empty.className = 'chip-track-empty';
+    empty.textContent = 'No parts — add a variable below';
+    track.appendChild(empty);
+  } else {
+    activeChips.forEach((chip, idx) => {
+      const el = document.createElement('div');
+      el.className = 'chip';
+      el.draggable = true;
+      el.dataset.index = idx;
+      el.setAttribute('role', 'listitem');
+
+      const label = document.createElement('span');
+      label.textContent = chip;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'chip-remove';
+      removeBtn.type = 'button';
+      removeBtn.textContent = '×';
+      removeBtn.setAttribute('aria-label', `Remove ${chip}`);
+      removeBtn.addEventListener('click', () => {
+        activeChips.splice(idx, 1);
+        renderChipBuilder();
+        syncPatternInput();
+      });
+
+      el.appendChild(label);
+      el.appendChild(removeBtn);
+
+      el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', String(idx));
+        e.dataTransfer.effectAllowed = 'move';
+        requestAnimationFrame(() => el.classList.add('dragging'));
+      });
+      el.addEventListener('dragend', () => el.classList.remove('dragging'));
+      el.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        track.querySelectorAll('.chip').forEach(c => c.classList.remove('drag-over'));
+        el.classList.add('drag-over');
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        const toIdx = parseInt(el.dataset.index, 10);
+        if (fromIdx !== toIdx) {
+          const [moved] = activeChips.splice(fromIdx, 1);
+          activeChips.splice(toIdx, 0, moved);
+          renderChipBuilder();
+          syncPatternInput();
+        }
+      });
+
+      track.appendChild(el);
+    });
+  }
+
+  const available = ALL_CHIPS.filter(c => !activeChips.includes(c));
+  palette.innerHTML = '';
+  if (available.length === 0) { palette.style.display = 'none'; return; }
+  palette.style.display = '';
+
+  const paletteLabel = document.createElement('span');
+  paletteLabel.className = 'chip-palette-label';
+  paletteLabel.textContent = 'Add variable:';
+  palette.appendChild(paletteLabel);
+
+  available.forEach(chip => {
+    const btn = document.createElement('button');
+    btn.className = 'chip-add';
+    btn.type = 'button';
+    btn.textContent = `+ ${chip}`;
+    btn.setAttribute('aria-label', `Add ${chip}`);
+    btn.addEventListener('click', () => {
+      activeChips.push(chip);
+      renderChipBuilder();
+      syncPatternInput();
+    });
+    palette.appendChild(btn);
+  });
+}
+
 // ── Document Section ──────────────────────────────────────────────────────
 function populateDocSection(d) {
   if (d.defaultType) $('sel-default-type').value = d.defaultType;
-  if (d.filenamePattern) $('inp-filename-pattern').value = d.filenamePattern;
-  updateFilenamePreview();
+  initChipBuilder(d.filenamePattern || '{docType} - {company} - {jobTitle}');
 }
 
 function updateFilenamePreview() {
@@ -178,17 +513,39 @@ async function saveDocuments() {
   docSettings.defaultType = $('sel-default-type').value;
   docSettings.filenamePattern = $('inp-filename-pattern').value.trim();
   await chrome.storage.sync.set({ docSettings });
+
+  const btn = $('btn-save-documents');
+  const original = btn.textContent;
+  btn.textContent = '✓ Saved';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
   showToast('✅ Document settings saved');
 }
 
 // ── Source Resume & Profile ───────────────────────────────────────────────
 async function populateSourceStatus() {
   const localData = await chrome.storage.local.get(['sourceResumeName']);
-  if (localData.sourceResumeName) {
-    $('source-upload-text').textContent = `${localData.sourceResumeName} uploaded ✓`;
-    $('source-resume-active-bar').textContent = `📄 Active Source: ${localData.sourceResumeName}`;
-    $('source-resume-active-bar').classList.remove('hidden');
-  }
+  if (!localData.sourceResumeName) return;
+
+  $('source-upload-text').textContent = `${localData.sourceResumeName} uploaded ✓`;
+  $('source-resume-active-bar').textContent = `📄 Active Source: ${localData.sourceResumeName}`;
+  $('source-resume-active-bar').classList.remove('hidden');
+
+  const statusEl = $('profile-autofill-status');
+  statusEl.textContent = '';
+
+  const msg = document.createElement('span');
+  msg.textContent = `Resume on file: ${localData.sourceResumeName}`;
+  statusEl.appendChild(msg);
+
+  const retryBtn = document.createElement('button');
+  retryBtn.className = 'btn-secondary btn-sm';
+  retryBtn.type = 'button';
+  retryBtn.textContent = 'Retry Auto-fill';
+  retryBtn.addEventListener('click', () => attemptAutofill(statusEl));
+  statusEl.appendChild(retryBtn);
+
+  statusEl.classList.remove('hidden');
 }
 
 // Dynamically loads pizzip.js as a global script (needed for DOCX parsing)
@@ -269,25 +626,7 @@ async function handleSourceResumeUpload(event) {
     $('source-resume-active-bar').classList.remove('hidden');
 
     showToast('✅ Resume uploaded. Starting AI auto-fill...');
-    
-    if (settings.provider && settings.provider !== 'mock') {
-      statusEl.textContent = '🤖 AI is analyzing your resume to auto-fill your profile...';
-      const extractedData = await extractProfileFromResume(plainText, settings);
-      
-      profile = {
-        ...profile,
-        personalInfo: { ...profile.personalInfo, ...(extractedData.personalInfo || extractedData.personal || {}) },
-        skills: extractedData.skills || profile.skills,
-        experience: extractedData.experience || profile.experience,
-        education: extractedData.education || profile.education,
-        certifications: extractedData.certifications || profile.certifications,
-      };
-      
-      populateProfile(profile);
-      statusEl.textContent = '✨ Profile fields auto-filled! Review and click "Save Profile" below.';
-    } else {
-      statusEl.textContent = '✅ Resume text saved. Configure an AI provider in Settings to enable auto-fill.';
-    }
+    await attemptAutofill(statusEl);
   } catch (e) {
     statusEl.textContent = `❌ Error: ${e.message}`;
     showToast('❌ Upload failed');
@@ -418,7 +757,34 @@ async function saveProfileData() {
     doNotClaimNotes: $('p-do-not-claim').value
   };
   await saveProfile(profile);
+
+  const btn = $('btn-save-profile');
+  const original = btn.textContent;
+  btn.textContent = '✓ Saved';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
   showToast('✅ Profile saved');
+}
+
+async function clearProfile() {
+  const confirmed = await showConfirmDialog(
+    'Clear all profile information?',
+    'This will remove your personal details, experience, education, and skills. It cannot be undone.',
+    'Clear All'
+  );
+  if (!confirmed) return;
+  profile = {
+    personalInfo: {},
+    summaries: [],
+    skills: [],
+    experience: [],
+    education: [],
+    certifications: [],
+    doNotClaimNotes: ''
+  };
+  populateProfile(profile);
+  await saveProfile(profile);
+  showToast('Profile cleared');
 }
 
 // Helpers
@@ -432,6 +798,214 @@ function showToast(msg) {
 
 function escHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── API Key Mask ──────────────────────────────────────────────────────────
+function maskKey(key) {
+  if (!key) return '';
+  if (key.length < 8) return '••••••••';
+  return `${key.slice(0, 4)}••••••••${key.slice(-4)}`;
+}
+
+function updateSavedKeyHint(key) {
+  const hint = $('hint-saved-key');
+  if (!hint) return;
+  if (key && key.length >= 4) {
+    hint.textContent = `Saved: ${maskKey(key)}`;
+    hint.classList.remove('hidden');
+  } else {
+    hint.classList.add('hidden');
+  }
+}
+
+// ── Confirm Dialog ────────────────────────────────────────────────────────
+function showConfirmDialog(title, body, confirmLabel = 'Confirm') {
+  return new Promise(resolve => {
+    $('confirm-title').textContent = title;
+    $('confirm-body').textContent = body;
+    $('confirm-btn-ok').textContent = confirmLabel;
+    $('confirm-overlay').classList.remove('hidden');
+    $('confirm-btn-cancel').focus();
+
+    const cleanup = result => {
+      $('confirm-overlay').classList.add('hidden');
+      $('confirm-overlay').removeEventListener('click', onBackdrop);
+      $('confirm-btn-ok').removeEventListener('click', onOk);
+      $('confirm-btn-cancel').removeEventListener('click', onCancel);
+      resolve(result);
+    };
+
+    const onOk      = () => cleanup(true);
+    const onCancel  = () => cleanup(false);
+    const onBackdrop = e => { if (e.target === $('confirm-overlay')) cleanup(false); };
+
+    $('confirm-btn-ok').addEventListener('click', onOk);
+    $('confirm-btn-cancel').addEventListener('click', onCancel);
+    $('confirm-overlay').addEventListener('click', onBackdrop);
+  });
+}
+
+// ── Ollama Help Modal ─────────────────────────────────────────────────────
+function showOllamaHelp() {
+  $('ollama-help-overlay').classList.remove('hidden');
+  $('btn-close-ollama-help').focus();
+}
+function hideOllamaHelp() {
+  $('ollama-help-overlay').classList.add('hidden');
+}
+
+// ── Settings Feature Tour ─────────────────────────────────────────────────
+const SETTINGS_TOUR_STEPS = [
+  {
+    targetId: 'settings-nav',
+    section: null,
+    title: 'Three Settings Sections',
+    body: 'Settings are split into AI Provider (which AI powers your drafts), Documents (how files are named), and My Profile (your professional details). Click any section to jump to it.'
+  },
+  {
+    targetId: 'sel-provider',
+    section: 'provider',
+    title: 'Choose Your AI Provider',
+    body: 'Select OpenAI, Google Gemini, OpenRouter, or Ollama (local AI). OpenRouter is great if you want access to many models from one key — Claude, GPT-4, Gemini, and more.'
+  },
+  {
+    targetId: 'group-model',
+    section: 'provider',
+    title: 'Select a Model',
+    body: 'Each provider offers different models. Choose from the list or select Custom to type any model name. For Ollama, the name must match exactly what you downloaded.'
+  },
+  {
+    targetId: 'provider-test-area',
+    section: 'provider',
+    title: 'Test Your Connection',
+    body: 'Always test before saving — this confirms your API key is valid and the AI is reachable. For Ollama, it also checks that the local endpoint is responding.'
+  },
+  {
+    targetId: 'btn-save-provider',
+    section: 'provider',
+    title: 'Save AI Settings',
+    body: 'Save your provider settings here. Your API key is stored locally in Chrome — it never leaves your device except to call the AI provider directly.'
+  },
+  {
+    targetId: 'chip-builder',
+    section: 'documents',
+    title: 'Filename Pattern',
+    body: 'Drag chips to set how your saved PDFs are named. Add or remove variables like job title, company, and date. The preview below updates live.'
+  },
+  {
+    targetId: 'source-upload-area',
+    section: 'profile',
+    title: 'Upload Your Resume',
+    body: 'Upload your current CV (.docx or .pdf) and the AI will auto-fill all the profile fields below — saving significant manual entry time.'
+  },
+  {
+    targetId: 'card-personal-details',
+    section: 'profile',
+    title: 'Your Professional Details',
+    body: 'Fill in as much as possible here. The AI draws on your skills, experience, and education to write tailored drafts for each job. More detail means better output.'
+  },
+  {
+    targetId: 'btn-save-profile',
+    section: 'profile',
+    title: 'Save Your Profile',
+    body: 'Click Save Profile after making any changes — it is not saved automatically. Your details persist across every future application until you update them.'
+  },
+];
+
+let settingsTourIndex = 0;
+
+function startSettingsTour() {
+  settingsTourIndex = 0;
+  $('settings-tour-overlay').classList.remove('hidden');
+  document.addEventListener('keydown', settingsTourKeyHandler);
+  showSettingsTourStep(0);
+}
+
+function showSettingsTourStep(index) {
+  settingsTourIndex = index;
+  const step = SETTINGS_TOUR_STEPS[index];
+  const overlay = $('settings-tour-overlay');
+  const spotlight = $('settings-tour-spotlight');
+  const tooltip = $('settings-tour-tooltip');
+
+  $('settings-tour-step-count').textContent = `${index + 1} of ${SETTINGS_TOUR_STEPS.length}`;
+  $('settings-tour-title').textContent = step.title;
+  $('settings-tour-body').textContent = step.body;
+  $('settings-tour-btn-prev').style.visibility = index === 0 ? 'hidden' : '';
+  $('settings-tour-btn-next').textContent = index === SETTINGS_TOUR_STEPS.length - 1 ? 'Done' : 'Next →';
+
+  // Navigate to the correct section first
+  if (step.section) {
+    const nav = document.querySelector(`.nav-btn[data-section="${step.section}"]`);
+    if (nav && !nav.classList.contains('active')) nav.click();
+  }
+
+  const settle = step.section ? 80 : 0;
+  setTimeout(() => {
+    const targetEl = $(step.targetId);
+    if (!targetEl) return;
+    // Instant scroll — smooth scroll causes a race with the position timer
+    targetEl.scrollIntoView({ block: 'nearest' });
+    // Use center if the element lands at the very bottom of the viewport
+    const r = targetEl.getBoundingClientRect();
+    if (r.bottom > window.innerHeight - 60) targetEl.scrollIntoView({ block: 'center' });
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      positionSettingsTourElements(targetEl, spotlight, tooltip)
+    ));
+  }, settle);
+}
+
+function positionSettingsTourElements(targetEl, spotlight, tooltip) {
+  const pad = 6;
+  const gap = 12;
+  const rect = targetEl.getBoundingClientRect();
+  const computed = getComputedStyle(targetEl);
+
+  spotlight.style.top    = `${rect.top - pad}px`;
+  spotlight.style.left   = `${rect.left - pad}px`;
+  spotlight.style.width  = `${rect.width + pad * 2}px`;
+  spotlight.style.height = `${rect.height + pad * 2}px`;
+  spotlight.style.borderRadius = computed.borderRadius || '8px';
+  spotlight.style.boxShadow = `0 0 0 9999px oklch(0% 0 0 / 0.62), 0 0 0 2px var(--color-accent)`;
+
+  const viewH = window.innerHeight;
+  const viewW = window.innerWidth;
+
+  // Measure actual tooltip size rather than guessing
+  tooltip.style.visibility = 'hidden';
+  tooltip.style.top = '0px';
+  tooltip.style.left = '0px';
+  const tipH = tooltip.getBoundingClientRect().height;
+  const tipW = tooltip.getBoundingClientRect().width;
+  tooltip.style.visibility = '';
+
+  let top;
+  if (rect.bottom + pad + gap + tipH <= viewH - 8) {
+    top = rect.bottom + pad + gap;                      // fits below
+  } else if (rect.top - pad - gap - tipH >= 8) {
+    top = rect.top - pad - gap - tipH;                  // fits above
+  } else {
+    top = Math.max(8, (viewH - tipH) / 2);             // neither — centre vertically
+  }
+
+  // Align with element left, clamped so right edge stays in viewport
+  let left = Math.max(8, rect.left);
+  if (left + tipW > viewW - 8) left = viewW - tipW - 8;
+  left = Math.max(8, left);
+
+  tooltip.style.top  = `${top}px`;
+  tooltip.style.left = `${left}px`;
+}
+
+function endSettingsTour() {
+  $('settings-tour-overlay').classList.add('hidden');
+  document.removeEventListener('keydown', settingsTourKeyHandler);
+}
+
+function settingsTourKeyHandler(e) {
+  if (e.key === 'Escape') endSettingsTour();
+  if (e.key === 'ArrowRight' && settingsTourIndex < SETTINGS_TOUR_STEPS.length - 1) showSettingsTourStep(settingsTourIndex + 1);
+  if (e.key === 'ArrowLeft'  && settingsTourIndex > 0) showSettingsTourStep(settingsTourIndex - 1);
 }
 
 init().catch(console.error);

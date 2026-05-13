@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Job Page Draft Assistant",
+  "name": "Job Application Assistant",
   "version": "1.0.0",
   "description": "A one-job-at-a-time AI drafting assistant for resumes and cover letters.",
   "permissions": [
@@ -32,7 +32,7 @@
     "open_in_tab": true
   },
   "action": {
-    "default_title": "Job Page Draft Assistant",
+    "default_title": "Job Application Assistant",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

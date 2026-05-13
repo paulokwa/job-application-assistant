@@ -43,7 +43,7 @@ Follow the provided schema exactly.`;
 
 // ── Resume Generation ─────────────────────────────────────────────────────
 
-export async function generateResume(jobData, profile, settings, sourceResumeText = '') {
+export async function generateResume(jobData, profile, settings, sourceResumeText = '', signal) {
   if (isMock(settings)) return generateMockResume(jobData, profile, sourceResumeText);
   const profileText = profileToPromptText(profile);
   const truthBlock = buildSourceTruthBlock(profileText, sourceResumeText);
@@ -102,12 +102,12 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
     JSON.stringify(resumeSchema, null, 2),
   ].join('\n');
 
-  return callAI(systemPrompt, userPrompt, settings);
+  return callAI(systemPrompt, userPrompt, settings, signal);
 }
 
 // ── Cover Letter Generation ───────────────────────────────────────────────
 
-export async function generateCoverLetter(jobData, profile, settings, sourceResumeText = '') {
+export async function generateCoverLetter(jobData, profile, settings, sourceResumeText = '', signal) {
   if (isMock(settings)) return generateMockCoverLetter(jobData, profile, sourceResumeText);
   const profileText = profileToPromptText(profile);
   const truthBlock = buildSourceTruthBlock(profileText, sourceResumeText);
@@ -144,7 +144,7 @@ export async function generateCoverLetter(jobData, profile, settings, sourceResu
     JSON.stringify(coverLetterSchema, null, 2),
   ].join('\n');
 
-  return callAI(systemPrompt, userPrompt, settings);
+  return callAI(systemPrompt, userPrompt, settings, signal);
 }
 
 // ── Draft Revision ─────────────────────────────────────────────────────────

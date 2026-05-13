@@ -3,35 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Settings — Job Page Draft Assistant</title>
+  <title>Settings — Job Application Assistant</title>
   <link rel="stylesheet" href="settings.css" />
 </head>
 <body>
 
   <header class="settings-header">
     <div class="header-inner">
-      <div class="logo-mark">✦</div>
+      <img src="../icons/icon48.png" class="logo-mark" alt="" aria-hidden="true" />
       <div>
         <h1 class="page-title">Settings</h1>
-        <p class="page-subtitle">Job Page Draft Assistant</p>
+        <p class="page-subtitle">Job Application Assistant</p>
       </div>
     </div>
-    <div id="save-banner" class="save-banner hidden">✅ Settings saved</div>
+    <div id="save-banner" class="save-banner hidden" role="status">Settings saved</div>
   </header>
 
   <main class="settings-main">
+
     <!-- ── Navigation ── -->
-    <nav class="settings-nav">
-      <button class="nav-btn active" data-section="provider">⚙ AI Provider</button>
-      <button class="nav-btn" data-section="documents">📄 Documents</button>
-      <button class="nav-btn" data-section="profile">👤 My Profile</button>
+    <nav class="settings-nav" id="settings-nav" aria-label="Settings sections">
+      <button class="nav-btn active" data-section="provider">AI Provider</button>
+      <button class="nav-btn" data-section="documents">Documents</button>
+      <button class="nav-btn" data-section="profile">My Profile</button>
+      <button id="btn-settings-tour" class="settings-tour-btn" title="Take a tour of Settings" aria-label="Start settings tour">?</button>
     </nav>
 
     <!-- ══════════════════════════════════════════
          SECTION: AI PROVIDER
     ══════════════════════════════════════════ -->
-    <section id="section-provider" class="settings-section active">
-      <h2 class="section-title">AI Provider</h2>
+    <section id="section-provider" class="settings-section active" aria-labelledby="provider-heading">
+      <h2 class="section-title" id="provider-heading">AI Provider</h2>
       <p class="section-desc">Choose the AI service that will generate your drafts.</p>
 
       <div class="card">
@@ -39,18 +41,24 @@
           <label for="sel-provider">Provider</label>
           <select id="sel-provider">
             <option value="">— Select a provider —</option>
-            <option value="mock">🧪 Mock Mode (dev / no API key needed)</option>
+            <option value="mock" style="display:none">Mock Mode (dev / no API key needed)</option>
             <option value="openai">OpenAI (ChatGPT)</option>
             <option value="gemini">Google Gemini</option>
+            <option value="openrouter">OpenRouter (multi-model)</option>
             <option value="ollama">Ollama (Local AI)</option>
           </select>
         </div>
 
         <div id="group-apikey" class="field-group hidden">
           <label for="inp-apikey">API Key</label>
-          <input type="password" id="inp-apikey" placeholder="sk-…  or  AIza…" autocomplete="off" />
-          <p class="field-hint">Your key is stored locally in Chrome and never shared.</p>
-          <p id="apikey-warning" class="field-hint hidden" style="color: var(--error); margin-top: 4px;">⚠️ An API Key is required to save or test this provider.</p>
+          <div class="key-input-wrap">
+            <input type="password" id="inp-apikey" placeholder="sk-…  or  AIza…" autocomplete="off" />
+            <button type="button" id="btn-toggle-key" class="key-toggle-btn" aria-label="Show API key">Show</button>
+          </div>
+          <p id="hint-saved-key" class="hint-saved-key hidden"></p>
+          <p class="field-hint">Your key is stored locally in Chrome and never shared with anyone except the AI provider you selected.</p>
+          <p id="hint-api-link" class="field-hint hidden"></p>
+          <p id="apikey-warning" class="field-hint field-hint--danger hidden">An API key is required to save or test this provider.</p>
         </div>
 
         <div class="field-group" id="group-model">
@@ -58,32 +66,33 @@
           <select id="sel-model">
             <!-- Populated dynamically -->
           </select>
-          <input type="text" id="inp-custom-model" class="hidden" placeholder="Type custom model name..." style="margin-top: 8px;" />
+          <input type="text" id="inp-custom-model" class="hidden" placeholder="e.g. anthropic/claude-3.5-haiku or gpt-4o" style="margin-top: 8px;" />
           <p class="field-hint">Select the AI model, or choose Custom to type your own.</p>
         </div>
 
         <div id="group-endpoint" class="field-group hidden">
           <label for="inp-endpoint">Local Endpoint</label>
           <input type="text" id="inp-endpoint" placeholder="http://localhost:11434" />
-          <p class="field-hint">Only needed for Ollama. Make sure Ollama is running.</p>
+          <p class="field-hint">Only needed for Ollama. Make sure Ollama is running before testing. <button id="btn-ollama-help" class="link-btn" type="button">Setup guide →</button></p>
+        </div>
+
+        <!-- Debug: simulate failure — hidden in production, readable by JS -->
+        <div style="display: none;" aria-hidden="true">
+          <select id="sel-simulate-failure">
+            <option value="none">Normal (No failure)</option>
+            <option value="billing">Billing Disabled</option>
+            <option value="unauthorized">Invalid API Key</option>
+            <option value="quota">Quota Exceeded</option>
+            <option value="rate_limit">Rate Limited</option>
+            <option value="network">Network Error</option>
+            <option value="timeout">Request Timeout</option>
+            <option value="unknown">Unknown Error</option>
+          </select>
         </div>
 
         <div id="provider-test-area" class="test-area">
-          <div class="field-group" style="margin-bottom: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
-            <label for="sel-simulate-failure" style="color: var(--warning);">🧪 Simulate API Failure (Testing)</label>
-            <select id="sel-simulate-failure" style="border-color: var(--warning); color: var(--warning);">
-              <option value="none">Normal (No failure)</option>
-              <option value="billing">Billing Disabled</option>
-              <option value="unauthorized">Invalid API Key</option>
-              <option value="quota">Quota Exceeded</option>
-              <option value="rate_limit">Rate Limited</option>
-              <option value="network">Network Error</option>
-              <option value="timeout">Request Timeout</option>
-              <option value="unknown">Unknown Error</option>
-            </select>
-          </div>
-          <button id="btn-test-provider" class="btn-secondary" type="button">🔌 Test Connection</button>
-          <span id="test-result" class="test-result"></span>
+          <button id="btn-test-provider" class="btn-secondary" type="button">Test Connection</button>
+          <span id="test-result" class="test-result" role="status" aria-live="polite"></span>
         </div>
       </div>
 
@@ -93,8 +102,8 @@
     <!-- ══════════════════════════════════════════
          SECTION: DOCUMENT SETTINGS
     ══════════════════════════════════════════ -->
-    <section id="section-documents" class="settings-section">
-      <h2 class="section-title">Document Settings</h2>
+    <section id="section-documents" class="settings-section" aria-labelledby="documents-heading">
+      <h2 class="section-title" id="documents-heading">Document Settings</h2>
       <p class="section-desc">Control how drafts are generated and saved.</p>
 
       <div class="card">
@@ -108,12 +117,17 @@
         </div>
 
         <div class="field-group">
-          <label for="inp-filename-pattern">Filename Pattern</label>
-          <input type="text" id="inp-filename-pattern"
-            placeholder="{docType} - {company} - {jobTitle}" />
-          <p class="field-hint">
-            Variables: <code>{jobTitle}</code> <code>{company}</code> <code>{date}</code> <code>{docType}</code>
-          </p>
+          <label>Filename Parts</label>
+          <div class="chip-builder" id="chip-builder">
+            <div class="chip-track" id="chip-track" role="list" aria-label="Active filename parts — drag to reorder"></div>
+            <div class="chip-separator-row">
+              <span class="chip-sep-label">Separator</span>
+              <input type="text" id="inp-separator" class="chip-sep-input" value=" - " aria-label="Separator between filename parts" />
+            </div>
+            <div class="chip-palette" id="chip-palette" role="group" aria-label="Available variables to add"></div>
+          </div>
+          <input type="hidden" id="inp-filename-pattern" />
+          <p class="field-hint">Drag to reorder · Click a variable below to add it · × to remove</p>
         </div>
 
         <div class="example-filenames">
@@ -126,57 +140,56 @@
       <button class="btn-save-section" id="btn-save-documents">Save Document Settings</button>
     </section>
 
-
     <!-- ══════════════════════════════════════════
          SECTION: PROFILE
     ══════════════════════════════════════════ -->
-    <section id="section-profile" class="settings-section">
-      <h2 class="section-title">My Profile</h2>
-      <p class="section-desc">The AI uses this data to generate tailored drafts. Fill in as much as possible.</p>
+    <section id="section-profile" class="settings-section" aria-labelledby="profile-heading">
+      <h2 class="section-title" id="profile-heading">My Profile</h2>
+      <p class="section-desc">The AI uses this to generate tailored drafts. Fill in as much as possible for best results.</p>
 
       <!-- Source Resume / Auto-fill -->
-      <div class="card" style="border-top: 4px solid var(--accent); margin-bottom: 24px;">
-        <h3 class="card-sub-title">🎓 Source Resume & Auto-fill</h3>
-        <p class="field-hint">Upload your actual resume (.docx or .pdf). The AI reads this to know your professional background and will auto-populate the fields below.</p>
-        
-        <div class="upload-area" style="margin-top: 12px;">
-          <input type="file" id="inp-source-resume" accept=".docx,.pdf" class="file-input" />
+      <div class="card">
+        <h3 class="card-sub-title">Source Resume and Auto-fill</h3>
+        <p class="field-hint">Upload your current resume (.docx or .pdf). The AI reads this to understand your professional background and can auto-populate the fields below.</p>
+
+        <div class="upload-area" id="source-upload-area" style="margin-top: 12px;">
+          <input type="file" id="inp-source-resume" accept=".docx,.pdf" class="file-input" aria-label="Upload source resume" />
           <label for="inp-source-resume" class="upload-label">
-            <span class="upload-icon">📄</span>
-            <span id="source-upload-text">Click to upload your Source Resume (.docx or .pdf)</span>
+            <span class="upload-icon" aria-hidden="true">📄</span>
+            <span id="source-upload-text">Click to upload your source resume (.docx or .pdf)</span>
           </label>
         </div>
         <div id="source-resume-active-bar" class="active-template-bar hidden" style="margin-top: 8px;"></div>
-        <div id="profile-autofill-status" class="hidden" style="margin-top: 12px; padding: 10px; background: var(--bg); border-radius: 6px; font-size: 13px; color: var(--muted); border: 1px dashed var(--border);"></div>
+        <div id="profile-autofill-status" class="autofill-status hidden"></div>
       </div>
 
       <!-- Personal Details -->
-      <div class="card">
+      <div class="card" id="card-personal-details">
         <h3 class="card-sub-title">Personal Details</h3>
         <div class="form-grid-2">
           <div class="field-group">
-            <label for="p-name">Full Name *</label>
-            <input type="text" id="p-name" placeholder="Jane Doe" />
+            <label for="p-name">Full Name <span aria-label="required">*</span></label>
+            <input type="text" id="p-name" placeholder="Jane Doe" autocomplete="name" />
           </div>
           <div class="field-group">
             <label for="p-email">Email</label>
-            <input type="email" id="p-email" placeholder="jane@example.com" />
+            <input type="email" id="p-email" placeholder="jane@example.com" autocomplete="email" />
           </div>
           <div class="field-group">
             <label for="p-phone">Phone</label>
-            <input type="tel" id="p-phone" placeholder="+1 902 555 0123" />
+            <input type="tel" id="p-phone" placeholder="+1 902 555 0123" autocomplete="tel" />
           </div>
           <div class="field-group">
             <label for="p-address">City / Province</label>
-            <input type="text" id="p-address" placeholder="Halifax, NS" />
+            <input type="text" id="p-address" placeholder="Halifax, NS" autocomplete="address-level2" />
           </div>
           <div class="field-group">
             <label for="p-linkedin">LinkedIn URL</label>
-            <input type="url" id="p-linkedin" placeholder="linkedin.com/in/janedoe" />
+            <input type="url" id="p-linkedin" placeholder="linkedin.com/in/janedoe" autocomplete="url" />
           </div>
           <div class="field-group">
             <label for="p-portfolio">Portfolio URL</label>
-            <input type="url" id="p-portfolio" placeholder="janedoe.com" />
+            <input type="url" id="p-portfolio" placeholder="janedoe.com" autocomplete="url" />
           </div>
         </div>
       </div>
@@ -184,16 +197,16 @@
       <!-- Summaries -->
       <div class="card">
         <h3 class="card-sub-title">Professional Summaries</h3>
-        <p class="field-hint">Store different summary styles. The AI will pick the most relevant one.</p>
+        <p class="field-hint">Store different summary styles. The AI will use the most relevant one for each application.</p>
         <div id="summaries-list"></div>
         <button class="btn-add" id="btn-add-summary" type="button">+ Add Style</button>
       </div>
 
       <!-- Skills -->
       <div class="card">
-        <h3 class="card-sub-title">Skills Bank</h3>
-        <p class="field-hint">One skill per line. Include soft and technical skills.</p>
-        <textarea id="p-skills" rows="6" placeholder="Client support&#10;Case documentation&#10;Stakeholder communication&#10;Jira&#10;Zendesk&#10;SEO"></textarea>
+        <h3 class="card-sub-title">Skills</h3>
+        <p class="field-hint">One skill per line. Include both soft and technical skills.</p>
+        <textarea id="p-skills" rows="6" placeholder="Client support&#10;Case documentation&#10;Stakeholder communication&#10;Jira&#10;Zendesk&#10;SEO" aria-label="Skills, one per line"></textarea>
       </div>
 
       <!-- Work Experience -->
@@ -219,22 +232,122 @@
 
       <!-- Do Not Claim -->
       <div class="card">
-        <h3 class="card-sub-title">⚠️ Do Not Claim Notes</h3>
+        <h3 class="card-sub-title">Do Not Claim</h3>
         <p class="field-hint">
-          Tell the AI what it must <strong>not</strong> claim or imply on your behalf.
-          These are hard rules the AI will always follow.
+          Hard rules the AI will always follow. Tell it what it must <strong>not</strong> claim or imply on your behalf.
         </p>
         <textarea id="p-do-not-claim" rows="4"
-          placeholder="Do not present me as a registered social worker unless explicitly specified.&#10;Do not claim software engineering beyond my actual experience.&#10;Do not say I am licensed unless the job requires it and I have supplied evidence.">
-        </textarea>
+          placeholder="Do not present me as a registered social worker unless explicitly specified.&#10;Do not claim software engineering beyond my actual experience.&#10;Do not say I am licensed unless the job requires it and I have supplied evidence."
+          aria-label="Do not claim notes"
+        ></textarea>
       </div>
 
-      <button class="btn-save-section" id="btn-save-profile">Save Profile</button>
+      <div class="profile-actions">
+        <button class="btn-save-section" id="btn-save-profile">Save Profile</button>
+        <button class="btn-danger-ghost" id="btn-clear-profile" type="button">Clear All</button>
+      </div>
     </section>
+
   </main>
 
-  <!-- Toast -->
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <!-- ── Confirm Dialog ── -->
+  <div id="confirm-overlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="confirm-modal">
+      <p class="confirm-modal-title" id="confirm-title"></p>
+      <p class="confirm-modal-body" id="confirm-body"></p>
+      <div class="confirm-modal-actions">
+        <button id="confirm-btn-cancel" class="btn-secondary" type="button">Cancel</button>
+        <button id="confirm-btn-ok" class="btn-danger-solid" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Ollama Setup Guide Modal ── -->
+  <div id="ollama-help-overlay" class="help-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ollama-help-title">
+    <div class="help-modal">
+      <div class="help-modal-header">
+        <h2 id="ollama-help-title" class="help-modal-title">Ollama Setup Guide</h2>
+        <button id="btn-close-ollama-help" class="help-modal-close" type="button" aria-label="Close guide">✕</button>
+      </div>
+      <div class="help-modal-body">
+
+        <p class="help-intro">Ollama runs AI models directly on your computer — no API key or internet connection needed. Two things are required before it works with this extension.</p>
+
+        <div class="help-section">
+          <h3 class="help-section-title">Step 1 — Allow extension access (CORS)</h3>
+          <p>By default Ollama only accepts browser requests from <code>localhost</code>, not Chrome extensions. You need to set one environment variable and restart Ollama.</p>
+
+          <div class="help-platform">
+            <div class="help-platform-label">Windows</div>
+            <ol class="help-steps">
+              <li>Press <code>Win + R</code>, type <code>SystemPropertiesAdvanced</code>, press Enter</li>
+              <li>Click <strong>Environment Variables</strong></li>
+              <li>Under "User variables" click <strong>New</strong></li>
+              <li>Name: <code>OLLAMA_ORIGINS</code> &nbsp; Value: <code>chrome-extension://*</code></li>
+              <li>Click OK on all dialogs</li>
+              <li>Right-click the Ollama icon in the system tray → <strong>Quit</strong></li>
+              <li>Reopen Ollama from the Start menu</li>
+            </ol>
+          </div>
+
+          <div class="help-platform">
+            <div class="help-platform-label">macOS</div>
+            <ol class="help-steps">
+              <li>Open <strong>Terminal</strong> and run:<br><code>launchctl setenv OLLAMA_ORIGINS "chrome-extension://*"</code></li>
+              <li>Click the Ollama icon in the menu bar → <strong>Quit</strong></li>
+              <li>Reopen Ollama from Applications</li>
+            </ol>
+            <p class="help-alt">Alternative — if you start Ollama from Terminal, prefix the command:<br><code>OLLAMA_ORIGINS="chrome-extension://*" ollama serve</code></p>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3 class="help-section-title">Step 2 — Download a model</h3>
+          <p>Ollama needs at least one AI model downloaded. Open a terminal (or Command Prompt on Windows) and run one of these:</p>
+          <div class="help-code-block">
+            <code>ollama pull llama3</code><span class="help-code-note">7B — good general use, needs ~4 GB RAM</span><br>
+            <code>ollama pull qwen2.5:3b</code><span class="help-code-note">3B — faster, works on lower-spec machines</span><br>
+            <code>ollama pull mistral</code><span class="help-code-note">7B — strong quality, good for writing tasks</span>
+          </div>
+          <p>After downloading, go back to <strong>AI Provider</strong> settings, choose the model from the dropdown (or select Custom and type the model name exactly as shown above), and save.</p>
+        </div>
+
+        <div class="help-section">
+          <h3 class="help-section-title">Step 3 — Verify it is running</h3>
+          <p>Open your browser and go to <code>http://localhost:11434</code>. If you see <strong>"Ollama is running"</strong> the address is correct and Ollama is ready.</p>
+        </div>
+
+        <div class="help-section help-section--trouble">
+          <h3 class="help-section-title">Troubleshooting</h3>
+          <ul class="help-trouble-list">
+            <li><strong>"Ollama blocked the request (CORS)"</strong> — the environment variable was not set, or Ollama was not fully restarted after setting it. Repeat Step 1.</li>
+            <li><strong>"Model not found"</strong> — the model has not been downloaded yet, or the name does not match exactly. Run <code>ollama list</code> in a terminal to see installed models.</li>
+            <li><strong>"Could not reach Ollama"</strong> — the app is not running. Open Ollama and check for its icon in the system tray (Windows) or menu bar (Mac).</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Settings Feature Tour ── -->
+  <div id="settings-tour-overlay" class="tour-overlay hidden" role="dialog" aria-modal="true" aria-label="Settings tour">
+    <div id="settings-tour-spotlight" class="tour-spotlight"></div>
+    <div id="settings-tour-tooltip" class="tour-tooltip">
+      <div id="settings-tour-step-count" class="tour-step-count"></div>
+      <div id="settings-tour-title" class="tour-title"></div>
+      <p id="settings-tour-body" class="tour-body"></p>
+      <div class="tour-nav">
+        <button id="settings-tour-btn-skip" class="tour-btn-skip" type="button">Skip tour</button>
+        <div class="tour-nav-right">
+          <button id="settings-tour-btn-prev" class="tour-btn-secondary" type="button">← Back</button>
+          <button id="settings-tour-btn-next" class="tour-btn-primary" type="button">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="settings.js"></script>
 

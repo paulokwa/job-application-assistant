@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Job Page Draft Assistant</title>
+  <title>Job Application Assistant</title>
   <link rel="stylesheet" href="dashboard.css" />
 </head>
 <body>
@@ -13,35 +13,36 @@
   ═══════════════════════════════════════════════════ -->
   <header id="app-header">
     <div class="header-left">
-      <div class="logo-mark">✦</div>
+      <img src="../icons/icon48.png" class="logo-mark" alt="" aria-hidden="true" />
       <div class="header-titles">
-        <span class="app-name">Draft Assistant</span>
-        <span id="mode-badge" class="mode-badge mode-both">Resume + Cover Letter</span>
+        <span class="app-name">Job Application Assistant</span>
       </div>
     </div>
     <div class="header-right">
-      <button id="btn-settings" class="icon-btn" title="Open Settings">⚙</button>
+      <button id="btn-new-draft" class="icon-btn header-new-btn" title="Clear draft and start fresh" aria-label="New draft">New</button>
+      <button id="btn-tour" class="icon-btn header-tour-btn" title="Feature tour" aria-label="Start feature tour">?</button>
+      <button id="btn-settings" class="icon-btn" title="Open Settings" aria-label="Open Settings">⚙</button>
     </div>
   </header>
 
   <!-- ═══════════════════════════════════════════════════
        SETTINGS OVERLAY (Slides from right)
   ═══════════════════════════════════════════════════ -->
-  <div id="settings-view" class="settings-overlay">
+  <div id="settings-view" class="settings-overlay" role="dialog" aria-label="Settings">
     <div class="overlay-header">
-      <button id="btn-close-settings" class="back-btn" title="Back to Dashboard">
-        <span class="arrow">←</span> Dashboard
+      <button id="btn-close-settings" class="back-btn" aria-label="Back to dashboard">
+        <span aria-hidden="true">←</span> Dashboard
       </button>
       <span class="overlay-title">Settings</span>
     </div>
     <div class="overlay-content">
-      <iframe id="settings-frame" src="../settings/settings.html?embed=true" frameborder="0"></iframe>
+      <iframe id="settings-frame" src="../settings/settings.html?embed=true" frameborder="0" title="Settings"></iframe>
     </div>
   </div>
 
   <!-- Mock Mode Banner -->
-  <div id="mock-mode-banner" class="mock-mode-banner hidden">
-    🧪 <strong>Mock Mode Active</strong> — AI responses are simulated for development. No real API is being called.
+  <div id="mock-mode-banner" class="mock-mode-banner hidden" role="status">
+    <strong>Mock Mode Active</strong> — AI responses are simulated. No real API is being called.
   </div>
 
   <!-- ═══════════════════════════════════════════════════
@@ -55,74 +56,77 @@
       <!-- Job Info Card -->
       <section class="card" id="card-job-info">
         <div class="card-header">
-          <span class="card-title"><span class="step-badge">1</span> 📋 Job Info</span>
-          <span class="card-hint" id="source-indicator"></span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">1</span> Job Info</span>
+          <div class="card-header-right">
+            <span class="card-hint" id="source-indicator"></span>
+            <button id="btn-scan-page" class="btn-scan" type="button" title="Scan the current browser tab for job details" aria-label="Scan current page for job details">Scan page</button>
+          </div>
         </div>
         <div class="form-grid">
           <label for="field-job-title">Job Title</label>
           <input type="text" id="field-job-title" placeholder="e.g. Case Worker" />
 
-          <label for="field-company">Company / Employer</label>
+          <label for="field-company">Employer</label>
           <input type="text" id="field-company" placeholder="e.g. Nova Scotia Health" />
 
           <label for="field-location">Location</label>
           <input type="text" id="field-location" placeholder="e.g. Halifax, NS" />
 
-          <label for="field-url">Source URL</label>
-          <input type="text" id="field-url" placeholder="Job posting URL" readonly />
+          <label for="field-url">Posting URL</label>
+          <input type="text" id="field-url" placeholder="Job posting URL" readonly aria-label="Job posting URL (auto-filled)" />
         </div>
       </section>
 
       <!-- Job Description Card -->
       <section class="card" id="card-job-desc">
         <div class="card-header">
-          <span class="card-title"><span class="step-badge">2</span> 📝 Job Description</span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">2</span> Job Description</span>
           <span class="card-hint">Edit before generating</span>
         </div>
-        <div id="selection-notice" class="selection-notice hidden">
-          ✅ Using your highlighted text as the job description.
+        <div id="selection-notice" class="selection-notice hidden" role="status">
+          Using your highlighted text as the job description.
         </div>
-        <textarea id="field-job-desc" rows="8" placeholder="Paste or edit the job description here…"></textarea>
+        <textarea id="field-job-desc" rows="8" placeholder="Paste or edit the job description here…" aria-label="Job description"></textarea>
       </section>
 
       <!-- Template Selection Card -->
       <section class="card" id="card-template">
         <div class="card-header">
-          <span class="card-title"><span class="step-badge">3</span> 🎨 Style & Template</span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">3</span> Style</span>
         </div>
-        <div class="template-grid">
-          <div class="template-option active" data-template="classic">
-            <div class="template-thumb classic"></div>
+        <div class="template-grid" role="group" aria-label="Choose a resume template">
+          <button class="template-option active" data-template="classic" type="button" aria-label="Classic template">
+            <div class="template-thumb classic" aria-hidden="true"></div>
             <span>Classic</span>
-          </div>
-          <div class="template-option" data-template="modern">
-            <div class="template-thumb modern"></div>
+          </button>
+          <button class="template-option" data-template="modern" type="button" aria-label="Modern template">
+            <div class="template-thumb modern" aria-hidden="true"></div>
             <span>Modern</span>
-          </div>
-          <div class="template-option" data-template="sidebar">
-            <div class="template-thumb sidebar"></div>
+          </button>
+          <button class="template-option" data-template="sidebar" type="button" aria-label="Sidebar template">
+            <div class="template-thumb sidebar" aria-hidden="true"></div>
             <span>Sidebar</span>
-          </div>
-          <div class="template-option" data-template="compact">
-            <div class="template-thumb compact"></div>
+          </button>
+          <button class="template-option" data-template="compact" type="button" aria-label="Compact template">
+            <div class="template-thumb compact" aria-hidden="true"></div>
             <span>Compact</span>
-          </div>
+          </button>
         </div>
-        
+
         <div class="customization-controls">
           <div class="control-group">
-            <label>Accent</label>
-            <div class="color-presets">
-              <button class="color-dot active" style="background: #2563eb" data-color="#2563eb"></button>
-              <button class="color-dot" style="background: #059669" data-color="#059669"></button>
-              <button class="color-dot" style="background: #dc2626" data-color="#dc2626"></button>
-              <button class="color-dot" style="background: #7c3aed" data-color="#7c3aed"></button>
-              <button class="color-dot" style="background: #0f172a" data-color="#0f172a"></button>
+            <label for="color-preset-group">Accent</label>
+            <div class="color-presets" id="color-preset-group" role="group" aria-label="Choose document accent colour">
+              <button class="color-dot active" style="background: #2563eb" data-color="#2563eb" type="button" aria-label="Blue accent"></button>
+              <button class="color-dot" style="background: #059669" data-color="#059669" type="button" aria-label="Green accent"></button>
+              <button class="color-dot" style="background: #dc2626" data-color="#dc2626" type="button" aria-label="Red accent"></button>
+              <button class="color-dot" style="background: #7c3aed" data-color="#7c3aed" type="button" aria-label="Purple accent"></button>
+              <button class="color-dot" style="background: #0f172a" data-color="#0f172a" type="button" aria-label="Dark accent"></button>
             </div>
           </div>
           <div class="control-group">
-            <label>Spacing</label>
-            <select id="select-spacing">
+            <label for="select-spacing">Spacing</label>
+            <select id="select-spacing" aria-label="Document spacing">
               <option value="standard">Standard</option>
               <option value="compact">Compact</option>
             </select>
@@ -133,24 +137,24 @@
       <!-- Generate Controls Card -->
       <section class="card" id="card-generate">
         <div class="card-header">
-          <span class="card-title"><span class="step-badge">4</span> ⚡ Actions</span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">4</span> Generate</span>
         </div>
         <div class="generate-buttons">
-          <button id="btn-gen-both" class="btn-primary btn-lg">Generate Resume + CV</button>
+          <button id="btn-gen-both" class="btn-primary btn-lg">Generate Resume + Cover Letter</button>
           <div class="btn-group-row">
             <button id="btn-gen-resume" class="btn-secondary">Resume Only</button>
             <button id="btn-gen-cover-letter" class="btn-secondary">Cover Letter Only</button>
           </div>
         </div>
-        <div id="gen-status" class="gen-status hidden">
-          <div class="spinner"></div>
+        <div id="gen-status" class="gen-status hidden" role="status" aria-live="polite">
+          <div class="spinner" aria-hidden="true"></div>
           <span id="gen-status-text">Generating…</span>
         </div>
-        <div id="gen-error" class="gen-error hidden">
+        <div id="gen-error" class="gen-error hidden" role="alert">
           <div id="gen-error-message"></div>
           <div class="error-actions">
-            <button id="btn-error-retry" class="btn-secondary btn-sm">↻ Retry</button>
-            <button id="btn-error-settings" class="btn-secondary btn-sm">⚙ Settings</button>
+            <button id="btn-error-retry" class="btn-secondary btn-sm">Retry</button>
+            <button id="btn-error-settings" class="btn-secondary btn-sm">Open Settings</button>
           </div>
         </div>
       </section>
@@ -160,95 +164,105 @@
     <!-- ─── RIGHT COLUMN ─────────────────────────── -->
     <div id="right-col">
 
-      <!-- Draft Tabs Card -->
+      <!-- Draft Preview Card -->
       <section class="card" id="card-drafts">
         <div class="card-header">
-          <span class="card-title">📄 Preview</span>
-          <div class="tab-bar">
-            <button class="tab-btn active" data-tab="resume">Resume</button>
-            <button class="tab-btn" data-tab="cover-letter">Cover Letter</button>
-            <button class="tab-btn hidden" id="tab-btn-merged" data-tab="merged">Merged</button>
+          <span class="card-title">Preview</span>
+          <div class="tab-bar" role="tablist" aria-label="Document preview">
+            <button class="tab-btn active" data-tab="resume" role="tab" aria-selected="true" aria-controls="tab-resume">Resume</button>
+            <button class="tab-btn" data-tab="cover-letter" role="tab" aria-selected="false" aria-controls="tab-cover-letter">Cover Letter</button>
+            <button class="tab-btn hidden" id="tab-btn-merged" data-tab="merged" role="tab" aria-selected="false" aria-controls="tab-merged">Merged</button>
           </div>
         </div>
 
-        <div id="tab-resume" class="tab-panel">
+        <div id="tab-resume" class="tab-panel" role="tabpanel" aria-label="Resume preview">
           <div id="draft-resume-empty" class="draft-empty">
-            <div class="draft-empty-icon">📋</div>
-            <p>Your resume preview will appear here.</p>
+            <div class="draft-empty-icon" aria-hidden="true">📄</div>
+            <strong>Ready when you are</strong>
+            <p>Fill in the job info and description, then click Generate.</p>
           </div>
           <div id="draft-resume-content" class="draft-preview-wrapper hidden">
-            <iframe id="preview-resume-frame" class="preview-frame"></iframe>
+            <iframe id="preview-resume-frame" class="preview-frame" title="Resume preview"></iframe>
           </div>
         </div>
 
-        <div id="tab-cover-letter" class="tab-panel">
+        <div id="tab-cover-letter" class="tab-panel" role="tabpanel" aria-label="Cover letter preview">
           <div id="draft-cl-empty" class="draft-empty">
-            <div class="draft-empty-icon">✉️</div>
-            <p>Your cover letter preview will appear here.</p>
+            <div class="draft-empty-icon" aria-hidden="true">✉️</div>
+            <strong>Ready when you are</strong>
+            <p>Fill in the job info and description, then click Generate.</p>
           </div>
           <div id="draft-cl-content" class="draft-preview-wrapper hidden">
-            <iframe id="preview-cl-frame" class="preview-frame"></iframe>
+            <iframe id="preview-cl-frame" class="preview-frame" title="Cover letter preview"></iframe>
           </div>
         </div>
 
-        <div id="tab-merged" class="tab-panel">
+        <div id="tab-merged" class="tab-panel" role="tabpanel" aria-label="Merged document preview">
           <div id="draft-merged-empty" class="draft-empty">
-            <div class="draft-empty-icon">📄📄</div>
-            <p>Your merged preview will appear here.</p>
+            <div class="draft-empty-icon" aria-hidden="true">📄</div>
+            <strong>Merged view</strong>
+            <p>Both documents combined into a single preview.</p>
           </div>
           <div id="draft-merged-content" class="draft-preview-wrapper hidden">
-            <iframe id="preview-merged-frame" class="preview-frame"></iframe>
+            <iframe id="preview-merged-frame" class="preview-frame" title="Merged document preview"></iframe>
           </div>
         </div>
       </section>
 
-      <!-- Revision Box Card -->
+      <!-- Revision Card -->
       <section class="card" id="card-revision">
         <div class="card-header">
-          <span class="card-title">💬 Refine Content</span>
+          <span class="card-title">Refine</span>
         </div>
         <textarea
           id="field-revision"
           rows="2"
-          placeholder="e.g. emphasize my leadership experience... make the tone more enthusiastic..."
+          placeholder="e.g. Emphasise leadership experience… make the tone more direct…"
+          aria-label="Revision instructions"
         ></textarea>
         <div class="revision-buttons">
-          <button id="btn-apply-changes"  class="btn-primary" disabled>Apply Changes</button>
-          <button id="btn-regenerate"     class="btn-secondary" disabled>↺ Reset</button>
+          <button id="btn-apply-changes" class="btn-primary" disabled>Apply Changes</button>
+          <button id="btn-regenerate" class="btn-secondary" disabled aria-label="Reset to original draft">Reset</button>
         </div>
       </section>
 
-      <!-- Export Card -->
+      <!-- Save Card -->
       <section class="card" id="card-save">
         <div class="card-header">
-          <span class="card-title">💾 Export</span>
+          <span class="card-title">Save as PDF</span>
         </div>
         <div class="save-buttons">
-          <!-- Primary: Native print flow (best quality) -->
           <div class="btn-group-row" style="margin-bottom: 4px;">
-            <button id="btn-print-both" class="btn-confirm" style="width: 100%;" disabled>🖨️ Print Resume + Cover Letter</button>
-            <button id="btn-print-cl" class="btn-confirm" style="width: 100%;" disabled>🖨️ Print Cover Letter Only</button>
+            <button id="btn-print-both" class="btn-confirm" style="width: 100%;" disabled>Resume + Cover Letter</button>
+            <button id="btn-print-cl" class="btn-confirm" style="width: 100%;" disabled>Cover Letter Only</button>
           </div>
-          <button id="btn-print-merged" class="btn-confirm hidden" style="width: 100%; margin-bottom: 4px;" disabled>🖨️ Print Merged (One Doc)</button>
-          <p class="export-hint">💡 Use <strong>Save as PDF</strong> in the print dialog for best results.</p>
-
-          <!-- Secondary: Quick html2pdf download (fallback) -->
-          <div class="export-divider">
-            <span>Quick Download</span>
-          </div>
-          <div class="btn-group-row">
-            <button id="btn-save-resume" class="btn-secondary" title="Quick PDF — may have formatting issues" disabled>⚠️ Resume PDF</button>
-            <button id="btn-save-cl" class="btn-secondary" title="Quick PDF — may have formatting issues" disabled>⚠️ Cover Letter PDF</button>
-          </div>
-          <p class="export-hint export-hint-warn">⚠️ Quick PDF may have pagination or font issues.</p>
+          <button id="btn-print-merged" class="btn-confirm hidden" style="width: 100%; margin-bottom: 4px;" disabled>Merged Document</button>
+          <p class="export-hint">Opens your browser's print dialog — choose <strong>Save as PDF</strong> as the destination.</p>
         </div>
       </section>
 
     </div><!-- /right-col -->
 
-  </main><!-- /app-main -->
+  </main>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- ── Feature Tour ── -->
+  <div id="tour-overlay" class="tour-overlay hidden" role="dialog" aria-modal="true" aria-label="Feature tour">
+    <div id="tour-spotlight" class="tour-spotlight"></div>
+    <div id="tour-tooltip" class="tour-tooltip">
+      <div id="tour-step-count" class="tour-step-count"></div>
+      <div id="tour-title" class="tour-title"></div>
+      <p id="tour-body" class="tour-body"></p>
+      <div class="tour-nav">
+        <button id="tour-btn-skip" class="tour-btn-skip" type="button">Skip tour</button>
+        <div class="tour-nav-right">
+          <button id="tour-btn-prev" class="tour-btn-secondary" type="button">← Back</button>
+          <button id="tour-btn-next" class="tour-btn-primary" type="button">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="dashboard.js"></script>
 
