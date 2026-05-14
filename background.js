@@ -6,7 +6,7 @@
 
 chrome.runtime.onInstalled.addListener(() => {
   // Disable side panel globally so it only shows on specific tabs when requested
-  chrome.sidePanel.setOptions({ enabled: false }).catch((error) => console.error(error));
+  chrome.sidePanel.setOptions({ enabled: false }).catch(error => console.error(error?.message || error));
 
   // Clear any existing menu items first
   chrome.contextMenus.removeAll(() => {
@@ -51,7 +51,7 @@ chrome.action.onClicked.addListener((tab) => {
     path: 'dashboard/dashboard.html',
     enabled: true
   });
-  chrome.sidePanel.open({ tabId: tab.id }).catch(err => console.error('Failed to open side panel via action:', err));
+  chrome.sidePanel.open({ tabId: tab.id }).catch(err => console.error('Failed to open side panel via action:', err?.message || err));
 });
 
 // ── Context Menu Click ─────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
   // 1. OPEN SIDE PANEL IMMEDIATELY (must be synchronous inside the user gesture handler)
   chrome.sidePanel.setOptions({ tabId: tab.id, path: 'dashboard/dashboard.html', enabled: true });
-  chrome.sidePanel.open({ tabId: tab.id }).catch(err => console.error('Failed to open side panel via context menu:', err));
+  chrome.sidePanel.open({ tabId: tab.id }).catch(err => console.error('Failed to open side panel via context menu:', err?.message || err));
 
   // 2. SCAN PAGE IN BACKGROUND — user triggered this action, so we read content now
   (async () => {

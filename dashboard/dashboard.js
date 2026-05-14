@@ -205,7 +205,6 @@ function applyExtractedData(raw, url, usedSelection) {
 
 function applySession(session) {
   if (!session || !session.extractedData) {
-    console.log('[JPDA] applySession: No data yet.');
     return;
   }
 
@@ -283,7 +282,7 @@ async function scanCurrentPage() {
     applyExtractedData(response, tab.url || '', !!response.selectedText);
     showToast('✦ Page scanned');
   } catch (err) {
-    console.warn('[JPDA] scanCurrentPage error:', err);
+    console.warn('[JPDA] scanCurrentPage error:', err?.message || 'Unknown scan error');
     showToast('⚠️ Could not scan the page. Try the context menu instead.');
   } finally {
     btn.disabled = false;
@@ -618,7 +617,7 @@ async function syncJobHistorySummary(entry) {
     ]);
     await chrome.storage.sync.set({ [SYNC_HISTORY_SUMMARY_KEY]: summaries });
   } catch (err) {
-    console.warn('Could not sync lightweight job history summary:', err);
+    console.warn('Could not sync lightweight job history summary:', err?.message || 'Unknown storage error');
   }
 }
 
@@ -1065,7 +1064,7 @@ function setGenerating(on) {
 function showError(err) {
   const mapped = mapError(err);
   // Only log to console.error for unexpected runtime errors, not validation messages
-  if (err instanceof Error && mapped.action === 'retry') console.error('[JPDA]', err);
+  if (err instanceof Error && mapped.action === 'retry') console.error('[JPDA]', err.message);
   else if (mapped.action !== 'settings') console.warn('[JPDA]', mapped.message);
   dom.genErrorMessage.textContent = `⚠️ ${mapped.message}`;
   dom.btnErrorRetry.classList.toggle('hidden', mapped.action !== 'retry');

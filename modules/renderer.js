@@ -5,6 +5,7 @@ import * as classic from '../templates/classic.js';
 import * as modern from '../templates/modern.js';
 import * as sidebar from '../templates/sidebar.js';
 import * as compact from '../templates/compact.js';
+import { esc, escapeHtmlStrings } from './html.js';
 
 const templates = {
   classic,
@@ -24,10 +25,11 @@ export function renderDocument(templateId, type, data, options = {}) {
   const template = templates[templateId] || templates.classic;
   const accentColor = options.accentColor || data.metadata?.accentColor || '#2563eb';
   const spacingMode = options.spacingMode || data.metadata?.spacingMode || 'standard';
+  const safeData = escapeHtmlStrings(data);
 
-  const contentHtml = type === 'resume' 
-    ? template.render(data) 
-    : template.renderCoverLetter(data);
+  const contentHtml = type === 'resume'
+    ? template.render(safeData)
+    : template.renderCoverLetter(safeData);
 
   return `
     <!DOCTYPE html>
@@ -36,7 +38,7 @@ export function renderDocument(templateId, type, data, options = {}) {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="color-scheme" content="light">
-      <title>${type === 'resume' ? 'Resume' : 'Cover Letter'} - ${data.personalInfo.fullName}</title>
+      <title>${type === 'resume' ? 'Resume' : 'Cover Letter'} - ${esc(data.personalInfo?.fullName)}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -131,9 +133,11 @@ export function renderMergedDocument(templateId, resumeData, clData, options = {
   const template = templates[templateId] || templates.classic;
   const accentColor = options.accentColor || '#2563eb';
   const spacingMode = options.spacingMode || 'standard';
+  const safeResumeData = escapeHtmlStrings(resumeData);
+  const safeClData = escapeHtmlStrings(clData);
 
-  const resumeHtml = template.render(resumeData);
-  const clHtml = template.renderCoverLetter(clData);
+  const resumeHtml = template.render(safeResumeData);
+  const clHtml = template.renderCoverLetter(safeClData);
 
   return `
     <!DOCTYPE html>
@@ -142,7 +146,7 @@ export function renderMergedDocument(templateId, resumeData, clData, options = {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="color-scheme" content="light">
-      <title>Merged Documents - ${resumeData.personalInfo.fullName}</title>
+      <title>Merged Documents - ${esc(resumeData.personalInfo?.fullName)}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">

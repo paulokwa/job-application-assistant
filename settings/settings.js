@@ -12,6 +12,7 @@ let docSettings = {};
 
 const ALL_CHIPS = ['{docType}', '{company}', '{jobTitle}', '{date}'];
 let activeChips = ['{docType}', '{company}', '{jobTitle}'];
+const MAX_SOURCE_RESUME_BYTES = 10 * 1024 * 1024;
 
 const PROVIDER_MODELS = {
   mock: ['mock-basic'],
@@ -561,7 +562,7 @@ async function saveDocuments() {
 
 // ── Source Resume & Profile ───────────────────────────────────────────────
 function clearSourceResumeUI() {
-  $('source-upload-text').textContent = 'Click to upload your source resume (.docx or .pdf)';
+  $('source-upload-text').textContent = 'Click to upload your source resume (.docx or text-based .pdf, max 10 MB)';
   $('source-resume-active-bar').textContent = '';
   $('source-resume-active-bar').classList.add('hidden');
   $('profile-autofill-status').textContent = '';
@@ -638,8 +639,16 @@ async function handleSourceResumeUpload(event) {
   if (!file) return;
 
   const statusEl = $('profile-autofill-status');
-  statusEl.textContent = '📄 Reading file...';
   statusEl.classList.remove('hidden');
+
+  if (file.size > MAX_SOURCE_RESUME_BYTES) {
+    statusEl.textContent = '❌ Error: File is too large. Please upload a .docx or text-based .pdf under 10 MB.';
+    event.target.value = '';
+    showToast('❌ Upload failed');
+    return;
+  }
+
+  statusEl.textContent = '📄 Reading file...';
 
   try {
     let plainText = '';
@@ -1196,4 +1205,4 @@ async function handleAddProfile() {
   document.querySelector('.nav-btn[data-section="profile"]').click();
 }
 
-init().catch(console.error);
+init().catch(err => console.error(err?.message || err));
