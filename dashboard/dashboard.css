@@ -1,4 +1,4 @@
-/* dashboard.css — Job Page Draft Assistant */
+/* dashboard.css — Job Application Assistant */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap');
 
@@ -226,6 +226,15 @@ html, body {
   inset: 0;
   z-index: 10000;
   pointer-events: all;
+}
+
+.tour-blur-panel {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  background: oklch(0% 0 0 / 0.18);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .tour-spotlight {
@@ -1048,11 +1057,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .error-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 #btn-error-settings,
-#btn-error-retry {
+#btn-error-retry,
+#btn-error-demo {
   width: auto;
   padding: 6px 14px;
   font-size: 12px;
@@ -1224,7 +1235,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border-radius: var(--radius-lg);
   padding: 28px 24px 20px;
   width: 100%;
-  max-width: 340px;
+  max-width: 380px;
   box-shadow: 0 16px 48px oklch(0% 0 0 / 0.32);
   display: flex;
   flex-direction: column;
@@ -1254,6 +1265,41 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .welcome-body p { margin: 0 0 10px; }
 .welcome-body p:last-child { margin-bottom: 0; }
+.welcome-step {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.welcome-option-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: -4px 0 16px;
+}
+.welcome-option-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding: 10px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.welcome-option-card strong {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  line-height: 1.25;
+}
+.welcome-option-card span {
+  color: var(--color-ink-2);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
 .welcome-btn-primary {
   width: 100%;
   margin-bottom: 8px;
@@ -1275,6 +1321,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   transition: opacity var(--dur-fast, 120ms);
 }
 .welcome-skip:hover { opacity: 1; }
+
+@media (max-width: 360px) {
+  .welcome-option-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ══════════════════════════════════════════════
    CONFIRM DIALOG

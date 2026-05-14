@@ -201,6 +201,7 @@
           <div class="error-actions">
             <button id="btn-error-retry" class="btn-secondary btn-sm">Retry</button>
             <button id="btn-error-settings" class="btn-secondary btn-sm">Open Settings</button>
+            <button id="btn-error-demo" class="btn-secondary btn-sm hidden">Use Demo Mode</button>
           </div>
         </div>
       </section>
@@ -337,6 +338,10 @@
 
   <!-- ── Feature Tour ── -->
   <div id="tour-overlay" class="tour-overlay hidden" role="dialog" aria-modal="true" aria-label="Feature tour">
+    <div class="tour-blur-panel tour-blur-panel--top" aria-hidden="true"></div>
+    <div class="tour-blur-panel tour-blur-panel--right" aria-hidden="true"></div>
+    <div class="tour-blur-panel tour-blur-panel--bottom" aria-hidden="true"></div>
+    <div class="tour-blur-panel tour-blur-panel--left" aria-hidden="true"></div>
     <div id="tour-spotlight" class="tour-spotlight"></div>
     <div id="tour-tooltip" class="tour-tooltip">
       <div id="tour-step-count" class="tour-step-count"></div>
@@ -356,14 +361,35 @@
   <div id="welcome-overlay" class="welcome-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
     <div class="welcome-modal">
       <div class="welcome-icon">✦</div>
-      <h2 class="welcome-title" id="welcome-title">Welcome to Job Page Draft Assistant</h2>
-      <div class="welcome-body">
-        <p>Job hunting is repetitive. This extension reduces the friction — scan a job posting, add your profile details, and get a tailored resume or cover letter draft without copying everything manually.</p>
-        <p>The extension is <strong>free</strong>. For real AI generation, connect your own API key in Settings. <strong>Demo Mode</strong> lets you try the full workflow with no key required.</p>
-        <p>If this tool saves you time, you can optionally support future updates.</p>
+      <div id="welcome-step-1" class="welcome-step">
+        <h2 class="welcome-title" id="welcome-title">Welcome to Job Application Assistant</h2>
+        <div class="welcome-body">
+          <p>Applying for jobs often means rewriting the same details over and over. This extension helps you create tailored resume and cover letter drafts for specific job postings.</p>
+          <p>Upload an existing resume or cover letter, or build your profile from scratch. Your saved details guide the assistant when creating each draft.</p>
+        </div>
+        <button id="welcome-btn-next" class="btn-primary welcome-btn-primary" type="button">Next</button>
       </div>
-      <button id="welcome-btn-start" class="btn-primary welcome-btn-primary" type="button">Get started</button>
-      <button id="welcome-btn-donate" class="btn-secondary welcome-btn-secondary" type="button">Support development</button>
+      <div id="welcome-step-2" class="welcome-step hidden">
+        <h2 class="welcome-title" id="welcome-title-setup">Set up AI generation</h2>
+        <div class="welcome-body">
+          <p>To create real tailored drafts, Job Application Assistant needs an AI provider.</p>
+          <p>You can use local AI with Ollama, which runs on your own computer and does not require a paid API key.</p>
+          <p>Or you can connect a cloud AI provider using your own API key. Cloud providers are often faster and may give better results, but usage may cost money depending on your provider.</p>
+          <p>Demo Mode is still available if you only want to try the workflow, but it uses sample/mock generation rather than real AI output.</p>
+        </div>
+        <div class="welcome-option-grid" aria-label="AI setup options">
+          <div class="welcome-option-card">
+            <strong>Local AI with Ollama</strong>
+            <span>Free/local option</span>
+          </div>
+          <div class="welcome-option-card">
+            <strong>Cloud AI Provider</strong>
+            <span>Use your own API key</span>
+          </div>
+        </div>
+        <button id="welcome-btn-settings" class="btn-primary welcome-btn-primary" type="button">Open AI Provider Settings</button>
+        <button id="welcome-btn-demo" class="btn-secondary welcome-btn-secondary" type="button">Try Demo Mode</button>
+      </div>
       <button id="welcome-btn-skip" class="welcome-skip" type="button">Maybe later</button>
     </div>
   </div>

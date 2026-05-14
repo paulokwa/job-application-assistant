@@ -1,4 +1,4 @@
-/* settings.css — Job Page Draft Assistant Settings */
+/* settings.css — Job Application Assistant Settings */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap');
 
@@ -400,6 +400,31 @@ input:focus, textarea:focus, select:focus {
   text-decoration: none;
 }
 .field-hint a:hover { text-decoration: underline; }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.feedback-form {
+  max-width: 680px;
+}
+.feedback-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
 
 .key-input-wrap {
   position: relative;

@@ -1,5 +1,5 @@
 ---
-name: Job Page Draft Assistant
+name: Job Application Assistant
 description: A calm, trustworthy Chrome extension for tailoring resumes and cover letters to specific job postings.
 colors:
   accent: "#2e7585"
@@ -101,7 +101,7 @@ components:
     padding: "{spacing.md}"
 ---
 
-# Design System: Job Page Draft Assistant
+# Design System: Job Application Assistant
 
 ## 1. Overview
 

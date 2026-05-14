@@ -26,7 +26,7 @@ export function mapError(error) {
   if (msg === 'no_job_desc') {
     return {
       type: 'validation',
-      message: 'The Job Description is empty. To proceed, you can copy and paste the job text here, or right-click on the job posting and select "Job Page Draft Assistant → Create Both" to capture it automatically.',
+      message: 'The Job Description is empty. To proceed, you can copy and paste the job text here, or right-click on the job posting and select "Job Application Assistant → Create Both" to capture it automatically.',
       action: 'none'
     };
   }
@@ -36,6 +36,15 @@ export function mapError(error) {
       message: 'Your profile is missing. Please go to Settings → My Profile and add your professional details (or upload your resume for auto-fill) before generating.',
       action: 'settings',
       settingsSection: 'profile',
+    };
+  }
+
+  if (msg === 'no_provider') {
+    return {
+      type: 'setup_required',
+      message: 'AI setup required. Real draft generation needs a connected AI provider/API key or local Ollama.',
+      action: 'settings',
+      settingsSection: 'provider',
     };
   }
 

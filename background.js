@@ -13,7 +13,7 @@ chrome.runtime.onInstalled.addListener(() => {
     // Create main menu item
     chrome.contextMenus.create({
       id: 'jpda-main',
-      title: 'Job Page Draft Assistant',
+      title: 'Job Application Assistant',
       contexts: ['page', 'selection'],
     });
   });

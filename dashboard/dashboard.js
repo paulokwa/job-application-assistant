@@ -7,9 +7,9 @@ import { renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { mapError } from '../modules/errorMapper.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
-// Support/Ko-fi URL — used by the header button and the first-run welcome modal.
-// Change this one line to update both places at once.
+// Support/Ko-fi URL — used by the header button.
 const SUPPORT_URL = 'https://ko-fi.com/mwakelabs';
+const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
 const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
@@ -67,6 +67,7 @@ const dom = {
   genErrorMessage:    $('gen-error-message'),
   btnErrorRetry:      $('btn-error-retry'),
   btnErrorSettings:   $('btn-error-settings'),
+  btnErrorDemo:       $('btn-error-demo'),
   
   tabBtns:            document.querySelectorAll('.tab-btn'),
   tabPanels:          document.querySelectorAll('.tab-panel'),
@@ -138,9 +139,13 @@ async function init() {
   state.profile  = await loadProfile();
   await populateProfileStrip();
 
-  const localData = await chrome.storage.local.get(['sourceResumeText', 'savedDraft', 'welcomeSeen', 'theme']);
+  const localData = await chrome.storage.local.get(['sourceResumeText', 'savedDraft', AI_PROVIDER_SETUP_SAVED_KEY, 'theme']);
   applyTheme(localData.theme || 'system');
   state.sourceResumeText = localData.sourceResumeText || '';
+  const aiProviderSetupComplete = localData[AI_PROVIDER_SETUP_SAVED_KEY] || hasExistingAiProviderSetup(state.settings);
+  if (aiProviderSetupComplete && !localData[AI_PROVIDER_SETUP_SAVED_KEY]) {
+    chrome.storage.local.set({ [AI_PROVIDER_SETUP_SAVED_KEY]: true });
+  }
 
   if (state.settings?.provider === 'mock') {
     dom.mockBanner.classList.remove('hidden');
@@ -165,8 +170,8 @@ async function init() {
     }
   });
 
-  // Show welcome modal on first run (non-blocking — all core setup is already done)
-  if (!localData.welcomeSeen) showWelcomeModal();
+  // Keep onboarding visible on app launch until the user saves AI Provider settings.
+  if (!aiProviderSetupComplete) showWelcomeModal();
 }
 
 function loadSession() {
@@ -346,11 +351,7 @@ function bindEvents() {
     if (!dom.profileStrip.contains(e.target)) closeProfileMenu();
   });
   dom.btnManageProfiles.addEventListener('click', () => {
-    dom.settingsView.classList.add('visible');
-    setTimeout(() => {
-      const nav = dom.settingsFrame.contentDocument?.querySelector('.nav-btn[data-section="profiles"]');
-      if (nav) nav.click();
-    }, 100);
+    openSettingsSection('profiles');
   });
 
   // Theme toggle
@@ -364,7 +365,7 @@ function bindEvents() {
   dom.btnSupport.addEventListener('click', () => window.open(SUPPORT_URL, '_blank', 'noopener'));
 
   // Settings
-  dom.btnSettings.addEventListener('click', () => dom.settingsView.classList.add('visible'));
+  dom.btnSettings.addEventListener('click', () => openSettingsSection());
   dom.btnCloseSettings.addEventListener('click', async () => {
     dom.settingsView.classList.remove('visible');
     state.settings = await loadSettings();
@@ -460,10 +461,13 @@ function bindEvents() {
 
   // Error → Open Settings (navigate iframe to the relevant section)
   dom.btnErrorSettings.addEventListener('click', () => {
-    dom.settingsView.classList.add('visible');
     const section = dom.btnErrorSettings.dataset.section || 'provider';
-    const nav = dom.settingsFrame.contentDocument?.querySelector(`.nav-btn[data-section="${section}"]`);
-    if (nav) nav.click();
+    openSettingsSection(section);
+  });
+
+  dom.btnErrorDemo.addEventListener('click', async () => {
+    await activateDemoMode();
+    hideError();
   });
 
   // Sync inputs
@@ -473,6 +477,81 @@ function bindEvents() {
 }
 
 // ── Core Logic ────────────────────────────────────────────────────────────
+
+function openSettingsSection(section = 'provider') {
+  dom.settingsView.classList.add('visible');
+
+  const activateSection = () => {
+    const nav = dom.settingsFrame.contentDocument?.querySelector(`.nav-btn[data-section="${section}"]`);
+    if (!nav) return false;
+    nav.click();
+    return true;
+  };
+
+  if (activateSection()) return;
+
+  const onLoad = () => {
+    activateSection();
+    dom.settingsFrame.removeEventListener('load', onLoad);
+  };
+  dom.settingsFrame.addEventListener('load', onLoad);
+  setTimeout(activateSection, 100);
+}
+
+function migrateProviderSettings(raw) {
+  if (!raw) return { activeProvider: '', configs: {}, simulateFailure: 'none' };
+  if (raw.configs !== undefined) {
+    return {
+      ...raw,
+      configs: raw.configs || {},
+      simulateFailure: raw.simulateFailure || 'none',
+    };
+  }
+
+  const provider = raw.provider || '';
+  const configs = {};
+  if (provider) {
+    configs[provider] = {
+      apiKey: raw.apiKey || '',
+      modelName: raw.modelName || '',
+      endpoint: raw.endpoint || '',
+    };
+  }
+
+  return { activeProvider: provider, configs, simulateFailure: raw.simulateFailure || 'none' };
+}
+
+function hasExistingAiProviderSetup(settings) {
+  if (!settings?.provider || settings.provider === 'mock') return false;
+  if (settings.provider === 'ollama') return true;
+  return !!settings.apiKey?.trim();
+}
+
+async function activateDemoMode() {
+  const data = await chrome.storage.sync.get(['providerSettings']);
+  const settings = migrateProviderSettings(data.providerSettings);
+  const configs = {
+    ...(settings.configs || {}),
+    mock: { apiKey: '', modelName: '', endpoint: '' },
+  };
+
+  await chrome.storage.sync.set({
+    providerSettings: {
+      ...settings,
+      activeProvider: 'mock',
+      configs,
+    },
+  });
+
+  state.settings = await loadSettings();
+  dom.mockBanner.classList.remove('hidden');
+  try {
+    dom.settingsFrame.contentWindow?.location.reload();
+  } catch (e) {
+    console.warn('Could not refresh settings frame after enabling Demo Mode:', e?.message || e);
+  }
+  showToast('Demo Mode enabled. Drafts will use mock/sample generation.');
+}
 
 async function runGeneration(mode) {
   if (!await validateForGeneration(mode)) return;
@@ -624,30 +703,37 @@ async function syncJobHistorySummary(entry) {
 // ── Welcome Modal ─────────────────────────────────────────────────────────
 
 function showWelcomeModal() {
-  const overlay   = document.getElementById('welcome-overlay');
-  const btnStart  = document.getElementById('welcome-btn-start');
-  const btnDonate = document.getElementById('welcome-btn-donate');
-  const btnSkip   = document.getElementById('welcome-btn-skip');
-
-  // Show the donate button only when a URL is configured
-  if (!SUPPORT_URL || SUPPORT_URL === '#') {
-    btnDonate.classList.add('hidden');
-  }
+  const overlay     = document.getElementById('welcome-overlay');
+  const step1       = document.getElementById('welcome-step-1');
+  const step2       = document.getElementById('welcome-step-2');
+  const btnNext     = document.getElementById('welcome-btn-next');
+  const btnSettings = document.getElementById('welcome-btn-settings');
+  const btnDemo     = document.getElementById('welcome-btn-demo');
+  const btnSkip     = document.getElementById('welcome-btn-skip');
 
   overlay.classList.remove('hidden');
-  btnStart.focus();
+  btnNext.focus();
 
-  const dismiss = () => {
-    chrome.storage.local.set({ welcomeSeen: true });
-    overlay.classList.add('hidden');
-  };
+  const dismiss = () => overlay.classList.add('hidden');
 
-  btnStart.addEventListener('click', dismiss, { once: true });
-  btnSkip.addEventListener('click', dismiss, { once: true });
-  btnDonate.addEventListener('click', () => {
-    window.open(SUPPORT_URL, '_blank', 'noopener');
+  btnNext.addEventListener('click', () => {
+    step1.classList.add('hidden');
+    step2.classList.remove('hidden');
+    overlay.setAttribute('aria-labelledby', 'welcome-title-setup');
+    btnSettings.focus();
+  }, { once: true });
+
+  btnSettings.addEventListener('click', () => {
+    dismiss();
+    openSettingsSection('provider');
+  }, { once: true });
+
+  btnDemo.addEventListener('click', async () => {
+    await activateDemoMode();
     dismiss();
   }, { once: true });
+
+  btnSkip.addEventListener('click', dismiss, { once: true });
 }
 
 // ── Confirm Dialog ────────────────────────────────────────────────────────
@@ -719,6 +805,10 @@ async function applyRevision() {
 
   const docType = state.currentTab;
   if (!state.drafts[docType]) return;
+  if (!state.settings?.provider) {
+    showError(new Error('no_provider'));
+    return;
+  }
 
   dom.btnApplyChanges.disabled = true;
   dom.btnApplyChanges.textContent = 'Applying…';
@@ -1017,7 +1107,7 @@ function switchTab(tab) {
 
 async function validateForGeneration(mode) {
   if (!state.settings?.provider) {
-    showError('AI provider not configured. Go to Settings.');
+    showError(new Error('no_provider'));
     return false;
   }
   if (!dom.fieldDesc.value.trim()) {
@@ -1069,7 +1159,10 @@ function showError(err) {
   dom.genErrorMessage.textContent = `⚠️ ${mapped.message}`;
   dom.btnErrorRetry.classList.toggle('hidden', mapped.action !== 'retry');
   dom.btnErrorSettings.classList.toggle('hidden', mapped.action !== 'settings');
-  dom.btnErrorSettings.dataset.section = mapped.settingsSection || 'provider';
+  const settingsSection = mapped.settingsSection || 'provider';
+  dom.btnErrorSettings.dataset.section = settingsSection;
+  dom.btnErrorSettings.textContent = settingsSection === 'provider' ? 'Open AI Provider Settings' : 'Open Settings';
+  dom.btnErrorDemo.classList.toggle('hidden', mapped.type !== 'setup_required');
   dom.genError.classList.remove('hidden');
   setGenerating(false);
 }
@@ -1090,6 +1183,10 @@ function refreshExportButtons() {
 
 async function runAtsCheck() {
   if (!state.drafts.resume || !state.jobData.description) return;
+  if (!state.settings?.provider) {
+    showError(new Error('no_provider'));
+    return;
+  }
 
   dom.atsStatus.classList.remove('hidden');
   dom.atsResults.classList.add('hidden');
@@ -1417,6 +1514,12 @@ function positionTourElements(targetEl) {
   const viewW    = window.innerWidth;
   const tipW     = tooltip.offsetWidth  || 288;
   const tipH     = tooltip.offsetHeight || 160;
+  positionTourBlurPanels({
+    top:    Math.max(0, rect.top - pad),
+    left:   Math.max(0, rect.left - pad),
+    right:  Math.min(viewW, rect.right + pad),
+    bottom: Math.min(viewH, rect.bottom + pad),
+  }, viewW, viewH);
 
   // Prefer below, fall back to above, then centre vertically if neither fits
   let top;
@@ -1433,6 +1536,40 @@ function positionTourElements(targetEl) {
 
   tooltip.style.top  = top  + 'px';
   tooltip.style.left = left + 'px';
+}
+
+function positionTourBlurPanels(hole, viewW, viewH) {
+  const panels = {
+    top:    document.querySelector('.tour-blur-panel--top'),
+    right:  document.querySelector('.tour-blur-panel--right'),
+    bottom: document.querySelector('.tour-blur-panel--bottom'),
+    left:   document.querySelector('.tour-blur-panel--left'),
+  };
+
+  Object.assign(panels.top.style, {
+    top: '0px',
+    left: '0px',
+    width: viewW + 'px',
+    height: hole.top + 'px',
+  });
+  Object.assign(panels.right.style, {
+    top: hole.top + 'px',
+    left: hole.right + 'px',
+    width: Math.max(0, viewW - hole.right) + 'px',
+    height: Math.max(0, hole.bottom - hole.top) + 'px',
+  });
+  Object.assign(panels.bottom.style, {
+    top: hole.bottom + 'px',
+    left: '0px',
+    width: viewW + 'px',
+    height: Math.max(0, viewH - hole.bottom) + 'px',
+  });
+  Object.assign(panels.left.style, {
+    top: hole.top + 'px',
+    left: '0px',
+    width: hole.left + 'px',
+    height: Math.max(0, hole.bottom - hole.top) + 'px',
+  });
 }
 
 function endTour() {

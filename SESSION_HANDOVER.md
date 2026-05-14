@@ -710,7 +710,7 @@ A guided highlight tour was added triggered by the "?" button in the header.
 
 ### 12. Icon and branding rename
 
-**App name changed:** "Draft Assistant" / "Job Page Draft Assistant" → "Job Application Assistant" everywhere:
+**App name changed:** legacy names were replaced with "Job Application Assistant" everywhere:
 - `manifest.json` — `name` and `action.default_title`
 - `dashboard/dashboard.html` — `<title>` and `.app-name` span
 - `settings/settings.html` — `<title>` and `.page-subtitle`
@@ -726,6 +726,67 @@ A guided highlight tour was added triggered by the "?" button in the header.
 The `←` glyph in the "← Dashboard" back button was sitting slightly low relative to the "Dashboard" text due to the arrow character's font metrics.
 
 **Fix:** `.back-btn span { line-height: 1; position: relative; top: -1px; }` in `dashboard.css`.
+
+---
+
+### 14. Welcome onboarding now drives AI setup
+
+The first-run welcome modal is now a 2-step flow:
+
+1. Welcome/value message under the app name **Job Application Assistant**
+2. AI setup explanation with direct actions for AI Provider Settings and Demo Mode
+
+The old support/donate CTA was removed from the modal. "Maybe later" only closes the modal for the current view. Persistent completion is controlled by `chrome.storage.local.aiProviderSetupSaved`, which is set when:
+- the user saves AI settings
+- existing non-mock provider settings are detected (`ollama` or a cloud provider with an API key)
+- the user types a non-empty API key in AI Provider settings
+
+Demo Mode remains available but secondary. Generation/revision/ATS actions now show a setup-required prompt with "Open AI Provider Settings" and "Use Demo Mode" when no provider is configured.
+
+---
+
+### 15. Help & Feedback settings section
+
+Added a new Settings nav item: **Help & Feedback**.
+
+It contains a no-backend feedback form that opens the user's email app through `mailto:mwake.dev@gmail.com` with a prefilled subject/body. Fields:
+- Type: Bug report, Feature request, General feedback
+- Message
+- Optional contact email
+- Optional safe diagnostics
+
+Diagnostics include app version, provider name, Demo Mode status, active settings page, and browser user agent. They do not include API keys, resumes, profile content, generated drafts, or job descriptions.
+
+---
+
+### 16. Settings tour split by active page
+
+The Settings `?` button now loads a tour based on the active settings section instead of running one long cross-page tour.
+
+Tour groups:
+- `provider` - AI provider, model, connection test, save settings
+- `documents` - default document mode, filename chips, preview, save
+- `profiles` - manage profiles, active profile, add profile, jump to My Profile
+- `profile` - upload/manual setup, contact details, skills, experience, Do Not Claim, save
+- `feedback` - feedback type, message, reply email, diagnostics, open email
+
+This keeps tours focused and prevents the Settings tour from feeling overwhelming.
+
+---
+
+### 17. Dashboard tour blur polish
+
+The main dashboard feature tour now uses four `tour-blur-panel` elements around the spotlight. The target element remains clear while the surrounding UI is softly blurred and dimmed. The existing spotlight, tooltip positioning, keyboard controls, and tour copy remain unchanged.
+
+---
+
+### 18. Final branding cleanup
+
+The remaining packaged legacy name references were removed. Notably:
+- `background.js` context menu title is now **Job Application Assistant**
+- `README.md`, `DESIGN.md`, `DESIGN.json`, CSS comments, and handover text no longer contain the old app name
+
+`manifest.json` was already correct. If Chrome Web Store still shows the old name after uploading a fresh zip, check the Web Store listing metadata in the Developer Dashboard.
 
 ---
 

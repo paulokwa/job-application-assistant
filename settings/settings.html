@@ -27,6 +27,7 @@
       <button class="nav-btn" data-section="documents">Documents</button>
       <button class="nav-btn" data-section="profiles">Profiles</button>
       <button class="nav-btn" data-section="profile">My Profile</button>
+      <button class="nav-btn" data-section="feedback">Help & Feedback</button>
       <button id="btn-settings-tour" class="settings-tour-btn" title="Take a tour of Settings" aria-label="Start settings tour">?</button>
     </nav>
 
@@ -286,6 +287,47 @@
         <button class="btn-save-section" id="btn-save-profile">Save Profile</button>
         <button class="btn-danger-ghost" id="btn-clear-profile" type="button">Clear All</button>
       </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════
+         SECTION: HELP & FEEDBACK
+    ══════════════════════════════════════════ -->
+    <section id="section-feedback" class="settings-section" aria-labelledby="feedback-heading">
+      <h2 class="section-title" id="feedback-heading">Help & Feedback</h2>
+      <p class="section-desc">Send a bug report, feature idea, or general note. This opens your email app with a prefilled message.</p>
+
+      <form id="feedback-form" class="card feedback-form">
+        <div class="field-group">
+          <label for="feedback-type">Type</label>
+          <select id="feedback-type">
+            <option value="Bug report">Bug report</option>
+            <option value="Feature request">Feature request</option>
+            <option value="General feedback">General feedback</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="feedback-message">Message</label>
+          <textarea id="feedback-message" rows="7" maxlength="2000" placeholder="Tell us what happened, what you expected, or what would make the app better." required></textarea>
+          <p class="field-hint">Please do not include API keys, full resumes, job descriptions, or private profile details.</p>
+        </div>
+
+        <div class="field-group">
+          <label for="feedback-email">Your email (optional)</label>
+          <input type="email" id="feedback-email" placeholder="name@example.com" autocomplete="email" />
+        </div>
+
+        <label class="checkbox-row" for="feedback-include-diagnostics">
+          <input type="checkbox" id="feedback-include-diagnostics" checked />
+          <span>Include basic app diagnostics</span>
+        </label>
+        <p class="field-hint">Diagnostics include app version, provider name, Demo Mode status, and browser details. They never include API keys, resume text, profile content, drafts, or job descriptions.</p>
+
+        <div class="feedback-actions">
+          <button class="btn-save-section" id="btn-open-feedback-email" type="submit">Open Email</button>
+          <span id="feedback-status" class="test-result" role="status" aria-live="polite"></span>
+        </div>
+      </form>
     </section>
 
   </main>

@@ -6,11 +6,6 @@ Ideas and planned features. Nothing here is committed or scheduled — it is a p
 
 ## High priority
 
-### Welcome banner: clearer AI setup path
-Update the first-run welcome banner so AI setup is harder to miss. It should make clear that the app needs an AI provider/API key or local Ollama setup before real generation will work, and should offer a direct action into AI Provider settings.
-
----
-
 ### Export / Import settings (JSON)
 A single "Export settings" button in the AI Provider or Profile section that downloads all `chrome.storage.sync` and `chrome.storage.local` data (minus large blobs like source resume text) as a JSON file. A matching "Import" button restores from that file.
 
@@ -30,11 +25,6 @@ Explore expanding the resume and cover letter template library beyond the curren
 
 ---
 
-### Support / feedback entry point
-Decide whether the app should include a convenient support or feedback link, and where it belongs. Possible placements: welcome banner, header support button, Settings footer, or a small "Help / Feedback" item near the tour button. Keep it useful without making the dashboard feel promotional.
-
----
-
 ## Not planned (and why)
 
 | Idea | Why not |
@@ -49,6 +39,11 @@ Decide whether the app should include a convenient support or feedback link, and
 
 | Feature | Session | Notes |
 |---|---|---|
+| Welcome banner: clearer AI setup path | Session 7 | First-run welcome is now a 2-step flow: value message, then AI setup. It routes directly to AI Provider Settings, keeps Demo Mode secondary, and stops reappearing once AI setup is acknowledged or existing real provider settings are detected. |
+| Help & Feedback settings section | Session 7 | Added Settings -> Help & Feedback with a `mailto:` form for bug reports, feature requests, and general feedback. Optional diagnostics include only app version, provider name, Demo Mode status, active settings page, and browser user agent. |
+| Section-specific Settings tours | Session 7 | The Settings `?` button now launches a tour for the active settings page only, including separate tours for Profiles and My Profile. |
+| Dashboard tour blur polish | Session 7 | Main dashboard tour now blurs and dims surrounding UI outside the spotlight while keeping the target element clear. |
+| Branding cleanup | Session 7 | Removed remaining packaged old-name strings so runtime UI and packaged docs consistently use "Job Application Assistant". |
 | Synced job history summary | Session 6 | Saves a lightweight `chrome.storage.sync` summary with job title, company, date, document type, and source URL. Full drafts and job-description regenerate data stay local, so synced-only rows can show the URL while Regenerate remains disabled. |
 | In-line draft editing | Session 5 | Edit button in the preview enables direct `contenteditable` changes inside generated resume and cover letter iframes before saving as PDF. |
 | History quick-action: Regenerate | Session 5 | History rows now expose Regenerate when the saved entry includes job description data. It reloads the job into the dashboard and triggers the matching generation mode. |

@@ -14,6 +14,8 @@ let profileDirty = false;
 const ALL_CHIPS = ['{docType}', '{company}', '{jobTitle}', '{date}'];
 let activeChips = ['{docType}', '{company}', '{jobTitle}'];
 const MAX_SOURCE_RESUME_BYTES = 10 * 1024 * 1024;
+const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
+const FEEDBACK_EMAIL = 'mwake.dev@gmail.com';
 
 const PROVIDER_MODELS = {
   mock: ['mock-basic'],
@@ -68,6 +70,9 @@ async function init() {
   settings = migrateSettings(stored.providerSettings);
   docSettings = stored.docSettings || { templateMode: 'smart' };
   profile = await loadProfile();
+  if (hasExistingAiProviderSetup(settings)) {
+    chrome.storage.local.set({ [AI_PROVIDER_SETUP_SAVED_KEY]: true });
+  }
 
   // Populate sections
   populateProviderSection(settings);
@@ -93,13 +98,14 @@ async function init() {
   $('btn-save-profile').addEventListener('click', saveProfileData);
   $('btn-clear-profile').addEventListener('click', clearProfile);
   $('btn-remove-source-resume').addEventListener('click', removeSourceResume);
+  $('feedback-form').addEventListener('submit', openFeedbackEmail);
 
   // Tour
   $('btn-settings-tour').addEventListener('click', startSettingsTour);
   $('settings-tour-btn-skip').addEventListener('click', endSettingsTour);
   $('settings-tour-btn-prev').addEventListener('click', () => { if (settingsTourIndex > 0) showSettingsTourStep(settingsTourIndex - 1); });
   $('settings-tour-btn-next').addEventListener('click', () => {
-    if (settingsTourIndex < SETTINGS_TOUR_STEPS.length - 1) showSettingsTourStep(settingsTourIndex + 1);
+    if (settingsTourIndex < currentSettingsTourSteps.length - 1) showSettingsTourStep(settingsTourIndex + 1);
     else endSettingsTour();
   });
 
@@ -112,7 +118,10 @@ async function init() {
     btn.textContent = revealing ? 'Hide' : 'Show';
     btn.setAttribute('aria-label', revealing ? 'Hide API key' : 'Show API key');
   });
-  $('inp-apikey').addEventListener('input', () => $('hint-saved-key').classList.add('hidden'));
+  $('inp-apikey').addEventListener('input', () => {
+    $('hint-saved-key').classList.add('hidden');
+    if ($('inp-apikey').value.trim()) markAiProviderSetupAcknowledged();
+  });
 
   // Ollama help modal
   $('btn-ollama-help').addEventListener('click', showOllamaHelp);
@@ -171,6 +180,17 @@ function migrateSettings(raw) {
     };
   }
   return { activeProvider: provider, configs, simulateFailure: raw.simulateFailure || 'none' };
+}
+
+function hasExistingAiProviderSetup(s) {
+  const provider = s?.activeProvider || '';
+  if (!provider || provider === 'mock') return false;
+  if (provider === 'ollama') return true;
+  return !!(s.configs || {})[provider]?.apiKey?.trim();
+}
+
+async function markAiProviderSetupAcknowledged() {
+  await chrome.storage.local.set({ [AI_PROVIDER_SETUP_SAVED_KEY]: true });
 }
 
 function populateProviderSection(s) {
@@ -254,6 +274,7 @@ async function saveProvider() {
 
   settings = { ...settings, activeProvider: provider, configs, simulateFailure: $('sel-simulate-failure').value };
   await chrome.storage.sync.set({ providerSettings: settings });
+  await markAiProviderSetupAcknowledged();
 
   const btn = $('btn-save-provider');
   const original = btn.textContent;
@@ -939,6 +960,66 @@ function escHtml(str) {
 }
 
 // ── API Key Mask ──────────────────────────────────────────────────────────
+function providerLabel(provider) {
+  const labels = {
+    mock: 'Demo Mode',
+    openai: 'OpenAI',
+    gemini: 'Google Gemini',
+    openrouter: 'OpenRouter',
+    ollama: 'Ollama',
+  };
+  return labels[provider] || provider || 'Not configured';
+}
+
+function buildFeedbackDiagnostics() {
+  const provider = settings?.activeProvider || '';
+  const manifest = chrome.runtime.getManifest();
+  return [
+    `App version: ${manifest.version || 'Unknown'}`,
+    `Provider: ${providerLabel(provider)}`,
+    `Demo Mode: ${provider === 'mock' ? 'Yes' : 'No'}`,
+    `Settings page: ${document.querySelector('.nav-btn.active')?.textContent?.trim() || 'Unknown'}`,
+    `Browser: ${navigator.userAgent}`,
+  ].join('\n');
+}
+
+function openFeedbackEmail(event) {
+  event.preventDefault();
+
+  const type = $('feedback-type').value;
+  const message = $('feedback-message').value.trim();
+  const replyTo = $('feedback-email').value.trim();
+  const includeDiagnostics = $('feedback-include-diagnostics').checked;
+  const status = $('feedback-status');
+
+  if (!message) {
+    status.textContent = 'Please add a message first.';
+    $('feedback-message').focus();
+    return;
+  }
+
+  const bodyParts = [
+    `Type: ${type}`,
+    '',
+    'Message:',
+    message,
+  ];
+
+  if (replyTo) {
+    bodyParts.push('', 'Contact:', replyTo);
+  }
+
+  if (includeDiagnostics) {
+    bodyParts.push('', 'Diagnostics:', buildFeedbackDiagnostics());
+  }
+
+  const subject = `Job Application Assistant feedback: ${type}`;
+  const mailtoUrl = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyParts.join('\n'))}`;
+
+  window.location.href = mailtoUrl;
+  status.textContent = 'Opening your email app...';
+}
+
 function maskKey(key) {
   if (!key) return '';
   if (key.length < 8) return '••••••••';
@@ -993,66 +1074,140 @@ function hideOllamaHelp() {
 }
 
 // ── Settings Feature Tour ─────────────────────────────────────────────────
-const SETTINGS_TOUR_STEPS = [
-  {
-    targetId: 'settings-nav',
-    section: null,
-    title: 'Three Settings Sections',
-    body: 'Settings are split into AI Provider (which AI powers your drafts), Documents (how files are named), and My Profile (your professional details). Click any section to jump to it.'
-  },
-  {
-    targetId: 'sel-provider',
-    section: 'provider',
-    title: 'Choose Your AI Provider',
-    body: 'Select OpenAI, Google Gemini, OpenRouter, or Ollama (local AI). OpenRouter is great if you want access to many models from one key — Claude, GPT-4, Gemini, and more.'
-  },
-  {
-    targetId: 'group-model',
-    section: 'provider',
-    title: 'Select a Model',
-    body: 'Each provider offers different models. Choose from the list or select Custom to type any model name. For Ollama, the name must match exactly what you downloaded.'
-  },
-  {
-    targetId: 'provider-test-area',
-    section: 'provider',
-    title: 'Test Your Connection',
-    body: 'Always test before saving — this confirms your API key is valid and the AI is reachable. For Ollama, it also checks that the local endpoint is responding.'
-  },
-  {
-    targetId: 'btn-save-provider',
-    section: 'provider',
-    title: 'Save AI Settings',
-    body: 'Save your provider settings here. Your API key is stored locally in Chrome — it never leaves your device except to call the AI provider directly.'
-  },
-  {
-    targetId: 'chip-builder',
-    section: 'documents',
-    title: 'Filename Pattern',
-    body: 'Drag chips to set how your saved PDFs are named. Add or remove variables like job title, company, and date. The preview below updates live.'
-  },
-  {
-    targetId: 'source-upload-area',
-    section: 'profile',
-    title: 'Upload Your Resume',
-    body: 'Upload your current CV (.docx or .pdf) and the AI will auto-fill all the profile fields below — saving significant manual entry time.'
-  },
-  {
-    targetId: 'card-personal-details',
-    section: 'profile',
-    title: 'Your Professional Details',
-    body: 'Fill in as much as possible here. The AI draws on your skills, experience, and education to write tailored drafts for each job. More detail means better output.'
-  },
-  {
-    targetId: 'btn-save-profile',
-    section: 'profile',
-    title: 'Save Your Profile',
-    body: 'Click Save Profile after making any changes — it is not saved automatically. Your details persist across every future application until you update them.'
-  },
-];
-
 let settingsTourIndex = 0;
+let currentSettingsTourSteps = [];
+
+const SETTINGS_TOURS = {
+  provider: [
+    {
+      targetId: 'sel-provider',
+      title: 'Choose the AI provider',
+      body: 'Pick what will power real draft generation. Ollama runs locally on your computer, while OpenAI, Gemini, and OpenRouter use your own cloud API key.'
+    },
+    {
+      targetId: 'group-model',
+      title: 'Choose the model',
+      body: 'Select the model you want this provider to use. For Ollama, the model name must match a model you have downloaded locally.'
+    },
+    {
+      targetId: 'provider-test-area',
+      title: 'Test before relying on it',
+      body: 'Use Test Connection to confirm the provider can be reached. For cloud providers this checks the key; for Ollama it checks the local endpoint.'
+    },
+    {
+      targetId: 'btn-save-provider',
+      title: 'Save AI settings',
+      body: 'Save after choosing a provider, model, and key or endpoint. Saving also tells onboarding that you understand AI setup.'
+    },
+  ],
+  documents: [
+    {
+      targetId: 'sel-default-type',
+      title: 'Default document mode',
+      body: 'Choose what the app should create by default when a workflow starts: resume, cover letter, or both.'
+    },
+    {
+      targetId: 'chip-builder',
+      title: 'Build file names',
+      body: 'Use chips to control how exported files are named. Add useful parts like company, job title, document type, and date.'
+    },
+    {
+      targetId: 'filename-preview-1',
+      title: 'Check the preview',
+      body: 'The examples update as you change the pattern, so you can confirm the file names will be clear before saving.'
+    },
+    {
+      targetId: 'btn-save-documents',
+      title: 'Save document settings',
+      body: 'Save these settings when the default mode or file naming pattern looks right.'
+    },
+  ],
+  profiles: [
+    {
+      targetId: 'profiles-list',
+      title: 'Manage saved profiles',
+      body: 'Profiles let you keep separate background details for different career paths, industries, or application styles.'
+    },
+    {
+      targetId: 'profiles-list',
+      title: 'Switch the active profile',
+      body: 'The active profile is the one the dashboard uses for new drafts. Switch profiles here before generating for a different context.'
+    },
+    {
+      targetId: 'btn-add-profile',
+      title: 'Create another profile',
+      body: 'Add a profile when you want a clean set of saved details, such as one profile for support roles and another for marketing roles.'
+    },
+    {
+      targetId: 'btn-go-to-profile',
+      title: 'Edit profile details',
+      body: 'Profiles controls which profile is active. My Profile is where you edit the actual details inside the active profile.'
+    },
+  ],
+  profile: [
+    {
+      targetId: 'source-upload-area',
+      title: 'Upload for faster setup',
+      body: 'Uploading a resume or cover letter can auto-fill profile details. It is optional; you can also fill everything in manually.'
+    },
+    {
+      targetId: 'card-personal-details',
+      title: 'Add contact details',
+      body: 'These details appear in generated documents when the selected template needs them. Keep them current before exporting.'
+    },
+    {
+      targetId: 'p-skills',
+      title: 'List reusable skills',
+      body: 'Add one skill per line. The assistant uses these saved details to tailor each draft to the job posting.'
+    },
+    {
+      targetId: 'btn-add-exp',
+      title: 'Add work history',
+      body: 'Add roles, achievements, and responsibilities you want the assistant to draw from. Specific details produce stronger drafts.'
+    },
+    {
+      targetId: 'p-do-not-claim',
+      title: 'Set hard limits',
+      body: 'Use Do Not Claim for anything the assistant must avoid, such as licenses, tools, or experience you do not have.'
+    },
+    {
+      targetId: 'btn-save-profile',
+      title: 'Save profile changes',
+      body: 'Profile edits are not saved automatically. Save after changes so future drafts use the updated details.'
+    },
+  ],
+  feedback: [
+    {
+      targetId: 'feedback-type',
+      title: 'Choose the kind of note',
+      body: 'Pick Bug report, Feature request, or General feedback so the email subject is easy to scan.'
+    },
+    {
+      targetId: 'feedback-message',
+      title: 'Describe the issue or idea',
+      body: 'Write what happened, what you expected, or what would improve the app. Avoid pasting private resume, profile, or job-posting text.'
+    },
+    {
+      targetId: 'feedback-email',
+      title: 'Add a reply address',
+      body: 'This is optional. Add your email only if you are comfortable being contacted about the feedback.'
+    },
+    {
+      targetId: 'feedback-include-diagnostics',
+      title: 'Include safe diagnostics',
+      body: 'Diagnostics help reproduce issues. They include version and provider name only, never API keys, resumes, drafts, or job descriptions.'
+    },
+    {
+      targetId: 'btn-open-feedback-email',
+      title: 'Open your email app',
+      body: 'This creates a prefilled email draft. You can review or edit everything before sending.'
+    },
+  ],
+};
 
 function startSettingsTour() {
+  const activeSection = document.querySelector('.nav-btn.active')?.dataset.section || 'provider';
+  currentSettingsTourSteps = SETTINGS_TOURS[activeSection] || SETTINGS_TOURS.provider;
   settingsTourIndex = 0;
   $('settings-tour-overlay').classList.remove('hidden');
   document.addEventListener('keydown', settingsTourKeyHandler);
@@ -1061,16 +1216,17 @@ function startSettingsTour() {
 
 function showSettingsTourStep(index) {
   settingsTourIndex = index;
-  const step = SETTINGS_TOUR_STEPS[index];
+  const step = currentSettingsTourSteps[index];
+  if (!step) return endSettingsTour();
   const overlay = $('settings-tour-overlay');
   const spotlight = $('settings-tour-spotlight');
   const tooltip = $('settings-tour-tooltip');
 
-  $('settings-tour-step-count').textContent = `${index + 1} of ${SETTINGS_TOUR_STEPS.length}`;
+  $('settings-tour-step-count').textContent = `${index + 1} of ${currentSettingsTourSteps.length}`;
   $('settings-tour-title').textContent = step.title;
   $('settings-tour-body').textContent = step.body;
   $('settings-tour-btn-prev').style.visibility = index === 0 ? 'hidden' : '';
-  $('settings-tour-btn-next').textContent = index === SETTINGS_TOUR_STEPS.length - 1 ? 'Done' : 'Next →';
+  $('settings-tour-btn-next').textContent = index === currentSettingsTourSteps.length - 1 ? 'Done' : 'Next →';
 
   // Navigate to the correct section first
   if (step.section) {
@@ -1142,7 +1298,7 @@ function endSettingsTour() {
 
 function settingsTourKeyHandler(e) {
   if (e.key === 'Escape') endSettingsTour();
-  if (e.key === 'ArrowRight' && settingsTourIndex < SETTINGS_TOUR_STEPS.length - 1) showSettingsTourStep(settingsTourIndex + 1);
+  if (e.key === 'ArrowRight' && settingsTourIndex < currentSettingsTourSteps.length - 1) showSettingsTourStep(settingsTourIndex + 1);
   if (e.key === 'ArrowLeft'  && settingsTourIndex > 0) showSettingsTourStep(settingsTourIndex - 1);
 }
 

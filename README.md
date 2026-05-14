@@ -1,4 +1,4 @@
-# Job Page Draft Assistant
+# Job Application Assistant
 
 A Chrome extension that helps you create tailored resumes and cover letters directly from any job posting page.
 
@@ -9,7 +9,7 @@ A Chrome extension that helps you create tailored resumes and cover letters dire
 1. Open Chrome and go to `chrome://extensions`
 2. Enable **Developer mode** (toggle in the top-right corner)
 3. Click **Load unpacked**
-4. Select this folder: `c:\Coding\Job Page Draft Assistant`
+4. Select this project folder
 5. The extension will appear in your toolbar
 
 ---
@@ -35,9 +35,9 @@ A Chrome extension that helps you create tailored resumes and cover letters dire
 2. *(Optional)* Highlight the job description text for more accurate extraction
 3. **Right-click** on the page
 4. Choose from the context menu:
-   - **Job Page Draft Assistant → Create Resume**
-   - **Job Page Draft Assistant → Create Cover Letter**
-   - **Job Page Draft Assistant → Create Both**
+   - **Job Application Assistant → Create Resume**
+   - **Job Application Assistant → Create Cover Letter**
+   - **Job Application Assistant → Create Both**
 5. The side panel opens — review and edit the extracted job info
 6. Click **Generate**
 7. Review the draft, ask for revisions in the chat box if needed
