@@ -64,6 +64,8 @@
  * @property {string[]} skills
  * @property {Project[]} projects
  * @property {string[]} certifications
+ * @property {{label: string, text: string}[]} customSections
+ * @property {string} doNotClaimNotes
  * @property {CoverLetterProfile} coverLetterProfile
  * @property {ResumeMetadata} metadata
  */
@@ -85,6 +87,8 @@ export const DEFAULT_RESUME_CONTENT = {
   skills: [],
   projects: [],
   certifications: [],
+  customSections: [],
+  doNotClaimNotes: '',
   coverLetterProfile: {
     tone: 'Professional',
     strengths: '',
@@ -98,6 +102,30 @@ export const DEFAULT_RESUME_CONTENT = {
   },
 };
 
+function normalizePersonalInfo(data = {}) {
+  return {
+    ...DEFAULT_RESUME_CONTENT.personalInfo,
+    ...(data.personalInfo || data.personal || {}),
+    cityProvince: data.personalInfo?.cityProvince
+      || data.personalInfo?.address
+      || data.personal?.cityProvince
+      || data.personal?.address
+      || '',
+  };
+}
+
+function normalizeCustomSections(data = {}) {
+  const rawSections = data.customSections || data.customFields || data.additionalSections || [];
+  if (!Array.isArray(rawSections)) return [];
+
+  return rawSections
+    .map(section => ({
+      label: String(section.label || section.name || section.title || 'Additional Background').trim(),
+      text: String(section.text || section.value || section.content || '').trim(),
+    }))
+    .filter(section => section.label && section.text);
+}
+
 /**
  * Normalizes any object into the ResumeContent schema.
  * Useful for migrating from old profile formats or cleaning AI output.
@@ -106,7 +134,7 @@ export function normalizeResumeContent(data = {}) {
   const base = { ...DEFAULT_RESUME_CONTENT };
 
   return {
-    personalInfo: { ...base.personalInfo, ...(data.personalInfo || data.personal || {}) },
+    personalInfo: normalizePersonalInfo(data),
     summary: data.summary || (data.summaries?.[0]?.text) || '',
     summaries: Array.isArray(data.summaries) ? data.summaries.map(s => ({
       label: s.label || 'Summary',
@@ -136,6 +164,8 @@ export function normalizeResumeContent(data = {}) {
       link: p.link || '',
     })),
     certifications: Array.isArray(data.certifications) ? data.certifications.map(c => typeof c === 'string' ? c : (c.name || '')) : [],
+    customSections: normalizeCustomSections(data),
+    doNotClaimNotes: data.doNotClaimNotes || data.doNotClaim || '',
     coverLetterProfile: { ...base.coverLetterProfile, ...(data.coverLetterProfile || {}) },
     metadata: { ...base.metadata, ...(data.metadata || {}) },
   };

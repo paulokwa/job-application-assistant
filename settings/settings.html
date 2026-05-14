@@ -249,6 +249,14 @@
         <button class="btn-add" id="btn-add-cert" type="button">+ Add Certification</button>
       </div>
 
+      <!-- Custom Sections -->
+      <div class="card">
+        <h3 class="card-sub-title">Additional Background</h3>
+        <p class="field-hint">Use this for useful resume details that do not fit the standard fields, such as volunteer work, publications, awards, languages, or community leadership.</p>
+        <div id="custom-sections-list"></div>
+        <button class="btn-add" id="btn-add-custom-section" type="button">+ Add Section</button>
+      </div>
+
       <!-- Do Not Claim -->
       <div class="card">
         <h3 class="card-sub-title">Do Not Claim</h3>
@@ -256,7 +264,7 @@
           Hard rules the AI will always follow. Tell it what it must <strong>not</strong> claim or imply on your behalf.
         </p>
         <textarea id="p-do-not-claim" rows="4"
-          placeholder="Do not present me as a registered social worker unless explicitly specified.&#10;Do not claim software engineering beyond my actual experience.&#10;Do not say I am licensed unless the job requires it and I have supplied evidence."
+          placeholder="Example: Do not describe me as licensed unless I list that license.&#10;Example: Do not claim management experience unless it appears in my profile or resume.&#10;Example: Do not imply fluency in a language unless I provide it."
           aria-label="Do not claim notes"
         ></textarea>
       </div>

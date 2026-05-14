@@ -1,6 +1,46 @@
 # Session Handover — Job Application Assistant
 
-**Last updated:** 2026-05-14 (Session 6 — Dashboard UI polish)
+**Last updated:** 2026-05-14 (Session 7 — Profile importer custom sections)
+
+---
+
+# Session 7 additions (2026-05-14)
+
+**Branch:** `main`
+
+---
+
+### 47. Resume importer custom sections
+
+Added a safe "Additional Background" path for non-standard resume content. This lets the importer and user preserve useful information that does not fit Personal Details, Skills, Work Experience, Education, or Certifications.
+
+**How it works:**
+
+- `modules/extraction.js` now asks the AI resume parser to return `customSections` for useful non-standard sections.
+- `modules/schema.js` now normalizes `customSections` and `doNotClaimNotes` so those fields survive profile save/load.
+- `settings/settings.html` adds an **Additional Background** card in My Profile with a dynamic list of labelled text sections.
+- `settings/settings.js` renders, collects, clears, and auto-fills those custom sections.
+- `modules/profile.js` includes custom sections in `profileToPromptText()` under **Additional Background** so generation can use them when relevant.
+
+**Compatibility notes:**
+
+- Draft generation already receives the raw uploaded source resume as ground truth, so this feature is mainly for preserving and reviewing unusual imported details in the structured profile.
+- The custom sections are labelled free-text sections, not arbitrary schema changes, to avoid breaking renderer or prompt expectations.
+- Existing profile fields remain unchanged and older profiles normalize with `customSections: []`.
+
+**Files changed:** `modules/extraction.js`, `modules/schema.js`, `modules/profile.js`, `settings/settings.html`, `settings/settings.css`, `settings/settings.js`
+
+---
+
+### 48. Profile importer preservation fixes
+
+Fixed two related profile persistence gaps found while adding custom sections:
+
+- Imported `summaries` are now saved into the profile instead of being discarded after auto-fill.
+- `doNotClaimNotes` are now preserved by schema normalization and included in prompt context as hard limits.
+- The Do Not Claim placeholder now reads as generic examples rather than personal rules.
+
+**Files changed:** `settings/settings.js`, `settings/settings.html`, `modules/schema.js`, `modules/profile.js`
 
 ---
 

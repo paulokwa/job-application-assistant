@@ -106,7 +106,14 @@ export function profileToPromptText(profile) {
   if (p.portfolio)    lines.push(`Portfolio: ${p.portfolio}`);
   if (p.website)      lines.push(`Website: ${p.website}`);
 
-  if (profile.summary) lines.push(`\nSummary: ${profile.summary}`);
+  if (profile.summaries?.length) {
+    lines.push('\n--- Professional Summaries ---');
+    profile.summaries.forEach(summary => {
+      if (summary.text) lines.push(`${summary.label || 'Summary'}: ${summary.text}`);
+    });
+  } else if (profile.summary) {
+    lines.push(`\nSummary: ${profile.summary}`);
+  }
 
   if (profile.skills?.length) {
     lines.push('\n--- Skills ---');
@@ -142,6 +149,18 @@ export function profileToPromptText(profile) {
   if (profile.certifications?.length) {
     lines.push('\n--- Certifications ---');
     profile.certifications.forEach(cert => lines.push(cert));
+  }
+
+  if (profile.customSections?.length) {
+    lines.push('\n--- Additional Background ---');
+    profile.customSections.forEach(section => {
+      if (section.text) lines.push(`${section.label}: ${section.text}`);
+    });
+  }
+
+  if (profile.doNotClaimNotes) {
+    lines.push('\n--- Do Not Claim / Hard Limits ---');
+    lines.push(profile.doNotClaimNotes);
   }
 
   lines.push('\n=== END USER PROFILE ===');

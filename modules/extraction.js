@@ -157,6 +157,7 @@ export async function extractProfileFromResume(resumeText, settings) {
   const systemPrompt = `You are a resume parsing assistant. 
 Your goal is to extract information from the user's resume and output it STRICTLY as a JSON object matching the exact schema below.
 If a piece of information is missing, leave the string empty or the array empty.
+If the resume includes useful non-standard sections that do not fit the main fields, preserve them under customSections.
 Do NOT include any markdown formatting, backticks, or explanation in your output. Just the raw JSON object.
 
 Schema:
@@ -188,6 +189,9 @@ Schema:
   ],
   "certifications": [
     { "name": "Cert Name", "issuer": "Issuing Org", "year": "Year", "doNotClaim": false }
+  ],
+  "customSections": [
+    { "label": "Volunteer Work", "text": "Useful resume content that does not fit the standard fields" }
   ]
 }`;
 

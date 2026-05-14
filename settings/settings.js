@@ -129,6 +129,7 @@ async function init() {
   $('btn-add-edu').addEventListener('click',  () => addEducationEntry());
   $('btn-add-cert').addEventListener('click', () => addCertEntry());
   $('btn-add-summary').addEventListener('click', () => addSummaryEntry());
+  $('btn-add-custom-section').addEventListener('click', () => addCustomSectionEntry());
 
   $('btn-add-profile').addEventListener('click', handleAddProfile);
   $('btn-go-to-profile').addEventListener('click', () => {
@@ -320,13 +321,16 @@ async function attemptAutofill(statusEl) {
 
   try {
     const extractedData = await extractProfileFromResume(plainText, effectiveSettings);
+    const extractedPersonal = normalizeAutofillPersonalInfo(extractedData.personalInfo || extractedData.personal || {});
     profile = {
       ...profile,
-      personalInfo: { ...profile.personalInfo, ...(extractedData.personalInfo || extractedData.personal || {}) },
+      personalInfo: { ...profile.personalInfo, ...extractedPersonal },
+      summaries: mergeAutofillArray(extractedData.summaries, profile.summaries),
       skills: extractedData.skills || profile.skills,
       experience: extractedData.experience || profile.experience,
       education: extractedData.education || profile.education,
       certifications: extractedData.certifications || profile.certifications,
+      customSections: mergeAutofillArray(extractedData.customSections || extractedData.customFields || extractedData.additionalSections, profile.customSections),
     };
     populateProfile(profile);
     await saveProfile(profile);
@@ -334,6 +338,17 @@ async function attemptAutofill(statusEl) {
   } catch (e) {
     renderErrorStatus(statusEl, e.message);
   }
+}
+
+function mergeAutofillArray(nextValue, fallbackValue) {
+  return Array.isArray(nextValue) && nextValue.length ? nextValue : (fallbackValue || []);
+}
+
+function normalizeAutofillPersonalInfo(data = {}) {
+  return {
+    ...data,
+    cityProvince: data.cityProvince || data.address || '',
+  };
 }
 
 function renderNoProviderStatus(statusEl) {
@@ -685,6 +700,8 @@ function populateProfile(p) {
   (p.education || []).forEach(edu => addEducationEntry(edu));
   $('certifications-list').innerHTML = '';
   (p.certifications || []).forEach(cert => addCertEntry(cert));
+  $('custom-sections-list').innerHTML = '';
+  (p.customSections || []).forEach(section => addCustomSectionEntry(section));
 }
 
 // Summaries / Experience / Education Helpers (Simplified)
@@ -761,6 +778,21 @@ function addCertEntry(data = {}) {
   $('certifications-list').appendChild(div);
 }
 
+function addCustomSectionEntry(data = {}) {
+  const div = document.createElement('div');
+  div.className = 'custom-section-entry';
+  div.style.marginBottom = '12px';
+
+  div.innerHTML = `
+    <div style="display:flex; justify-content:space-between; gap:8px">
+      <input type="text" class="custom-section-label" value="${escHtml(data.label || data.name || data.title || '')}" placeholder="Section label" style="font-weight:bold" />
+      <button onclick="this.closest('.custom-section-entry').remove()" class="btn-remove">✕</button>
+    </div>
+    <textarea class="custom-section-text" rows="3" placeholder="Details the AI can use when relevant">${escHtml(data.text || data.value || data.content || '')}</textarea>
+  `;
+  $('custom-sections-list').appendChild(div);
+}
+
 function collectProfileFromForm() {
   const readList = (sel, mapFn) => [...document.querySelectorAll(sel)].map(mapFn);
   return {
@@ -788,6 +820,10 @@ function collectProfileFromForm() {
       name:   el.querySelector('.cert-name').value,
       issuer: el.querySelector('.cert-issuer').value
     })),
+    customSections: readList('.custom-section-entry', el => ({
+      label: el.querySelector('.custom-section-label').value,
+      text:  el.querySelector('.custom-section-text').value
+    })).filter(section => section.label.trim() || section.text.trim()),
     doNotClaimNotes: $('p-do-not-claim').value
   };
 }
@@ -818,6 +854,7 @@ async function clearProfile() {
     experience: [],
     education: [],
     certifications: [],
+    customSections: [],
     doNotClaimNotes: ''
   };
   populateProfile(profile);
