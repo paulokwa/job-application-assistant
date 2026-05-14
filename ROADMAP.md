@@ -6,28 +6,10 @@ Ideas and planned features. Nothing here is committed or scheduled — it is a p
 
 ## High priority
 
-### Job History page
-A dedicated "History" view (accessible from the dashboard header or settings nav) showing every job the user has generated drafts for. Displayed as a sortable table with:
-
-- Job title
-- Employer / company name
-- Date and time generated
-- Document type (Resume, Cover Letter, or Both)
-- Source URL of the job posting
-- Quick-action buttons: Regenerate, Open URL, Delete entry
-
-**Storage:** Each generation run appends a lightweight record to `chrome.storage.local` under a `jobHistory` key (array of objects). Full draft text is not stored here — only metadata. History records are capped (e.g. last 100 entries) to stay within storage limits.
-
-**Why it matters:** Users applying to many roles lose track of where they applied and what they generated. A history table is the most direct fix.
-
----
-
-## Medium priority
-
 ### Export / Import settings (JSON)
 A single "Export settings" button in the AI Provider or Profile section that downloads all `chrome.storage.sync` and `chrome.storage.local` data (minus large blobs like source resume text) as a JSON file. A matching "Import" button restores from that file.
 
-**Why:** Profile data lives in `chrome.storage.local` and does not sync across devices. Chrome syncs provider and document settings automatically, but the full profile (experience, education, skills) requires this manual bridge. No backend needed — just a file download/upload.
+**Why:** Profile data lives in `chrome.storage.sync` per profile and does not automatically transfer between browsers. Chrome syncs data across devices for the same account, but a manual export/import is a useful backup and migration path. No backend needed — just a file download/upload.
 
 ---
 
@@ -36,24 +18,13 @@ Allow the user to directly edit generated resume or cover letter text inside the
 
 ---
 
-### Multiple saved profiles
-Support for saving and switching between different profile presets (e.g. "Product Manager track" vs "Operations track"). The current system has one profile. This would require a profile selector at the top of the Profile settings section.
-
----
-
 ## Low priority / Exploratory
 
-### Tone / formality slider
-A single slider on the dashboard (Formal ↔ Casual) that adjusts the generation system prompt. Would let users tailor voice for different company cultures without needing to use the Refine card.
+### History quick-action: Regenerate
+The History page currently shows past jobs but the "Regenerate" quick-action button is not wired up. Clicking it should reload the job data into the dashboard and trigger generation.
 
-### Cover letter length control
-A dropdown or pill selector: Short (3 paragraphs) / Standard (4–5 paragraphs) / Detailed (6+ paragraphs). Maps to a word-count instruction in the prompt.
-
-### ATS keyword scan
-After generating, a secondary AI call analyses the job description and highlights keywords that appear in the job post but are absent from the generated resume. Displayed as a small chip list with a "Re-run with keywords" button.
-
-### Dark/light mode toggle
-Currently the theme follows `prefers-color-scheme`. An explicit toggle saved to storage would let users override the system preference.
+### Profile export/import per profile
+Allow exporting a single profile (not all settings) as a shareable JSON file, and importing one. Useful for users who want to back up a specific profile or share it across devices without exporting everything.
 
 ---
 
@@ -64,3 +35,24 @@ Currently the theme follows `prefers-color-scheme`. An explicit toggle saved to 
 | Cloud sync via Supabase | Adds backend dependency, auth complexity, and a data-at-rest liability. Not worth it while Chrome sync covers provider/doc settings and export covers profile. |
 | Built-in PDF editor | Out of scope — the extension is a drafting tool, not a document editor. Save-as-PDF via the preview already covers the use case. |
 | Job board scraping / auto-apply | Moves into automation territory outside the extension's "assist, not replace" principle. |
+
+---
+
+## Completed
+
+| Feature | Session | Notes |
+|---|---|---|
+| Job History page | Session 4 | History viewer at `history/history.html`, accessible from dashboard header. Sortable table with job title, company, date, doc type, URL, delete. |
+| Multiple saved profiles | Session 4 | Full multi-profile storage (`profile_{id}` sync keys), CRUD in settings, profile switcher on dashboard, source resume filename tracked per profile. |
+| Tone / formality slider | Session 4 | Formal ↔ Casual slider (0–100) with dynamic descriptor label. Injects tone instruction into generation prompt. |
+| Cover letter length control | Session 4 | Short / Standard / Detailed pills. Maps to `clLengthInstruction()` controlling paragraph count in prompt. |
+| ATS keyword scan | Session 4 | AI extracts 10–15 keywords from job description. Displayed as selectable chips; one-click injects missing keywords into the Refine textarea. |
+| Dark/light mode toggle | Session 4 | Sun/moon button overrides `prefers-color-scheme`. Stored as `{ theme }` in local storage. Applied via `data-theme` attribute on `<html>` in both dashboard and settings pages. |
+| Settings feature tour | Session 2 | 9-step spotlight tour triggered by `?` button in settings nav. |
+| Ollama setup guide | Session 2 | In-app modal with step-by-step CORS setup and model download instructions. |
+| Per-provider API config | Session 2 | Switching providers restores previously saved credentials for that provider. |
+| Draft persistence across close/reopen | Session 1 | Generated drafts saved to `chrome.storage.local` and restored on next open. |
+| Stop/cancel generation | Session 1 | AbortController wired through the full AI call chain; active button transforms to "■ Stop". |
+| Filename chip builder | Session 1 | Drag-to-reorder chips replace plain text pattern input in Document Settings. |
+| Apply Changes disabled until text entered | Session 3 | Button activates only when draft exists AND revision textarea has non-whitespace content. |
+| Overwrite confirmation before generation | Session 3 | Confirms before overwriting an existing draft. |
