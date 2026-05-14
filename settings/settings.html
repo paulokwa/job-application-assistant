@@ -169,13 +169,13 @@
       <!-- Source Resume / Auto-fill -->
       <div class="card">
         <h3 class="card-sub-title">Source Resume and Auto-fill</h3>
-        <p class="field-hint">Accepts .docx or text-based .pdf. Scanned/image-only PDFs may not be readable. Max 10 MB.</p>
+        <p class="field-hint">For best results, upload a Word document (.docx). PDFs are supported, but PDF import is best-effort. Complex layouts, sidebars, two-column designs, decorative fonts, or scanned/image-based PDFs may produce incomplete or out-of-order text. Please review the extracted text before generating your tailored resume. Max 10 MB.</p>
 
         <div class="upload-area" id="source-upload-area" style="margin-top: 12px;">
           <input type="file" id="inp-source-resume" accept=".docx,.pdf" class="file-input" aria-label="Upload source resume" />
           <label for="inp-source-resume" class="upload-label">
             <span class="upload-icon" aria-hidden="true">📄</span>
-            <span id="source-upload-text">Click to upload your source resume (.docx or text-based .pdf, max 10 MB)</span>
+            <span id="source-upload-text">Click to upload your source resume (.docx recommended, or text-based .pdf, max 10 MB)</span>
           </label>
         </div>
         <div id="source-resume-active-bar" class="active-template-bar hidden" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
@@ -183,6 +183,16 @@
           <button id="btn-remove-source-resume" class="btn-sm btn-secondary" type="button">Remove</button>
         </div>
         <div id="profile-autofill-status" class="autofill-status hidden"></div>
+
+        <!-- PDF quality warning — shown dynamically after PDF upload -->
+        <div id="pdf-quality-warning" class="pdf-quality-warning hidden" role="alert"></div>
+
+        <!-- PDF extracted text preview — collapsible, shown after PDF upload -->
+        <details id="pdf-text-preview" class="pdf-preview hidden">
+          <summary class="pdf-preview-summary">Review extracted PDF text</summary>
+          <p class="pdf-preview-note">This is the raw text extracted from your PDF. If it looks garbled or incomplete, the auto-filled profile fields may be inaccurate. Uploading a .docx version will give better results.</p>
+          <textarea id="pdf-text-content" class="pdf-preview-textarea" rows="10" readonly aria-label="Extracted PDF text"></textarea>
+        </details>
       </div>
 
       <!-- Personal Details -->

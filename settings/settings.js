@@ -1,6 +1,6 @@
 // settings/settings.js — Settings page controller (Redesigned for HTML-First System)
 
-import { extractProfileFromResume, extractTextFromDocx, fileToArrayBuffer } from '../modules/extraction.js';
+import { extractProfileFromResume, extractTextFromDocx, extractTextFromPdf, scorePdfExtraction, fileToArrayBuffer } from '../modules/extraction.js';
 import { loadProfile, saveProfile, loadProfiles, createProfile, renameProfile, deleteProfile, switchProfile, updateProfileMeta } from '../modules/profile.js';
 import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
@@ -577,6 +577,7 @@ function clearSourceResumeUI() {
   $('profile-autofill-status').textContent = '';
   $('profile-autofill-status').classList.add('hidden');
   $('inp-source-resume').value = '';
+  hidePdfUI();
 }
 
 async function removeSourceResume() {
@@ -622,31 +623,42 @@ function loadPizZip() {
   });
 }
 
-// Reads a PDF file's text content using FileReader (works for text-based PDFs)
-function extractTextFromPdf(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const bytes = new Uint8Array(e.target.result);
-      // Pull raw text strings from PDF bytes (basic approach — good enough for AI parsing)
-      let text = '';
-      for (let i = 0; i < bytes.length - 1; i++) {
-        const c = bytes[i];
-        if (c >= 32 && c < 127) {
-          text += String.fromCharCode(c);
-        } else if (c === 10 || c === 13) {
-          text += '\n';
-        }
-      }
-      // Filter out short/garbage lines of PDF binary noise
-      const cleaned = text.split('\n')
-        .filter(line => line.trim().length > 3)
-        .join('\n');
-      resolve(cleaned);
-    };
-    reader.onerror = () => reject(new Error('Failed to read PDF file.'));
-    reader.readAsArrayBuffer(file);
-  });
+// ── PDF quality UI helpers ────────────────────────────────────────────────
+
+function showPdfQualityWarning(level, charCount) {
+  const el = $('pdf-quality-warning');
+  if (!el) return;
+  if (level === 'poor') {
+    el.textContent = `⚠️ Limited text extracted from this PDF (${charCount} characters). `
+      + 'Complex layouts, sidebars, or non-standard fonts can reduce extraction quality. '
+      + 'The auto-filled fields below may be incomplete. '
+      + 'For best results, upload a .docx version or review the extracted text below.';
+    el.className = 'pdf-quality-warning pdf-quality-warning--poor';
+    el.classList.remove('hidden');
+  } else if (level === 'partial') {
+    el.textContent = '📄 PDF imported. Some content may have been missed due to the visual layout. '
+      + 'Please review the profile fields below before generating.';
+    el.className = 'pdf-quality-warning pdf-quality-warning--partial';
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+function showPdfTextPreview(text) {
+  const preview = $('pdf-text-preview');
+  const content = $('pdf-text-content');
+  if (!preview || !content) return;
+  content.value = text;
+  preview.classList.remove('hidden');
+  preview.removeAttribute('open');
+}
+
+function hidePdfUI() {
+  const warning = $('pdf-quality-warning');
+  const preview = $('pdf-text-preview');
+  if (warning) { warning.classList.add('hidden'); warning.textContent = ''; }
+  if (preview) { preview.classList.add('hidden'); }
 }
 
 async function handleSourceResumeUpload(event) {
@@ -655,6 +667,7 @@ async function handleSourceResumeUpload(event) {
 
   const statusEl = $('profile-autofill-status');
   statusEl.classList.remove('hidden');
+  hidePdfUI();
 
   if (file.size > MAX_SOURCE_RESUME_BYTES) {
     statusEl.textContent = '❌ Error: File is too large. Please upload a .docx or text-based .pdf under 10 MB.';
@@ -665,10 +678,11 @@ async function handleSourceResumeUpload(event) {
 
   statusEl.textContent = '📄 Reading file...';
 
+  const isPdf = file.name.toLowerCase().endsWith('.pdf');
+  const isDocx = file.name.toLowerCase().endsWith('.docx');
+
   try {
     let plainText = '';
-    const isPdf = file.name.toLowerCase().endsWith('.pdf');
-    const isDocx = file.name.toLowerCase().endsWith('.docx');
 
     if (isDocx) {
       statusEl.textContent = '📄 Loading DOCX parser...';
@@ -683,7 +697,18 @@ async function handleSourceResumeUpload(event) {
     }
 
     if (!plainText || plainText.trim().length < 50) {
-      throw new Error('Could not extract enough text from the file. Please try a different format.');
+      throw new Error(isPdf
+        ? "We couldn't read enough text from this PDF. It may be scanned, password-protected, image-based, or use a complex layout. Try uploading a .docx version, a simpler text-based PDF, or paste your resume text manually."
+        : 'Could not extract enough text from the file. Please try a different format.');
+    }
+
+    // PDF quality assessment — show preview and warning before auto-fill runs
+    let qualityLevel = 'good';
+    if (isPdf) {
+      const quality = scorePdfExtraction(plainText);
+      qualityLevel = quality.level;
+      showPdfTextPreview(plainText);
+      showPdfQualityWarning(quality.level, quality.charCount);
     }
 
     await chrome.storage.local.set({
@@ -698,11 +723,18 @@ async function handleSourceResumeUpload(event) {
     $('source-resume-active-label').textContent = `📄 Active Source: ${file.name}`;
     $('source-resume-active-bar').classList.remove('hidden');
 
-    showToast('✅ Resume uploaded. Starting AI auto-fill...');
+    if (isPdf && qualityLevel !== 'good') {
+      showToast('📄 PDF imported — please review the profile fields before generating.');
+    } else {
+      showToast('✅ Resume uploaded. Starting AI auto-fill...');
+    }
+
     await attemptAutofill(statusEl);
   } catch (e) {
     statusEl.textContent = `❌ Error: ${e.message}`;
     showToast('❌ Upload failed');
+    // Reset input so the user can retry the same file (change event won't fire otherwise)
+    event.target.value = '';
   }
 }
 

@@ -254,3 +254,392 @@ export function fileToArrayBuffer(file) {
     reader.readAsArrayBuffer(file);
   });
 }
+
+// ── PDF Extraction ────────────────────────────────────────────────────────
+// Strategy: decompress FlateDecode content streams using the browser's native
+// DecompressionStream API, then parse PDF text operators (BT/ET/Tj/TJ).
+// Falls back to a byte scan for uncompressed PDFs.
+// Neither approach handles scanned/image PDFs or complex font encoding tables.
+
+/**
+ * Extracts text from a PDF File object.
+ * Primary: decompresses content streams and parses text operators.
+ * Fallback: scans raw bytes for printable ASCII (catches uncompressed PDFs).
+ * @param {File} file
+ * @returns {Promise<string>}
+ */
+export async function extractTextFromPdf(file) {
+  const ab = await file.arrayBuffer();
+  const bytes = new Uint8Array(ab);
+
+  let streamText = '';
+  try {
+    streamText = await extractPdfStreams(bytes);
+  } catch (_) {
+    // Stream extraction failed entirely — proceed to fallback
+  }
+
+  // Prefer stream extraction when it produced meaningful content.
+  // Byte-scanning a compressed PDF produces large amounts of printable-range garbage,
+  // so a raw length comparison would incorrectly favour the scan over real text.
+  let text;
+  if (streamText.trim().length >= 50) {
+    text = streamText;
+  } else {
+    const scanText = extractPdfByteScan(bytes);
+    text = scanText.trim().length > streamText.trim().length ? scanText : streamText;
+  }
+
+  return normalizePdfText(text);
+}
+
+/**
+ * Scores quality of extracted PDF text.
+ * Returns a level ('good' | 'partial' | 'poor' | 'failed') plus raw metrics.
+ * @param {string} text
+ * @returns {{ level: string, score: number, charCount: number }}
+ */
+export function scorePdfExtraction(text) {
+  if (!text || text.trim().length === 0) return { level: 'failed', score: 0, charCount: 0 };
+
+  const t = text.toLowerCase();
+  const charCount = text.trim().length;
+  let score = 0;
+
+  // Volume
+  if (charCount >= 800) score += 3;
+  else if (charCount >= 300) score += 2;
+  else if (charCount >= 100) score += 1;
+
+  // Contact signals
+  if (/@[a-z0-9.-]+\.[a-z]{2,}/.test(t)) score += 2;
+  if (/\b\d{3}[\s.\-]\d{3}[\s.\-]\d{4}|\(\d{3}\)\s*\d{3}/.test(text)) score += 1;
+  if (/linkedin/.test(t)) score += 1;
+
+  // Resume section headings
+  const headings = ['experience', 'education', 'skills', 'summary', 'objective',
+    'certifications', 'projects', 'work history', 'employment'];
+  const foundCount = headings.filter(h => t.includes(h)).length;
+  score += Math.min(foundCount * 2, 4);
+
+  const level = score >= 8 ? 'good' : score >= 4 ? 'partial' : 'poor';
+  return { level, score, charCount };
+}
+
+/**
+ * Finds all PDF content streams, decompresses FlateDecode ones with
+ * DecompressionStream, and extracts text from each.
+ * @param {Uint8Array} bytes
+ * @returns {Promise<string>}
+ */
+async function extractPdfStreams(bytes) {
+  // Decode as latin1 — lossless for binary data (byte N → codepoint N)
+  const raw = new TextDecoder('latin1').decode(bytes);
+  const collectedTexts = [];
+  let searchFrom = 0;
+
+  while (searchFrom < raw.length) {
+    // Find next valid stream keyword (must be preceded by newline)
+    const idx1 = raw.indexOf('\nstream\n', searchFrom);
+    const idx2 = raw.indexOf('\nstream\r\n', searchFrom);
+
+    let contentStart;
+    if (idx1 === -1 && idx2 === -1) break;
+
+    if (idx1 !== -1 && (idx2 === -1 || idx1 <= idx2)) {
+      contentStart = idx1 + 8;  // skip '\nstream\n'
+    } else {
+      contentStart = idx2 + 9;  // skip '\nstream\r\n'
+    }
+
+    // Look back up to 512 chars for the stream's dictionary
+    const lookbackStart = Math.max(0, contentStart - 520);
+    const region = raw.slice(lookbackStart, contentStart);
+    const dictStart = region.lastIndexOf('<<');
+
+    if (dictStart === -1) { searchFrom = contentStart; continue; }
+
+    const dictStr = region.slice(dictStart);
+
+    // Skip image and font-descriptor streams
+    if (/\/Subtype\s*\/Image/i.test(dictStr) || /\/Type\s*\/FontDescriptor/i.test(dictStr)) {
+      searchFrom = contentStart;
+      continue;
+    }
+
+    // Get declared byte length — must be a literal number (indirect refs skipped)
+    const lenMatch = dictStr.match(/\/Length\s+(\d+)/);
+    if (!lenMatch) { searchFrom = contentStart; continue; }
+
+    const declaredLength = parseInt(lenMatch[1], 10);
+    if (declaredLength <= 0 || contentStart + declaredLength > raw.length) {
+      searchFrom = contentStart;
+      continue;
+    }
+
+    const isFlate = /\/Filter\s*\/FlateDecode/i.test(dictStr) ||
+                    /\/Filter\s*\[.*?\/FlateDecode.*?\]/i.test(dictStr);
+
+    let contentStr = null;
+
+    if (isFlate) {
+      try {
+        const compressed = bytes.slice(contentStart, contentStart + declaredLength);
+        const decompressed = await decompressZlib(compressed);
+        if (decompressed) {
+          contentStr = new TextDecoder('latin1').decode(decompressed);
+        }
+      } catch (_) {
+        // Skip this stream on error
+      }
+    } else {
+      contentStr = raw.slice(contentStart, contentStart + declaredLength);
+    }
+
+    if (contentStr) {
+      const text = parseContentStreamText(contentStr);
+      if (text && text.trim().length > 0) collectedTexts.push(text);
+    }
+
+    searchFrom = contentStart + declaredLength;
+  }
+
+  return collectedTexts.join('\n');
+}
+
+/**
+ * Decompresses a FlateDecode stream using the browser-native DecompressionStream API.
+ * Tries zlib format first (PDF spec), then raw deflate (some generators omit the header).
+ * Returns null if the API is unavailable or both formats fail.
+ * @param {Uint8Array} compressed
+ * @returns {Promise<Uint8Array|null>}
+ */
+async function decompressZlib(compressed) {
+  if (typeof DecompressionStream === 'undefined') return null;
+  // 'deflate' = zlib wrapper (RFC 1950) — correct per PDF spec
+  // 'deflate-raw' = raw DEFLATE (RFC 1951) — fallback for non-compliant generators
+  for (const format of ['deflate', 'deflate-raw']) {
+    const result = await tryDecompress(compressed, format);
+    if (result) return result;
+  }
+  return null;
+}
+
+async function tryDecompress(compressed, format) {
+  try {
+    const ds = new DecompressionStream(format);
+    const writer = ds.writable.getWriter();
+    const reader = ds.readable.getReader();
+
+    // Fire-and-forget write: don't await before reading or we can deadlock on backpressure
+    writer.write(compressed).then(() => writer.close()).catch(() => {});
+
+    const chunks = [];
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+    } catch (_) {
+      if (chunks.length === 0) return null;
+    }
+
+    if (chunks.length === 0) return null;
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
+    return result;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Parses text from a decoded PDF content stream string.
+ * Handles BT/ET blocks and Tj, TJ, ' operators.
+ * @param {string} content
+ * @returns {string}
+ */
+function parseContentStreamText(content) {
+  const segments = [];
+
+  // Match BT...ET blocks (non-greedy, dot matches newlines via [\s\S])
+  const btEtRegex = /\bBT\b([\s\S]*?)\bET\b/g;
+  let m;
+  while ((m = btEtRegex.exec(content)) !== null) {
+    const blockText = parseTextBlock(m[1]);
+    if (blockText.trim()) segments.push(blockText.trim());
+  }
+
+  return segments.join('\n');
+}
+
+/**
+ * Extracts text from the body of a BT...ET block.
+ * @param {string} block
+ * @returns {string}
+ */
+function parseTextBlock(block) {
+  let result = '';
+  const lines = block.split(/\r?\n/);
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+
+    // T* — move to next line
+    if (/\bT\*\b/.test(t)) { result += '\n'; continue; }
+
+    // Td / TD — vertical movement means new line
+    const tdM = t.match(/(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+T[dD]\b/);
+    if (tdM && Math.abs(parseFloat(tdM[2])) > 0.1) { result += '\n'; }
+
+    // Tj — (string) Tj  or  <hex> Tj
+    const tjRe = /(\((?:[^()\\]|\\.)*\)|<[0-9a-fA-F\s]*>)\s+Tj\b/g;
+    let sub;
+    while ((sub = tjRe.exec(t)) !== null) result += decodePdfOperand(sub[1]);
+
+    // ' — newline + show string (\b after ' is wrong; ' is non-word so boundary never fires)
+    const primeRe = /(\((?:[^()\\]|\\.)*\)|<[0-9a-fA-F\s]*>)\s+'(?=\s|$)/g;
+    while ((sub = primeRe.exec(t)) !== null) result += '\n' + decodePdfOperand(sub[1]);
+
+    // TJ — [(str)kern(str)...] TJ
+    const tjArrRe = /\[([\s\S]*?)\]\s+TJ\b/g;
+    while ((sub = tjArrRe.exec(t)) !== null) result += decodeTjArray(sub[1]);
+  }
+
+  return result;
+}
+
+/**
+ * Decodes a single PDF string operand: literal (text) or hex <hex>.
+ * @param {string} operand
+ * @returns {string}
+ */
+function decodePdfOperand(operand) {
+  if (operand.startsWith('(')) return decodePdfLiteralString(operand.slice(1, -1));
+  if (operand.startsWith('<')) return decodePdfHexString(operand.slice(1, -1));
+  return '';
+}
+
+/**
+ * Decodes a PDF literal string, handling common escape sequences.
+ * Strips high-byte characters that aren't standard ASCII.
+ * @param {string} raw
+ * @returns {string}
+ */
+function decodePdfLiteralString(raw) {
+  return raw
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\\\/g, '\\')
+    .replace(/\\\(/g, '(')
+    .replace(/\\\)/g, ')')
+    .replace(/\\[0-7]{1,3}/g, m => {
+      const code = parseInt(m.slice(1), 8);
+      return code >= 0x20 && code <= 0x7E ? String.fromCharCode(code) : '';
+    })
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, '');
+}
+
+/**
+ * Decodes a PDF hex string like 48656C6C6F → "Hello".
+ * @param {string} hex
+ * @returns {string}
+ */
+function decodePdfHexString(hex) {
+  const cleaned = hex.replace(/\s/g, '');
+  let out = '';
+  for (let i = 0; i + 1 < cleaned.length; i += 2) {
+    const code = parseInt(cleaned.slice(i, i + 2), 16);
+    if (code >= 0x20 && code <= 0x7E) out += String.fromCharCode(code);
+  }
+  return out;
+}
+
+/**
+ * Decodes a TJ array: mix of literal strings, hex strings, and kerning numbers.
+ * Large negative kerning values (< -200) are treated as word spaces.
+ * @param {string} inner - content between the outer brackets
+ * @returns {string}
+ */
+function decodeTjArray(inner) {
+  let out = '';
+  let i = 0;
+  while (i < inner.length) {
+    if (inner[i] === '(') {
+      // Literal string — walk to matching close paren, respecting escapes
+      let j = i + 1;
+      let depth = 1;
+      while (j < inner.length && depth > 0) {
+        if (inner[j] === '\\') { j += 2; continue; }
+        if (inner[j] === '(') depth++;
+        if (inner[j] === ')') depth--;
+        j++;
+      }
+      out += decodePdfLiteralString(inner.slice(i + 1, j - 1));
+      i = j;
+    } else if (inner[i] === '<') {
+      const end = inner.indexOf('>', i);
+      if (end === -1) break;
+      out += decodePdfHexString(inner.slice(i + 1, end));
+      i = end + 1;
+    } else {
+      const numM = inner.slice(i).match(/^\s*(-?\d+(?:\.\d+)?)\s*/);
+      if (numM) {
+        if (parseFloat(numM[1]) < -200) out += ' '; // large kerning gap = word space
+        i += numM[0].length;
+      } else {
+        i++;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Fallback: scans raw bytes for printable ASCII.
+ * Works for uncompressed PDFs or PDFs with ASCII-encoded content streams.
+ * Filters out lines that are purely PDF syntax noise.
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+function extractPdfByteScan(bytes) {
+  let text = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const c = bytes[i];
+    if (c >= 32 && c < 127) text += String.fromCharCode(c);
+    else if (c === 10 || c === 13) text += '\n';
+  }
+  return text.split('\n')
+    .filter(line => line.trim().length > 3 && /[a-zA-Z0-9]/.test(line))
+    .join('\n');
+}
+
+/**
+ * Post-processes extracted PDF text:
+ * - Collapses spaced-out headings like "S K I L L S" → "SKILLS"
+ * - Reduces excessive blank lines
+ * - Removes lines with no alphanumeric content
+ * @param {string} text
+ * @returns {string}
+ */
+function normalizePdfText(text) {
+  if (!text) return '';
+
+  // "S K I L L S" → "SKILLS" (3+ single uppercase letters separated by single spaces)
+  text = text.replace(/\b([A-Z](?: [A-Z]){2,})\b/g, m => m.replace(/ /g, ''));
+
+  // Collapse runs of 3+ blank lines to 2
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  // Drop lines with no letters or digits
+  text = text.split('\n')
+    .filter(line => !line.trim() || /[a-zA-Z0-9]/.test(line))
+    .join('\n');
+
+  return text.trim();
+}
