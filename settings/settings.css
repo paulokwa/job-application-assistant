@@ -467,6 +467,15 @@ code {
   box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent);
 }
 
+#btn-save-profile.is-muted {
+  background: var(--color-raised);
+  color: var(--color-ink-3);
+  border-color: var(--color-border);
+}
+#btn-save-profile.is-muted:hover {
+  background: var(--color-raised);
+}
+
 .btn-secondary {
   background: var(--color-raised);
   color: var(--color-ink-2);

@@ -11,10 +11,6 @@ function asArray(value) {
   return [value].filter(Boolean);
 }
 
-function sourceExcerpt(sourceResumeText) {
-  const cleaned = String(sourceResumeText || '').replace(/\s+/g, ' ').trim();
-  return cleaned ? cleaned.slice(0, 320) + (cleaned.length > 320 ? '...' : '') : '';
-}
 
 function normalizeExperience(exp = {}) {
   const dates = firstText(exp.dates);
@@ -44,7 +40,7 @@ function normalizeCertification(cert) {
   return [cert?.name, cert?.issuer, cert?.year].filter(Boolean).join(' - ');
 }
 
-function profileSummary(profile = {}, sourceResumeText = '') {
+function profileSummary(profile = {}) {
   const summary = firstText(
     profile.summary,
     profile.summaries?.find(s => s?.text)?.text,
@@ -52,11 +48,7 @@ function profileSummary(profile = {}, sourceResumeText = '') {
     profile.coverLetterProfile?.notableAchievements
   );
   if (summary) return summary;
-
-  const excerpt = sourceExcerpt(sourceResumeText);
-  if (excerpt) return `Demo mode source resume excerpt: ${excerpt}`;
-
-  return '[Demo placeholder] Add a profile summary or source resume before using this draft.';
+  return '[Demo placeholder] Add a profile summary in Settings → My Profile to see tailored content here.';
 }
 
 function profileExperience(profile = {}, sourceResumeText = '') {
@@ -88,7 +80,7 @@ function profileExperience(profile = {}, sourceResumeText = '') {
 
 export function generateMockResume(jobData, profile, sourceResumeText) {
   const personalInfo = profile?.personalInfo || {};
-  const summary = profileSummary(profile, sourceResumeText);
+  const summary = profileSummary(profile);
   const skills = asArray(profile?.skills);
   const experience = profileExperience(profile, sourceResumeText);
   const education = asArray(profile?.education).map(normalizeEducation).filter(edu =>
@@ -110,7 +102,7 @@ export function generateMockResume(jobData, profile, sourceResumeText) {
 export function generateMockCoverLetter(jobData, profile, sourceResumeText) {
   const personalInfo = profile?.personalInfo || {};
   const fullName = firstText(personalInfo.fullName, 'Candidate Name');
-  const summary = profileSummary(profile, sourceResumeText);
+  const summary = profileSummary(profile);
   const firstRole = normalizeExperience(profile?.experience?.[0] || {});
   const skills = asArray(profile?.skills).slice(0, 5);
   const roleText = firstText(jobData.jobTitle, 'the role');

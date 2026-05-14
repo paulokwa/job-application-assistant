@@ -178,7 +178,10 @@
             <span id="source-upload-text">Click to upload your source resume (.docx or text-based .pdf, max 10 MB)</span>
           </label>
         </div>
-        <div id="source-resume-active-bar" class="active-template-bar hidden" style="margin-top: 8px;"></div>
+        <div id="source-resume-active-bar" class="active-template-bar hidden" style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <span id="source-resume-active-label"></span>
+          <button id="btn-remove-source-resume" class="btn-sm btn-secondary" type="button">Remove</button>
+        </div>
         <div id="profile-autofill-status" class="autofill-status hidden"></div>
       </div>
 

@@ -9,6 +9,7 @@ import { mapError } from '../modules/errorMapper.js';
 let profile = null;
 let settings = {};
 let docSettings = {};
+let profileDirty = false;
 
 const ALL_CHIPS = ['{docType}', '{company}', '{jobTitle}', '{date}'];
 let activeChips = ['{docType}', '{company}', '{jobTitle}'];
@@ -72,6 +73,7 @@ async function init() {
   populateProviderSection(settings);
   populateDocSection(docSettings);
   populateProfile(profile);
+  setProfileDirty(false);
   await populateSourceStatus();
   await populateProfilesSection();
 
@@ -90,6 +92,7 @@ async function init() {
   $('btn-save-documents').addEventListener('click', saveDocuments);
   $('btn-save-profile').addEventListener('click', saveProfileData);
   $('btn-clear-profile').addEventListener('click', clearProfile);
+  $('btn-remove-source-resume').addEventListener('click', removeSourceResume);
 
   // Tour
   $('btn-settings-tour').addEventListener('click', startSettingsTour);
@@ -126,11 +129,17 @@ async function init() {
   $('inp-source-resume').addEventListener('change', handleSourceResumeUpload);
 
   // Dynamic lists
-  $('btn-add-exp').addEventListener('click',  () => addExperienceEntry());
-  $('btn-add-edu').addEventListener('click',  () => addEducationEntry());
-  $('btn-add-cert').addEventListener('click', () => addCertEntry());
-  $('btn-add-summary').addEventListener('click', () => addSummaryEntry());
-  $('btn-add-custom-section').addEventListener('click', () => addCustomSectionEntry());
+  $('btn-add-exp').addEventListener('click',  () => { addExperienceEntry(); setProfileDirty(true); });
+  $('btn-add-edu').addEventListener('click',  () => { addEducationEntry(); setProfileDirty(true); });
+  $('btn-add-cert').addEventListener('click', () => { addCertEntry(); setProfileDirty(true); });
+  $('btn-add-summary').addEventListener('click', () => { addSummaryEntry(); setProfileDirty(true); });
+  $('btn-add-custom-section').addEventListener('click', () => { addCustomSectionEntry(); setProfileDirty(true); });
+
+  // Profile dirty tracking — any field edit or row removal lights up the Save button
+  $('section-profile').addEventListener('input', () => setProfileDirty(true));
+  $('section-profile').addEventListener('click', e => {
+    if (e.target.closest('.btn-remove')) setProfileDirty(true);
+  });
 
   $('btn-add-profile').addEventListener('click', handleAddProfile);
   $('btn-go-to-profile').addEventListener('click', () => {
@@ -563,11 +572,17 @@ async function saveDocuments() {
 // ── Source Resume & Profile ───────────────────────────────────────────────
 function clearSourceResumeUI() {
   $('source-upload-text').textContent = 'Click to upload your source resume (.docx or text-based .pdf, max 10 MB)';
-  $('source-resume-active-bar').textContent = '';
+  $('source-resume-active-label').textContent = '';
   $('source-resume-active-bar').classList.add('hidden');
   $('profile-autofill-status').textContent = '';
   $('profile-autofill-status').classList.add('hidden');
   $('inp-source-resume').value = '';
+}
+
+async function removeSourceResume() {
+  await chrome.storage.local.remove(['sourceResumeText', 'sourceResumeName']);
+  clearSourceResumeUI();
+  showToast('Source resume removed.');
 }
 
 async function populateSourceStatus() {
@@ -575,7 +590,7 @@ async function populateSourceStatus() {
   if (!localData.sourceResumeName) return;
 
   $('source-upload-text').textContent = `${localData.sourceResumeName} uploaded ✓`;
-  $('source-resume-active-bar').textContent = `📄 Active Source: ${localData.sourceResumeName}`;
+  $('source-resume-active-label').textContent = `📄 Active Source: ${localData.sourceResumeName}`;
   $('source-resume-active-bar').classList.remove('hidden');
 
   const statusEl = $('profile-autofill-status');
@@ -680,7 +695,7 @@ async function handleSourceResumeUpload(event) {
     if (activeId) await updateProfileMeta(activeId, { sourceResumeName: file.name });
 
     $('source-upload-text').textContent = `${file.name} uploaded ✓`;
-    $('source-resume-active-bar').textContent = `📄 Active Source: ${file.name}`;
+    $('source-resume-active-label').textContent = `📄 Active Source: ${file.name}`;
     $('source-resume-active-bar').classList.remove('hidden');
 
     showToast('✅ Resume uploaded. Starting AI auto-fill...');
@@ -840,6 +855,7 @@ function collectProfileFromForm() {
 async function saveProfileData() {
   profile = collectProfileFromForm();
   await saveProfile(profile);
+  setProfileDirty(false);
 
   const btn = $('btn-save-profile');
   const original = btn.textContent;
@@ -852,7 +868,7 @@ async function saveProfileData() {
 async function clearProfile() {
   const confirmed = await showConfirmDialog(
     'Clear all profile information?',
-    'This will remove your personal details, experience, education, and skills. It cannot be undone.',
+    'This will remove your personal details, experience, education, and skills. Your uploaded source resume will remain active — use the Remove button in the Source Resume section to delete it separately.',
     'Clear All'
   );
   if (!confirmed) return;
@@ -867,11 +883,17 @@ async function clearProfile() {
     doNotClaimNotes: ''
   };
   populateProfile(profile);
+  setProfileDirty(false);
   await saveProfile(profile);
   showToast('Profile cleared');
 }
 
 // Helpers
+function setProfileDirty(dirty) {
+  profileDirty = dirty;
+  $('btn-save-profile').classList.toggle('is-muted', !dirty);
+}
+
 let toastTimer;
 function showToast(msg) {
   const t = $('toast');
