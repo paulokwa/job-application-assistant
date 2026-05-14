@@ -53,8 +53,13 @@ async function init() {
 
   // Apply stored theme before page renders to prevent flash
   const { theme } = await chrome.storage.local.get(['theme']);
-  if (theme === 'dark')  document.documentElement.setAttribute('data-theme', 'dark');
-  else if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  applyTheme(theme || 'system');
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes.theme) {
+      applyTheme(changes.theme.newValue || 'system');
+    }
+  });
 
   // Load saved data
   const stored = await chrome.storage.sync.get(['providerSettings', 'docSettings']);
@@ -131,6 +136,12 @@ async function init() {
   });
 
   updateFilenamePreview();
+}
+
+function applyTheme(theme) {
+  if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
+  else if (theme === 'light') document.documentElement.dataset.theme = 'light';
+  else delete document.documentElement.dataset.theme;
 }
 
 // ── Provider Section ──────────────────────────────────────────────────────

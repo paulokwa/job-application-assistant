@@ -1,6 +1,78 @@
 # Session Handover — Job Application Assistant
 
-**Last updated:** 2026-05-13 (Session 4 — Dashboard features, multi-profile, settings polish)
+**Last updated:** 2026-05-13 (Session 5 — Inline draft editing)
+
+---
+
+# Session 5 additions (2026-05-13)
+
+**Branch:** `feature/inline-editing` (merged to `main`)
+
+---
+
+### 44. Inline draft editing
+
+Users can now directly edit the generated resume or cover letter text inside the preview iframe before saving as PDF. This addresses the lack of DOCX export — users can make final tweaks in the preview pane instead of needing to edit a downloaded file.
+
+**How it works:**
+
+- A small "✏ Edit" pill button (`.btn-edit-toggle`) sits in a centered `.preview-edit-bar` positioned absolutely near the top of each draft wrapper (`draft-resume-content`, `draft-cl-content`). The bar is only visible when a draft exists (the wrapper is unhidden on generation).
+- Clicking "✏ Edit" calls `toggleEditMode(tab)` which:
+  1. Injects a `<style id="edit-mode-style">` into the iframe document to override `.page-preview { overflow: visible !important; }` (the renderer sets `overflow: hidden` which would clip edited content)
+  2. Sets `contentEditable = 'true'` on the `.page-preview` div inside the iframe
+  3. Focuses the element so the user can start typing immediately
+  4. Attaches a `{ once: true }` `input` listener that sets `state.hasEdits[tab] = true` on first keystroke
+  5. Changes the button label to "Done" and applies the `.editing` class (teal filled style)
+- Clicking "Done" calls `toggleEditMode(tab)` again which:
+  1. Removes `contenteditable` attribute from `.page-preview`
+  2. Removes the injected `edit-mode-style` (overflow goes back to hidden)
+  3. Resets the button to "✏ Edit"
+  4. `state.hasEdits[tab]` remains `true` if any input was received
+
+**Print/save pipeline (critical — read before touching `printDraft`):**
+
+The existing pipeline calls `renderDocument()` from `state.drafts` JSON, which would wipe out any inline edits. The fix is:
+- `printDraft()` checks `state.hasEdits[tab]` for each tab being printed
+- If edits exist, it calls `getIframeHtml(iframe)` which returns `'<!DOCTYPE html>\n' + iframe.contentDocument.documentElement.outerHTML`
+- This captures the full HTML including all embedded CSS and print media styles already baked into the rendered document by `renderDocument()`, so print quality is identical to the non-edited path
+- The merged print (`btn-print-merged`) always re-renders from state — no edit integration for merged (kept simple)
+
+**Edit state reset:**
+
+- `clearEditState(tab)` resets `state.editMode[tab]`, `state.hasEdits[tab]`, and the button UI
+- `updatePreviews()` calls `clearEditState` for resume and cover-letter tabs before injecting new HTML (so template changes, revisions, and re-generations all clear any previous edits)
+- `clearSession()` calls `clearEditState` for both tabs
+
+**New state fields:**
+```js
+editMode: { resume: false, 'cover-letter': false },
+hasEdits: { resume: false, 'cover-letter': false },
+```
+
+**New DOM refs:** `btnEditResume` (`#btn-edit-resume`), `btnEditCL` (`#btn-edit-cl`)
+
+**New functions:** `toggleEditMode(tab)`, `getIframeHtml(iframe)`, `clearEditState(tab)`
+
+**Files changed:**
+| File | Change |
+|---|---|
+| `dashboard/dashboard.html` | Added `.preview-edit-bar` + `#btn-edit-resume` inside `#draft-resume-content`; same for `#btn-edit-cl` inside `#draft-cl-content` |
+| `dashboard/dashboard.css` | Added `.preview-edit-bar` (absolute, top-right, z-index 10), `.btn-edit-toggle` (pill button, muted style), `.btn-edit-toggle:hover` (accent border/color), `.btn-edit-toggle.editing` (teal fill) |
+| `dashboard/dashboard.js` | `editMode`/`hasEdits` state, DOM refs, event listeners, `toggleEditMode()`, `getIframeHtml()`, `clearEditState()`, modified `updatePreviews()`, modified `printDraft()` (uses iframe HTML when edits exist), modified `clearSession()` |
+
+---
+
+## Next steps for Session 5
+
+- Load the extension on `feature/inline-editing` branch and test:
+  1. Generate a draft → "✏ Edit" button appears in top-right of preview
+  2. Click Edit → button turns teal "Done", text in preview is editable
+  3. Make a change → click Done
+  4. Click "Resume + Cover Letter" save button → print dialog should show the edited version
+  5. Verify template changes / revisions clear edits and reset button
+  6. Verify "New Draft" clears edit state
+- Merged `feature/inline-editing` → `main` after user confirmation and moved "In-line draft editing" to Completed in ROADMAP.md.
+- If not working, switch back to `main` (the branch has no changes to any shared module — only dashboard files)
 
 ---
 

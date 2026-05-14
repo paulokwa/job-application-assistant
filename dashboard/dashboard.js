@@ -30,7 +30,9 @@ const state = {
   settings: null,
   profile: null,
   sourceResumeText: '',
-  lastRunMode: null
+  lastRunMode: null,
+  editMode: { resume: false, 'cover-letter': false },
+  hasEdits: { resume: false, 'cover-letter': false },
 };
 
 let currentAbortController = null;
@@ -83,6 +85,7 @@ const dom = {
   btnRegenerate:      $('btn-regenerate'),
   
   btnPrintBoth:       $('btn-print-both'),
+  btnPrintResume:     $('btn-print-resume'),
   btnPrintCL:         $('btn-print-cl'),
   btnPrintMerged:     $('btn-print-merged'),
 
@@ -114,6 +117,8 @@ const dom = {
   btnTour:            $('btn-tour'),
   btnScan:            $('btn-scan-page'),
   settingsFrame:      $('settings-frame'),
+  btnEditResume:      $('btn-edit-resume'),
+  btnEditCL:          $('btn-edit-cl'),
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -144,7 +149,7 @@ async function init() {
 
   // Listen for data written by background script (context menu extraction)
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'session' && (changes.extractedData || changes.pendingMode)) {
+    if (areaName === 'session' && (changes.extractedData || changes.pendingMode || changes.regenerateRequested)) {
       loadSession();
     }
   });
@@ -176,12 +181,15 @@ function applyExtractedData(raw, url, usedSelection) {
   }
 
   const fields = extractJobFields(text, url);
-  dom.fieldTitle.value   = fields.jobTitle;
-  dom.fieldCompany.value = fields.company;
+  const jobTitle = raw.jobTitle || fields.jobTitle;
+  const company = raw.company || fields.company;
+
+  dom.fieldTitle.value   = jobTitle;
+  dom.fieldCompany.value = company;
   dom.fieldUrl.value     = url;
   dom.fieldDesc.value    = text;
 
-  state.jobData = { jobTitle: fields.jobTitle, company: fields.company, sourceUrl: url, description: text };
+  state.jobData = { jobTitle, company, sourceUrl: url, description: text };
 }
 
 function applySession(session) {
@@ -196,6 +204,14 @@ function applySession(session) {
 
   if (session.pendingMode) {
     state.lastRunMode = session.pendingMode;
+  }
+
+  if (session.regenerateRequested) {
+    const mode = session.pendingMode || 'both';
+    dom.historyView.classList.remove('visible');
+    chrome.storage.session.remove(['regenerateRequested']);
+    showToast('Reloaded job from history. Regenerating...');
+    runGeneration(mode);
   }
 }
 
@@ -384,8 +400,13 @@ function bindEvents() {
   dom.btnAtsScan.addEventListener('click', runAtsCheck);
   dom.btnAtsApply.addEventListener('click', applyAtsKeywords);
 
+  // Inline editing
+  dom.btnEditResume.addEventListener('click', () => toggleEditMode('resume'));
+  dom.btnEditCL.addEventListener('click', () => toggleEditMode('cover-letter'));
+
   // Save as PDF (via print dialog)
   dom.btnPrintBoth.addEventListener('click', () => printDraft('resume', 'cover-letter'));
+  dom.btnPrintResume.addEventListener('click', () => printDraft('resume'));
   dom.btnPrintCL.addEventListener('click', () => printDraft('cover-letter'));
   dom.btnPrintMerged.addEventListener('click', () => printDraft('merged'));
 
@@ -502,6 +523,7 @@ async function appendJobHistory(targets) {
     sourceUrl: state.jobData.sourceUrl || '',
     docType,
     date:      new Date().toISOString(),
+    jobData:   { ...state.jobData },
   };
 
   const { jobHistory = [] } = await chrome.storage.local.get('jobHistory');
@@ -642,6 +664,7 @@ function updatePreviews() {
   };
 
   if (state.drafts.resume) {
+    clearEditState('resume');
     dom.draftResumeEmpty.classList.add('hidden');
     dom.draftResumeContent.classList.remove('hidden');
     const resumeData = {
@@ -654,6 +677,7 @@ function updatePreviews() {
   }
 
   if (state.drafts['cover-letter']) {
+    clearEditState('cover-letter');
     dom.draftCLEmpty.classList.add('hidden');
     dom.draftCLContent.classList.remove('hidden');
     // Map the draft to the expected format for cover letters
@@ -690,6 +714,52 @@ function injectToIframe(iframe, html) {
   doc.close();
 }
 
+function toggleEditMode(tab) {
+  const entering = !state.editMode[tab];
+  state.editMode[tab] = entering;
+
+  const iframe = tab === 'resume' ? dom.previewResumeFrame : dom.previewCLFrame;
+  const btn    = tab === 'resume' ? dom.btnEditResume : dom.btnEditCL;
+  const doc    = iframe.contentDocument;
+  const page   = doc?.querySelector('.page-preview');
+
+  if (!page) return;
+
+  if (entering) {
+    const style = doc.createElement('style');
+    style.id = 'edit-mode-style';
+    style.textContent = '.page-preview { overflow: visible !important; }';
+    doc.head.appendChild(style);
+    page.contentEditable = 'true';
+    page.focus();
+    page.addEventListener('input', () => { state.hasEdits[tab] = true; }, { once: true });
+    btn.textContent = 'Done';
+    btn.classList.add('editing');
+    btn.title = 'Click to exit edit mode';
+  } else {
+    page.removeAttribute('contenteditable');
+    const style = doc.getElementById('edit-mode-style');
+    if (style) style.remove();
+    btn.textContent = '✏ Edit';
+    btn.classList.remove('editing');
+    btn.title = 'Edit the document directly in the preview';
+  }
+}
+
+function getIframeHtml(iframe) {
+  return '<!DOCTYPE html>\n' + iframe.contentDocument.documentElement.outerHTML;
+}
+
+function clearEditState(tab) {
+  state.editMode[tab] = false;
+  state.hasEdits[tab] = false;
+  const btn = tab === 'resume' ? dom.btnEditResume : dom.btnEditCL;
+  if (btn) {
+    btn.textContent = '✏ Edit';
+    btn.classList.remove('editing');
+    btn.title = 'Edit the document directly in the preview';
+  }
+}
 
 function printDraft(...types) {
   // If no types specified, default to the currently active tab
@@ -738,12 +808,17 @@ function printDraft(...types) {
   }
 
   for (const tab of targets.filter(t => !!state.drafts[t])) {
-    const draft = state.drafts[tab];
-    const data = tab === 'resume'
-      ? { ...draft, personalInfo: state.profile.personalInfo }
-      : { personalInfo: state.profile.personalInfo, content: draft };
-
-    const html = renderDocument(state.templateId, tab, data, options);
+    let html;
+    if (state.hasEdits[tab]) {
+      const iframe = tab === 'resume' ? dom.previewResumeFrame : dom.previewCLFrame;
+      html = getIframeHtml(iframe);
+    } else {
+      const draft = state.drafts[tab];
+      const data = tab === 'resume'
+        ? { ...draft, personalInfo: state.profile.personalInfo }
+        : { personalInfo: state.profile.personalInfo, content: draft };
+      html = renderDocument(state.templateId, tab, data, options);
+    }
 
     const printWin = window.open('', '_blank');
     if (!printWin) {
@@ -830,6 +905,8 @@ async function clearSession() {
   dom.draftMergedContent.classList.add('hidden');
   dom.tabBtnMerged.classList.add('hidden');
   dom.btnPrintMerged.classList.add('hidden');
+  clearEditState('resume');
+  clearEditState('cover-letter');
 
   refreshExportButtons();
   switchTab('resume');
@@ -913,7 +990,8 @@ function hideError() { dom.genError.classList.add('hidden'); }
 function refreshExportButtons() {
   const hasResume = !!state.drafts.resume;
   const hasCL = !!state.drafts['cover-letter'];
-  dom.btnPrintBoth.disabled = !hasResume;
+  dom.btnPrintBoth.disabled = !(hasResume && hasCL);
+  dom.btnPrintResume.disabled = !hasResume;
   dom.btnPrintCL.disabled = !hasCL;
   dom.btnPrintMerged.disabled = !(hasResume && hasCL);
   dom.btnAtsScan.disabled = !hasResume || !state.jobData.description;
@@ -1072,6 +1150,7 @@ function applyTheme(theme) {
   dom.btnTheme.textContent   = isDark ? '☀' : '🌙';
   dom.btnTheme.title         = isDark ? 'Switch to light mode' : 'Switch to dark mode';
   dom.btnTheme.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+  syncEmbeddedTheme(theme);
 }
 
 function toggleTheme() {
@@ -1081,6 +1160,16 @@ function toggleTheme() {
   const next = isDark ? 'light' : 'dark';
   applyTheme(next);
   chrome.storage.local.set({ theme: next });
+}
+
+function syncEmbeddedTheme(theme) {
+  [dom.settingsFrame, document.getElementById('history-frame')].forEach(frame => {
+    const root = frame?.contentDocument?.documentElement;
+    if (!root) return;
+    if (theme === 'dark') root.dataset.theme = 'dark';
+    else if (theme === 'light') root.dataset.theme = 'light';
+    else delete root.dataset.theme;
+  });
 }
 
 function toneLabel(value) {

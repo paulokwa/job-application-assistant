@@ -716,6 +716,11 @@ html, body {
   width: 100%;
 }
 
+.save-button-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 4px;
+}
+
 /* ══════════════════════════════════════════════
    PREVIEW
    ══════════════════════════════════════════════ */
@@ -724,6 +729,43 @@ html, body {
   flex-direction: column;
   flex: 1;
   min-height: 400px;
+}
+
+.preview-edit-bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.btn-edit-toggle {
+  font-size: 11px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-3);
+  cursor: pointer;
+  line-height: 1.4;
+  transition: background var(--dur-fast) var(--ease-std),
+              color var(--dur-fast) var(--ease-std),
+              border-color var(--dur-fast) var(--ease-std);
+}
+
+.btn-edit-toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.btn-edit-toggle.editing {
+  border-color: var(--color-accent);
+  color: var(--color-accent-on);
+  background: var(--color-accent);
+  font-weight: 600;
 }
 
 .draft-preview-wrapper {

@@ -3,6 +3,12 @@
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
+function applyTheme(theme) {
+  if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
+  else if (theme === 'light') document.documentElement.dataset.theme = 'light';
+  else delete document.documentElement.dataset.theme;
+}
+
 function escHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -29,6 +35,12 @@ function typeBadgeClass(docType) {
   if (docType === 'Cover Letter') return 'type-badge type-cover-letter';
   if (docType === 'Merged')       return 'type-badge type-merged';
   return 'type-badge'; // Resume + Cover Letter / Resume
+}
+
+function generationModeForEntry(entry) {
+  if (entry.docType === 'Cover Letter') return 'cover-letter';
+  if (entry.docType === 'Resume') return 'resume';
+  return 'both';
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────
@@ -67,9 +79,13 @@ function render(entries) {
 
   for (const entry of entries) {
     const tr = document.createElement('tr');
+    const canRegenerate = !!entry.jobData?.description;
     const openBtn = entry.sourceUrl
       ? `<button class="action-btn" data-action="open" data-url="${escAttr(entry.sourceUrl)}" title="Open original job posting">Open URL</button>`
       : '';
+    const regenerateTitle = canRegenerate
+      ? 'Reload this job in the dashboard and regenerate'
+      : 'This older history entry does not include the job description needed to regenerate';
 
     tr.innerHTML = `
       <td class="col-date">
@@ -80,8 +96,11 @@ function render(entries) {
       <td class="col-company">${escHtml(entry.company || '—')}</td>
       <td class="col-type"><span class="${typeBadgeClass(entry.docType)}">${escHtml(entry.docType)}</span></td>
       <td class="col-actions">
-        ${openBtn}
-        <button class="action-btn action-btn--danger" data-action="delete" data-id="${entry.id}" title="Remove from history">Delete</button>
+        <div class="history-actions">
+          <button class="action-btn" data-action="regenerate" data-id="${entry.id}" title="${escAttr(regenerateTitle)}" ${canRegenerate ? '' : 'disabled'}>Regenerate</button>
+          ${openBtn}
+          <button class="action-btn action-btn--danger" data-action="delete" data-id="${entry.id}" title="Remove from history">Delete</button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
@@ -134,9 +153,38 @@ async function clearAll() {
   render([]);
 }
 
+async function regenerateEntry(id) {
+  const entries = await loadHistory();
+  const entry = entries.find(e => e.id === id);
+  const jobData = entry?.jobData;
+  if (!jobData?.description) return;
+
+  const sourceUrl = jobData.sourceUrl || entry.sourceUrl || '';
+  const mode = generationModeForEntry(entry);
+
+  await chrome.storage.session.set({
+    extractedData: {
+      pageText: jobData.description,
+      jobTitle: jobData.jobTitle || entry.jobTitle || '',
+      company: jobData.company || entry.company || '',
+      url: sourceUrl,
+    },
+    sourceUrl,
+    sourceTitle: [jobData.jobTitle || entry.jobTitle, jobData.company || entry.company].filter(Boolean).join(' - '),
+    pendingMode: mode,
+    regenerateRequested: {
+      id: entry.id,
+      requestedAt: new Date().toISOString(),
+    },
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 
 async function init() {
+  const { theme } = await chrome.storage.local.get(['theme']);
+  applyTheme(theme || 'system');
+
   const entries = await loadHistory();
   render(entries);
 
@@ -147,6 +195,10 @@ async function init() {
 
     if (btn.dataset.action === 'open') {
       window.open(btn.dataset.url, '_blank', 'noopener');
+    }
+
+    if (btn.dataset.action === 'regenerate') {
+      await regenerateEntry(Number(btn.dataset.id));
     }
 
     if (btn.dataset.action === 'delete') {
@@ -171,6 +223,10 @@ async function init() {
 
   // Auto-refresh when a new entry is saved from the dashboard
   chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.theme) {
+      applyTheme(changes.theme.newValue || 'system');
+    }
+
     if (area === 'local' && changes.jobHistory) {
       render(changes.jobHistory.newValue || []);
     }

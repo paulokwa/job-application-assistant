@@ -223,6 +223,9 @@
             <p>Fill in the job info and description, then click Generate.</p>
           </div>
           <div id="draft-resume-content" class="draft-preview-wrapper hidden">
+            <div class="preview-edit-bar">
+              <button id="btn-edit-resume" class="btn-edit-toggle" type="button" title="Edit the document directly in the preview">✏ Edit</button>
+            </div>
             <iframe id="preview-resume-frame" class="preview-frame" title="Resume preview"></iframe>
           </div>
         </div>
@@ -234,6 +237,9 @@
             <p>Fill in the job info and description, then click Generate.</p>
           </div>
           <div id="draft-cl-content" class="draft-preview-wrapper hidden">
+            <div class="preview-edit-bar">
+              <button id="btn-edit-cl" class="btn-edit-toggle" type="button" title="Edit the document directly in the preview">✏ Edit</button>
+            </div>
             <iframe id="preview-cl-frame" class="preview-frame" title="Cover letter preview"></iframe>
           </div>
         </div>
@@ -302,8 +308,9 @@
           <span class="card-title">Save as PDF</span>
         </div>
         <div class="save-buttons">
-          <div class="btn-group-row" style="margin-bottom: 4px;">
+          <div class="btn-group-row save-button-row">
             <button id="btn-print-both" class="btn-confirm" style="width: 100%;" disabled>Resume + Cover Letter</button>
+            <button id="btn-print-resume" class="btn-confirm" style="width: 100%;" disabled>Resume Only</button>
             <button id="btn-print-cl" class="btn-confirm" style="width: 100%;" disabled>Cover Letter Only</button>
           </div>
           <button id="btn-print-merged" class="btn-confirm hidden" style="width: 100%; margin-bottom: 4px;" disabled>Merged Document</button>

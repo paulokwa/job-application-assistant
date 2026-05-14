@@ -13,15 +13,7 @@ A single "Export settings" button in the AI Provider or Profile section that dow
 
 ---
 
-### In-line draft editing
-Allow the user to directly edit generated resume or cover letter text inside the preview pane, rather than only being able to use the Refine/Revision card. A simple `contenteditable` approach within the preview would suffice for v1.
-
----
-
 ## Low priority / Exploratory
-
-### History quick-action: Regenerate
-The History page currently shows past jobs but the "Regenerate" quick-action button is not wired up. Clicking it should reload the job data into the dashboard and trigger generation.
 
 ### Profile export/import per profile
 Allow exporting a single profile (not all settings) as a shareable JSON file, and importing one. Useful for users who want to back up a specific profile or share it across devices without exporting everything.
@@ -42,6 +34,8 @@ Allow exporting a single profile (not all settings) as a shareable JSON file, an
 
 | Feature | Session | Notes |
 |---|---|---|
+| In-line draft editing | Session 5 | Edit button in the preview enables direct `contenteditable` changes inside generated resume and cover letter iframes before saving as PDF. |
+| History quick-action: Regenerate | Session 5 | History rows now expose Regenerate when the saved entry includes job description data. It reloads the job into the dashboard and triggers the matching generation mode. |
 | Job History page | Session 4 | History viewer at `history/history.html`, accessible from dashboard header. Sortable table with job title, company, date, doc type, URL, delete. |
 | Multiple saved profiles | Session 4 | Full multi-profile storage (`profile_{id}` sync keys), CRUD in settings, profile switcher on dashboard, source resume filename tracked per profile. |
 | Tone / formality slider | Session 4 | Formal ↔ Casual slider (0–100) with dynamic descriptor label. Injects tone instruction into generation prompt. |
