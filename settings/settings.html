@@ -25,6 +25,7 @@
     <nav class="settings-nav" id="settings-nav" aria-label="Settings sections">
       <button class="nav-btn active" data-section="provider">AI Provider</button>
       <button class="nav-btn" data-section="documents">Documents</button>
+      <button class="nav-btn" data-section="profiles">Profiles</button>
       <button class="nav-btn" data-section="profile">My Profile</button>
       <button id="btn-settings-tour" class="settings-tour-btn" title="Take a tour of Settings" aria-label="Start settings tour">?</button>
     </nav>
@@ -41,7 +42,7 @@
           <label for="sel-provider">Provider</label>
           <select id="sel-provider">
             <option value="">— Select a provider —</option>
-            <option value="mock" style="display:none">Mock Mode (dev / no API key needed)</option>
+            <option value="mock">Demo Mode (no API key needed)</option>
             <option value="openai">OpenAI (ChatGPT)</option>
             <option value="gemini">Google Gemini</option>
             <option value="openrouter">OpenRouter (multi-model)</option>
@@ -138,6 +139,24 @@
       </div>
 
       <button class="btn-save-section" id="btn-save-documents">Save Document Settings</button>
+    </section>
+
+    <!-- ══════════════════════════════════════════
+         SECTION: PROFILES
+    ══════════════════════════════════════════ -->
+    <section id="section-profiles" class="settings-section" aria-labelledby="profiles-heading">
+      <h2 class="section-title" id="profiles-heading">Profiles</h2>
+      <p class="section-desc">Maintain separate profiles for different career paths or application styles. Switch between them here or directly on the dashboard.</p>
+
+      <div class="card">
+        <div id="profiles-list" class="profiles-list"></div>
+        <button class="btn-add" id="btn-add-profile" type="button">+ New Profile</button>
+      </div>
+
+      <p class="section-desc" style="margin-top: 10px; font-size: 12px;">
+        Edit the active profile's details in
+        <button class="link-btn" id="btn-go-to-profile" type="button">My Profile →</button>
+      </p>
     </section>
 
     <!-- ══════════════════════════════════════════
@@ -325,6 +344,7 @@
             <li><strong>"Ollama blocked the request (CORS)"</strong> — the environment variable was not set, or Ollama was not fully restarted after setting it. Repeat Step 1.</li>
             <li><strong>"Model not found"</strong> — the model has not been downloaded yet, or the name does not match exactly. Run <code>ollama list</code> in a terminal to see installed models.</li>
             <li><strong>"Could not reach Ollama"</strong> — the app is not running. Open Ollama and check for its icon in the system tray (Windows) or menu bar (Mac).</li>
+            <li><strong>Using a remote or non-localhost endpoint</strong> — this extension can only reach Ollama at <code>localhost</code> or <code>127.0.0.1</code>. If you point the endpoint at another machine or IP address (e.g. <code>http://192.168.1.10:11434</code>), Chrome will block the request because the extension does not have permission for arbitrary IP addresses. To use Ollama, it must be running on the same computer as Chrome.</li>
           </ul>
         </div>
 

@@ -1,0 +1,342 @@
+/* history/history.css — Job History page */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ══════════════════════════════════════════════
+   DESIGN TOKENS
+   ══════════════════════════════════════════════ */
+:root {
+  --color-canvas:          oklch(97.5% 0.007 85);
+  --color-surface:         oklch(99.5% 0.004 85);
+  --color-raised:          oklch(95.5% 0.009 85);
+  --color-border:          oklch(87% 0.008 240);
+  --color-border-subtle:   oklch(92% 0.005 240);
+  --color-ink:             oklch(18% 0.007 240);
+  --color-ink-2:           oklch(44% 0.009 240);
+  --color-ink-3:           oklch(63% 0.007 240);
+  --color-accent:          oklch(46% 0.10 195);
+  --color-accent-subtle:   oklch(93% 0.05 195);
+  --color-danger:          oklch(54% 0.17 25);
+  --color-danger-subtle:   oklch(95% 0.06 25);
+  --color-success:         oklch(56% 0.13 145);
+  --color-success-subtle:  oklch(94% 0.05 145);
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --ease-std:  cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:  150ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas:         oklch(14% 0.008 250);
+    --color-surface:        oklch(18% 0.009 250);
+    --color-raised:         oklch(22% 0.009 250);
+    --color-border:         oklch(30% 0.008 250);
+    --color-border-subtle:  oklch(26% 0.005 250);
+    --color-ink:            oklch(94% 0.006 85);
+    --color-ink-2:          oklch(73% 0.007 250);
+    --color-ink-3:          oklch(52% 0.007 250);
+    --color-accent:         oklch(56% 0.10 195);
+    --color-accent-subtle:  oklch(20% 0.07 195);
+    --color-danger:         oklch(60% 0.17 25);
+    --color-danger-subtle:  oklch(18% 0.08 25);
+    --color-success:        oklch(60% 0.13 145);
+    --color-success-subtle: oklch(18% 0.06 145);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ══════════════════════════════════════════════
+   BASE
+   ══════════════════════════════════════════════ */
+body {
+  font-family: var(--font-body);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ══════════════════════════════════════════════
+   HEADER
+   ══════════════════════════════════════════════ */
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.page-subtitle {
+  font-size: 11.5px;
+  color: var(--color-ink-3);
+  margin-top: 2px;
+}
+
+/* ══════════════════════════════════════════════
+   MAIN
+   ══════════════════════════════════════════════ */
+.history-main {
+  padding: 16px 20px 32px;
+}
+
+/* ══════════════════════════════════════════════
+   EMPTY STATE
+   ══════════════════════════════════════════════ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+  gap: 10px;
+}
+
+.empty-icon {
+  font-size: 36px;
+  opacity: 0.4;
+}
+
+.empty-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink-2);
+}
+
+.empty-body {
+  font-size: 12.5px;
+  color: var(--color-ink-3);
+  max-width: 220px;
+  line-height: 1.6;
+}
+
+/* ══════════════════════════════════════════════
+   TABLE
+   ══════════════════════════════════════════════ */
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.history-table thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-3);
+  padding: 0 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.history-table tbody tr {
+  border-bottom: 1px solid var(--color-border-subtle);
+  transition: background var(--dur-fast) var(--ease-std);
+}
+
+.history-table tbody tr:hover {
+  background: var(--color-raised);
+}
+
+.history-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.history-table td {
+  padding: 10px 8px;
+  vertical-align: middle;
+  color: var(--color-ink-2);
+}
+
+.col-date   { width: 90px; }
+.col-title  { min-width: 90px; color: var(--color-ink); font-weight: 500; }
+.col-company { min-width: 70px; }
+.col-type   { width: 110px; }
+.col-actions { width: 110px; text-align: right; }
+
+.date-primary {
+  display: block;
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.date-secondary {
+  display: block;
+  font-size: 11px;
+  color: var(--color-ink-3);
+  margin-top: 1px;
+}
+
+/* ── Type badge ─────────────────────────────── */
+.type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.type-badge.type-cover-letter {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.type-badge.type-merged {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+/* ── Action buttons ─────────────────────────── */
+.action-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-2);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-left: 4px;
+  transition: background var(--dur-fast) var(--ease-std),
+              color var(--dur-fast) var(--ease-std),
+              border-color var(--dur-fast) var(--ease-std);
+}
+
+.action-btn:hover {
+  background: var(--color-raised);
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+}
+
+.action-btn--danger:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+/* ══════════════════════════════════════════════
+   BUTTONS
+   ══════════════════════════════════════════════ */
+.btn-danger-outline {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-3);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-std),
+              color var(--dur-fast) var(--ease-std),
+              border-color var(--dur-fast) var(--ease-std);
+}
+
+.btn-danger-outline:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+
+.btn-secondary {
+  background: var(--color-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-2);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+/* ══════════════════════════════════════════════
+   CONFIRM DIALOG
+   ══════════════════════════════════════════════ */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: oklch(0% 0 0 / 0.5);
+  z-index: 30000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.confirm-modal {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px 24px 20px;
+  width: 100%;
+  max-width: 300px;
+  box-shadow: 0 12px 40px oklch(0% 0 0 / 0.28);
+}
+
+.confirm-modal-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0 0 8px;
+}
+
+.confirm-modal-body {
+  font-size: 13px;
+  color: var(--color-ink-2);
+  line-height: 1.55;
+  margin: 0 0 20px;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ══════════════════════════════════════════════
+   UTILITY
+   ══════════════════════════════════════════════ */
+.hidden { display: none !important; }

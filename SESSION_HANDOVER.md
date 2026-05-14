@@ -1,6 +1,163 @@
 # Session Handover — Job Application Assistant
 
-**Last updated:** 2026-05-13 (Session 2 — Feature additions, bug fixes, per-provider storage)
+**Last updated:** 2026-05-13 (Session 4 — Dashboard features, multi-profile, settings polish)
+
+---
+
+# Session 4 additions (2026-05-13)
+
+---
+
+### 31. Cover Letter Length Control
+
+Three pill buttons (Short / Standard / Detailed) appear inside the style card under a "Writing" section label. Selection sets `state.clLength` and is passed to `generateCoverLetter()`. A `clLengthInstruction()` helper in `modules/drafting.js` maps each value to a prompt instruction controlling paragraph count.
+
+**Files changed:** `dashboard/dashboard.html`, `dashboard/dashboard.css`, `dashboard/dashboard.js`, `modules/drafting.js`
+
+---
+
+### 32. Style card section labels (Layout / Writing)
+
+The style card now has two labelled sub-sections: **Layout** (template, accent colour, spacing) and **Writing** (tone slider + descriptor, cover letter length). Implemented with `.ctrl-section-label` dividers (10px uppercase muted text with a bottom border).
+
+**Files changed:** `dashboard/dashboard.html`, `dashboard/dashboard.css`
+
+---
+
+### 33. Tone descriptor moved under slider
+
+The dynamic tone label (Formal / Professional / Balanced / Conversational / Casual) was relocated from beside the slider to directly below it, using a `.tone-slider-col` flex-column wrapper. Labels for Layout and Writing blocks are now left-aligned, matching each other.
+
+**Files changed:** `dashboard/dashboard.html`, `dashboard/dashboard.css`
+
+---
+
+### 34. ATS keyword scan
+
+A new "ATS Check" card (step between Style and Generate) lets users scan the job description for missing keywords.
+
+**Flow:**
+1. User clicks "Scan for Keywords" → `extractAtsKeywords()` calls the AI with a prompt requesting 10–15 critical keywords as JSON
+2. All missing keywords are rendered as selectable chips (all pre-selected)
+3. User deselects any they don't want to add
+4. "Apply to Refine" injects a pre-built prompt into the Refine textarea: "Please naturally incorporate the following keywords: …"
+
+**New exports in `modules/drafting.js`:** `extractAtsKeywords(jobDescription, settings, signal)` — returns `string[]`  
+**New mock in `modules/mock.js`:** `mockExtractAtsKeywords()` — 12 hardcoded keywords  
+**New JS in `dashboard.js`:** `runAtsCheck()`, `renderAtsResults()`, `updateAtsApplyButton()`, `applyAtsKeywords()`  
+**New CSS:** `.ats-chip--missing`, `.ats-chip--deselected`, `.ats-apply-row`
+
+---
+
+### 35. Apply Changes button animation fix
+
+Previously, clicking "Apply Changes" triggered the Generate section spinner. Fixed: the spinner is now a CSS `::before` pseudo-element on the button itself using a `.btn--loading` class, keeping it visually attached to the button regardless of scroll position.
+
+**Files changed:** `dashboard/dashboard.css`, `dashboard/dashboard.js`
+
+---
+
+### 36. Reset → Revert with snapshot restore
+
+The "Reset" button in the Refine card was renamed "↩ Revert" and no longer calls `runGeneration()` (which would make an API call). Instead, it restores from `state.originalDrafts` — a deep copy (`JSON.parse(JSON.stringify())`) taken immediately after every successful generation. No API call, instant restore.
+
+**Files changed:** `dashboard/dashboard.js`
+
+---
+
+### 37. Location field removed from Job Info
+
+The Location field was removed from the Job Info card. Location was not used in any AI prompts and added form friction with no benefit.
+
+**Files changed:** `dashboard/dashboard.html`, `dashboard/dashboard.js`
+
+---
+
+### 38. Dark/light mode toggle
+
+A sun/moon toggle button (`#btn-theme`) was added between the tour and support buttons. Clicking calls `toggleTheme()` which cycles between `dark` and `light`, stores the choice in `chrome.storage.local` as `{ theme }`, and applies `data-theme` attribute to `document.documentElement`.
+
+**CSS pattern:**
+- Light default: `:root { ... }` tokens
+- OS dark: `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ... } }`
+- Manual dark: `:root[data-theme="dark"] { ... }`
+
+**Files changed:** `dashboard/dashboard.html`, `dashboard/dashboard.css`, `dashboard/dashboard.js`
+
+---
+
+### 39. Multiple saved profiles (multi-profile rewrite)
+
+`modules/profile.js` was fully rewritten to support multiple profiles. Each profile lives in its own `chrome.storage.sync` key (`profile_{id}`) for the full 8 KB per-item budget. An `profileIndex` array in sync storage tracks all profiles (id + name + optional metadata).
+
+**Key exports:** `loadProfiles()`, `loadProfile()`, `saveProfile()`, `switchProfile()`, `createProfile()`, `renameProfile()`, `updateProfileMeta()`, `deleteProfile()`, `profileToPromptText()`
+
+**Migration:** `migrateIfNeeded()` runs on first load — if no `profileIndex` exists, wraps any existing `userProfile` data into a new profile called "General".
+
+**Dashboard:** A profile strip above the left column shows a `<select>` of all profiles. Switching auto-saves the current profile first, then loads the selected one.
+
+**Settings (Profiles section):** A new "Profiles" nav section lists all profiles as rows with Switch / Rename / Delete buttons. Rename is inline (span → input → blur commits). New Profile auto-switches and navigates to "My Profile" for data entry.
+
+**Files changed:** `modules/profile.js` (full rewrite), `dashboard/dashboard.html`, `dashboard/dashboard.css`, `dashboard/dashboard.js`, `settings/settings.html`, `settings/settings.css`, `settings/settings.js`
+
+---
+
+### 40. Filename per-profile tracking
+
+After a successful resume upload, `updateProfileMeta(activeId, { sourceResumeName: file.name })` stores the filename in the profile index entry (sync storage). The Profiles list renders this as a subtitle under the profile name (`📄 filename.pdf`), truncated with ellipsis and a title tooltip for long names.
+
+**Files changed:** `settings/settings.js`, `settings/settings.css`
+
+---
+
+### 41. Sticky Save/Clear profile buttons
+
+The `.profile-actions` container (Save Profile + Clear All) in the My Profile section now has `position: sticky; bottom: 0` with a canvas background and border-top so the buttons are always visible regardless of scroll position within the settings panel.
+
+**Files changed:** `settings/settings.css`
+
+---
+
+### 42. Settings dark/light mode fix
+
+The settings page was not responding to the manual dark/light toggle because it had no `data-theme` awareness.
+
+**Fixes:**
+- `settings.css`: Dark media query changed from `:root` to `:root:not([data-theme="light"])`. Added `:root[data-theme="dark"]` block with identical dark tokens.
+- `settings.js` `init()`: Reads `chrome.storage.local.get(['theme'])` and applies `data-theme` attribute before first paint.
+
+**Files changed:** `settings/settings.css`, `settings/settings.js`
+
+---
+
+### 43. Settings nav height fix (align-content + font-family)
+
+Two related bugs caused the settings nav bar to change height when switching sections.
+
+**Bug 1 — Grid stretch:** In embedded mode the settings grid has `min-height: 100vh`. When a section's content is shorter than the iframe height (AI Provider, Documents, Profiles), CSS Grid's default `align-content: stretch` distributed the leftover space equally between the nav row and section row, inflating the nav row by 60–100px. Fix: `align-content: start` on `body.embedded .settings-main`.
+
+**Bug 2 — Font metric shift:** `.nav-btn.active` changed `font-family` from Inter to Plus Jakarta Sans. Different font metrics caused the active button to render slightly taller. Fix: removed `font-family: var(--font-display)` from `.nav-btn.active`. Added explicit `line-height: 1.4` to `.nav-btn` for consistency.
+
+**Files changed:** `settings/settings.css`
+
+---
+
+## Files changed in Session 4
+
+| File | Nature of change |
+|---|---|
+| `dashboard/dashboard.html` | Profile strip, ATS card, tone layout, length pills, revert button, location field removal, theme button |
+| `dashboard/dashboard.css` | Section labels, tone column, length pills, ATS chips, btn--loading spinner, profile strip |
+| `dashboard/dashboard.js` | clLength state, originalDrafts snapshot, applyRevision animation, resetToOriginal, ATS scan, theme toggle, profile strip |
+| `modules/drafting.js` | clLengthInstruction(), extractAtsKeywords() |
+| `modules/mock.js` | mockExtractAtsKeywords() |
+| `modules/profile.js` | Full rewrite — multi-profile, updateProfileMeta |
+| `settings/settings.html` | Profiles nav + section |
+| `settings/settings.css` | Profile rows, sticky save bar, profile-row-file, dark theme data-theme, align-content fix, nav font fix |
+| `settings/settings.js` | updateProfileMeta import, filename tracking, renderProfilesList with filename, theme loading |
+| `history/history.html` | New — application history viewer |
+| `history/history.css` | New — history page styles |
+| `history/history.js` | New — history page controller |
 
 ---
 
@@ -161,6 +318,49 @@ The API key field now follows industry-standard password field conventions:
 - **Saved key hint** — a small monospace line below the input shows `Saved: sk-ab••••••••cdef` (first 4 chars + 8 dots + last 4 chars) when a saved key exists. This confirms at a glance that a key is stored and roughly which one it is, without exposing it. Hides when the user starts typing a new key.
 
 **Files changed:** `settings/settings.html`, `settings/settings.css`, `settings/settings.js`
+
+---
+
+### 28. Permission narrowing for Chrome Web Store (Session 3 — 2026-05-13)
+
+Removed broad permissions ahead of Chrome Web Store submission.
+
+**Manifest changes:**
+- `content_scripts` block removed entirely — `content.js` is no longer auto-injected on every page load
+- `host_permissions` replaced `<all_urls>` with five specific entries: `https://api.openai.com/*`, `https://generativelanguage.googleapis.com/*`, `https://openrouter.ai/*`, `http://localhost:*/*`, `http://127.0.0.1:*/*`
+- `web_accessible_resources` block removed — no module currently imports `lib/docxtemplater.js`, and extension pages can always load their own resources without this declaration
+
+**`lib/docxtemplater.js` note:** This file is present in the repo but is not imported by any current module (`renderer.js`, `drafting.js`, `extraction.js`, etc. all use native JS). If docxtemplater is ever needed in the future, add back `web_accessible_resources` — but only if a content script needs to expose the file to a web page. Extension pages do not require it. Do not add `<all_urls>` back as the match; use the narrowest match that covers only the pages that genuinely need it.
+
+**`content.js` changes:** Added `window.__jpdaContentInjected` guard to prevent duplicate `onMessage` listeners if `executeScript` is called more than once on the same tab. Updated header comment to make clear page content is only read after an explicit user action.
+
+**`background.js` changes:** Added `isRestrictedUrl()` helper and `captureTab()` helper. Context menu handler now checks for restricted pages first (returns a user-friendly error object), then always injects `content.js` then sends `CAPTURE_CONTENT` — replacing the old try-send-catch-inject-retry pattern. Removed `allFrames: true` (main frame only is correct).
+
+**`dashboard.js` changes:** Added `isRestrictedUrl()` helper. `scanCurrentPage()` now checks the URL before attempting injection, shows specific error messages for restricted pages vs injection failures vs null responses.
+
+**Ollama help modal update:** Added a fourth troubleshooting bullet explaining that only `localhost` / `127.0.0.1` Ollama endpoints are supported — remote/LAN Ollama endpoints are blocked by Chrome because the extension's host permissions do not cover arbitrary IPs.
+
+**Files changed:** `manifest.json`, `content.js`, `background.js`, `dashboard/dashboard.js`, `settings/settings.html`
+
+---
+
+### 29. Apply Changes button disabled until text is entered (Session 3 — 2026-05-13)
+
+The "Apply Changes" button in the Refine card was always visually active once a draft existed, even with an empty textarea. This was a false affordance.
+
+**Fix:** `refreshRevisionButton()` now controls the button state. It disables the button unless both conditions are true: (a) a draft exists for the current tab, and (b) the revision textarea contains non-whitespace text. An `input` listener on `#field-revision` calls `refreshRevisionButton()` on every keystroke so the button activates and deactivates in real time. After a successful `applyRevision()` the textarea is cleared and `refreshRevisionButton()` is called to re-disable the button immediately.
+
+**Files changed:** `dashboard/dashboard.js`
+
+---
+
+### 30. Overwrite confirmation before generation (Session 3 — 2026-05-13)
+
+If the user clicks a generation button (Resume, Cover Letter, or Both) while a draft already exists for the targeted document type, a confirmation dialog now appears before the generation runs, preventing accidental overwrites.
+
+**Implementation:** `confirmOverwrite(mode)` checks `state.drafts` for the relevant type(s). If a draft is found, it calls native `window.confirm()` with a clear message. The generation only proceeds if the user confirms. The three generation button handlers in `bindEvents()` were updated to use this guard.
+
+**Files changed:** `dashboard/dashboard.js`
 
 ---
 

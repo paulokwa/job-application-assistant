@@ -1,0 +1,180 @@
+// history/history.js — Job History page controller
+// Entries are written by dashboard.js when the user saves a document as PDF.
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escAttr(str) {
+  return String(str).replace(/"/g, '&quot;');
+}
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function typeBadgeClass(docType) {
+  if (docType === 'Cover Letter') return 'type-badge type-cover-letter';
+  if (docType === 'Merged')       return 'type-badge type-merged';
+  return 'type-badge'; // Resume + Cover Letter / Resume
+}
+
+// ── Storage ───────────────────────────────────────────────────────────────
+
+async function loadHistory() {
+  const { jobHistory = [] } = await chrome.storage.local.get('jobHistory');
+  return jobHistory;
+}
+
+async function saveHistory(entries) {
+  await chrome.storage.local.set({ jobHistory: entries });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+
+function render(entries) {
+  const table  = document.getElementById('history-table');
+  const empty  = document.getElementById('empty-state');
+  const tbody  = document.getElementById('history-body');
+  const btnClear = document.getElementById('btn-clear-all');
+
+  if (!entries.length) {
+    table.classList.add('hidden');
+    empty.classList.remove('hidden');
+    btnClear.disabled = true;
+    btnClear.style.opacity = '0.4';
+    return;
+  }
+
+  empty.classList.add('hidden');
+  table.classList.remove('hidden');
+  btnClear.disabled = false;
+  btnClear.style.opacity = '';
+
+  tbody.innerHTML = '';
+
+  for (const entry of entries) {
+    const tr = document.createElement('tr');
+    const openBtn = entry.sourceUrl
+      ? `<button class="action-btn" data-action="open" data-url="${escAttr(entry.sourceUrl)}" title="Open original job posting">Open URL</button>`
+      : '';
+
+    tr.innerHTML = `
+      <td class="col-date">
+        <span class="date-primary">${escHtml(formatDate(entry.date))}</span>
+        <span class="date-secondary">${escHtml(formatTime(entry.date))}</span>
+      </td>
+      <td class="col-title">${escHtml(entry.jobTitle || '—')}</td>
+      <td class="col-company">${escHtml(entry.company || '—')}</td>
+      <td class="col-type"><span class="${typeBadgeClass(entry.docType)}">${escHtml(entry.docType)}</span></td>
+      <td class="col-actions">
+        ${openBtn}
+        <button class="action-btn action-btn--danger" data-action="delete" data-id="${entry.id}" title="Remove from history">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+// ── Confirm dialog ────────────────────────────────────────────────────────
+
+function showConfirm(title, body, confirmLabel) {
+  return new Promise(resolve => {
+    const overlay   = document.getElementById('confirm-overlay');
+    const btnOk     = document.getElementById('confirm-btn-ok');
+    const btnCancel = document.getElementById('confirm-btn-cancel');
+
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-body').textContent  = body;
+    btnOk.textContent = confirmLabel;
+    overlay.classList.remove('hidden');
+    btnCancel.focus();
+
+    const cleanup = result => {
+      overlay.classList.add('hidden');
+      overlay.removeEventListener('click', onBackdrop);
+      btnOk.removeEventListener('click', onOk);
+      btnCancel.removeEventListener('click', onCancel);
+      resolve(result);
+    };
+
+    const onOk       = () => cleanup(true);
+    const onCancel   = () => cleanup(false);
+    const onBackdrop = e => { if (e.target === overlay) cleanup(false); };
+
+    btnOk.addEventListener('click', onOk);
+    btnCancel.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onBackdrop);
+  });
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────
+
+async function deleteEntry(id) {
+  const entries = await loadHistory();
+  const updated = entries.filter(e => e.id !== id);
+  await saveHistory(updated);
+  render(updated);
+}
+
+async function clearAll() {
+  await saveHistory([]);
+  render([]);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+
+async function init() {
+  const entries = await loadHistory();
+  render(entries);
+
+  // Table row actions via event delegation
+  document.getElementById('history-body').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    if (btn.dataset.action === 'open') {
+      window.open(btn.dataset.url, '_blank', 'noopener');
+    }
+
+    if (btn.dataset.action === 'delete') {
+      const ok = await showConfirm(
+        'Remove this entry?',
+        'It will be removed from your history.',
+        'Delete'
+      );
+      if (ok) deleteEntry(Number(btn.dataset.id));
+    }
+  });
+
+  // Clear all button
+  document.getElementById('btn-clear-all').addEventListener('click', async () => {
+    const ok = await showConfirm(
+      'Clear all history?',
+      'All saved entries will be removed. This cannot be undone.',
+      'Clear all'
+    );
+    if (ok) clearAll();
+  });
+
+  // Auto-refresh when a new entry is saved from the dashboard
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.jobHistory) {
+      render(changes.jobHistory.newValue || []);
+    }
+  });
+}
+
+init();

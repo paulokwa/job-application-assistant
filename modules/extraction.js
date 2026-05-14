@@ -6,17 +6,15 @@
  * Attempts to extract structured job fields from raw text.
  * @param {string} rawText - The raw text from the page or selection
  * @param {string} url - The source URL
- * @returns {{ jobTitle, company, location, sourceUrl, description, usedSelection }}
+ * @returns {{ jobTitle, company, sourceUrl, description }}
  */
 export function extractJobFields(rawText, url) {
-  if (!rawText) return { jobTitle: '', company: '', location: '', sourceUrl: url || '', description: '' };
+  if (!rawText) return { jobTitle: '', company: '', sourceUrl: url || '', description: '' };
   const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
 
   let jobTitle = '';
   let company = '';
-  let location = '';
 
-  // Heuristic patterns for common job posting structure
   const titlePatterns = [
     /^job\s*title[:\-–]?\s*(.+)$/i,
     /^position[:\-–]?\s*(.+)$/i,
@@ -27,10 +25,6 @@ export function extractJobFields(rawText, url) {
   const companyPatterns = [
     /^(?:company|employer|organization|department|ministry|agency|branch)[:\-–]?\s*(.+)$/i,
     /^(?:employer|hiring\s*organization)[:\-–]?\s*(.+)$/i,
-  ];
-  const locationPatterns = [
-    /^(?:location|city|province|region|work\s*location|place\s*of\s*work)[:\-–]?\s*(.+)$/i,
-    /^(?:work\s*location|duty\s*station)[:\-–]?\s*(.+)$/i,
   ];
 
   for (const line of lines) {
@@ -46,27 +40,18 @@ export function extractJobFields(rawText, url) {
         if (m) { company = m[1].trim(); break; }
       }
     }
-    if (!location) {
-      for (const pat of locationPatterns) {
-        const m = line.match(pat);
-        if (m) { location = m[1].trim(); break; }
-      }
-    }
-    if (jobTitle && company && location) break;
+    if (jobTitle && company) break;
   }
 
-  // Fallback: use page title for job title if still empty
+  // Fallback: first meaningful line as job title
   if (!jobTitle) {
-    const urlObj = (() => { try { return new URL(url); } catch { return null; } })();
-    // Job title often appears in first non-empty, non-menu-looking line
     const firstMeaningfulLine = lines.find(l => l.length > 8 && l.length < 120 && !/^(home|menu|skip|search|login|sign)/i.test(l));
     if (firstMeaningfulLine) jobTitle = firstMeaningfulLine;
   }
 
   return {
     jobTitle: jobTitle || '',
-    company: company || '',
-    location: location || '',
+    company:  company  || '',
     sourceUrl: url || '',
     description: rawText,
   };

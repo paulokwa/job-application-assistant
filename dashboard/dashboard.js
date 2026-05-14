@@ -1,23 +1,31 @@
 // dashboard/dashboard.js — Main dashboard controller (Redesigned for HTML/PDF System)
 
 import { extractJobFields } from '../modules/extraction.js';
-import { generateResume, generateCoverLetter, reviseDraft } from '../modules/drafting.js';
-import { loadProfile } from '../modules/profile.js';
+import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
+import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
 import { renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { mapError } from '../modules/errorMapper.js';
+
+// ── Config ─────────────────────────────────────────────────────────────────
+// Support/Ko-fi URL — used by the header button and the first-run welcome modal.
+// Change this one line to update both places at once.
+const SUPPORT_URL = 'https://ko-fi.com/mwakelabs';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
   jobData: {
-    jobTitle: '', company: '', location: '', sourceUrl: '', description: '',
+    jobTitle: '', company: '', sourceUrl: '', description: '',
   },
   currentTab: 'resume',     // 'resume' | 'cover-letter'
-  drafts: { resume: null, 'cover-letter': null }, // Now stores structured JSON
-  
+  drafts:         { resume: null, 'cover-letter': null },
+  originalDrafts: { resume: null, 'cover-letter': null },
+
   // UI customization
   templateId: 'classic',
   accentColor: '#2563eb',
   spacingMode: 'standard',
+  tone: 30,
+  clLength: 'standard',
 
   settings: null,
   profile: null,
@@ -35,7 +43,6 @@ const dom = {
   selectionNotice:    $('selection-notice'),
   fieldTitle:         $('field-job-title'),
   fieldCompany:       $('field-company'),
-  fieldLocation:      $('field-location'),
   fieldUrl:           $('field-url'),
   fieldDesc:          $('field-job-desc'),
   
@@ -56,6 +63,9 @@ const dom = {
   templateOptions:    document.querySelectorAll('.template-option'),
   colorDots:          document.querySelectorAll('.color-dot'),
   selectSpacing:      $('select-spacing'),
+  rangeTone:          $('range-tone'),
+  toneDescriptor:     $('tone-descriptor'),
+  lengthPills:        document.querySelectorAll('.length-pill'),
   
   previewResumeFrame: $('preview-resume-frame'),
   previewCLFrame:     $('preview-cl-frame'),
@@ -75,8 +85,27 @@ const dom = {
   btnPrintBoth:       $('btn-print-both'),
   btnPrintCL:         $('btn-print-cl'),
   btnPrintMerged:     $('btn-print-merged'),
+
+  btnAtsScan:         $('btn-ats-scan'),
+  atsEmpty:           $('ats-empty'),
+  atsStatus:          $('ats-status'),
+  atsResults:         $('ats-results'),
+  atsScore:           $('ats-score'),
+  atsMatchedGroup:    $('ats-matched-group'),
+  atsMissingGroup:    $('ats-missing-group'),
+  atsMatchedChips:    $('ats-matched-chips'),
+  atsMissingChips:    $('ats-missing-chips'),
+  atsApplyRow:        $('ats-apply-row'),
+  btnAtsApply:        $('btn-ats-apply'),
   
   toast:              $('toast'),
+  btnTheme:           $('btn-theme'),
+  btnHistory:         $('btn-history'),
+  profileSwitcher:    $('profile-switcher'),
+  btnManageProfiles:  $('btn-manage-profiles'),
+  historyView:        $('history-view'),
+  btnCloseHistory:    $('btn-close-history'),
+  btnSupport:         $('btn-support'),
   btnSettings:        $('btn-settings'),
   mockBanner:         $('mock-mode-banner'),
   settingsView:       $('settings-view'),
@@ -91,8 +120,10 @@ const dom = {
 async function init() {
   state.settings = await loadSettings();
   state.profile  = await loadProfile();
+  await populateProfileStrip();
 
-  const localData = await chrome.storage.local.get(['sourceResumeText', 'savedDraft']);
+  const localData = await chrome.storage.local.get(['sourceResumeText', 'savedDraft', 'welcomeSeen', 'theme']);
+  applyTheme(localData.theme || 'system');
   state.sourceResumeText = localData.sourceResumeText || '';
 
   if (state.settings?.provider === 'mock') {
@@ -117,6 +148,9 @@ async function init() {
       loadSession();
     }
   });
+
+  // Show welcome modal on first run (non-blocking — all core setup is already done)
+  if (!localData.welcomeSeen) showWelcomeModal();
 }
 
 function loadSession() {
@@ -142,13 +176,12 @@ function applyExtractedData(raw, url, usedSelection) {
   }
 
   const fields = extractJobFields(text, url);
-  dom.fieldTitle.value    = fields.jobTitle;
-  dom.fieldCompany.value  = fields.company;
-  dom.fieldLocation.value = fields.location;
-  dom.fieldUrl.value      = url;
-  dom.fieldDesc.value     = text;
+  dom.fieldTitle.value   = fields.jobTitle;
+  dom.fieldCompany.value = fields.company;
+  dom.fieldUrl.value     = url;
+  dom.fieldDesc.value    = text;
 
-  state.jobData = { ...fields, sourceUrl: url, description: text };
+  state.jobData = { jobTitle: fields.jobTitle, company: fields.company, sourceUrl: url, description: text };
 }
 
 function applySession(session) {
@@ -166,6 +199,20 @@ function applySession(session) {
   }
 }
 
+// Returns true for pages where Chrome blocks script injection.
+function isRestrictedUrl(url) {
+  if (!url) return true;
+  return (
+    url.startsWith('chrome://') ||
+    url.startsWith('chrome-extension://') ||
+    url.startsWith('edge://') ||
+    url.startsWith('about:') ||
+    url.startsWith('data:') ||
+    url.startsWith('https://chrome.google.com/webstore') ||
+    url.startsWith('https://chromewebstore.google.com')
+  );
+}
+
 async function scanCurrentPage() {
   const btn = dom.btnScan;
   btn.disabled = true;
@@ -174,22 +221,35 @@ async function scanCurrentPage() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    if (!tab || !tab.id || tab.url?.startsWith('chrome://') || tab.url?.startsWith('edge://')) {
-      showToast('⚠️ Cannot scan this page — try a real job posting tab.');
+    if (!tab?.id) {
+      showToast('⚠️ No active tab found.');
       return;
     }
 
-    let response;
-    try {
-      response = await chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_CONTENT' });
-    } catch {
-      // Content script not yet injected — inject it then retry
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-      response = await chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_CONTENT' });
+    if (isRestrictedUrl(tab.url)) {
+      showToast('⚠️ Cannot scan this page — open a job posting in a normal browser tab first.');
+      return;
     }
+
+    // Inject content.js on demand (user triggered this action).
+    // The guard in content.js prevents duplicate listeners on repeated scans.
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    } catch (injectErr) {
+      console.warn('[JPDA] Could not inject content script:', injectErr.message);
+      showToast('⚠️ Cannot scan this page — Chrome blocks scripts here (e.g. PDFs, restricted sites).');
+      return;
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_CONTENT' });
 
     if (!response) {
       showToast('⚠️ No response from page. Try right-clicking and using the context menu instead.');
+      return;
+    }
+
+    if (response.error) {
+      showToast(`⚠️ ${response.error}`);
       return;
     }
 
@@ -221,6 +281,29 @@ function bindEvents() {
   // New draft
   dom.btnNewDraft.addEventListener('click', clearSession);
 
+  // Profile strip
+  dom.profileSwitcher.addEventListener('change', async () => {
+    state.profile = await switchProfile(dom.profileSwitcher.value);
+    showToast('✦ Profile switched.');
+  });
+  dom.btnManageProfiles.addEventListener('click', () => {
+    dom.settingsView.classList.add('visible');
+    setTimeout(() => {
+      const nav = dom.settingsFrame.contentDocument?.querySelector('.nav-btn[data-section="profiles"]');
+      if (nav) nav.click();
+    }, 100);
+  });
+
+  // Theme toggle
+  dom.btnTheme.addEventListener('click', toggleTheme);
+
+  // History
+  dom.btnHistory.addEventListener('click', () => dom.historyView.classList.add('visible'));
+  dom.btnCloseHistory.addEventListener('click', () => dom.historyView.classList.remove('visible'));
+
+  // Support
+  dom.btnSupport.addEventListener('click', () => window.open(SUPPORT_URL, '_blank', 'noopener'));
+
   // Settings
   dom.btnSettings.addEventListener('click', () => dom.settingsView.classList.add('visible'));
   dom.btnCloseSettings.addEventListener('click', async () => {
@@ -228,6 +311,7 @@ function bindEvents() {
     state.settings = await loadSettings();
     state.profile  = await loadProfile();
     dom.mockBanner.classList.toggle('hidden', state.settings?.provider !== 'mock');
+    await populateProfileStrip();
   });
 
   // Tabs
@@ -261,17 +345,44 @@ function bindEvents() {
     updatePreviews();
   });
 
-  // Generation — same handler doubles as Stop when in generating state
-  dom.btnGenResume.addEventListener('click', () =>
-    dom.btnGenResume.classList.contains('btn-stop') ? stopGeneration() : runGeneration('resume'));
-  dom.btnGenCL.addEventListener('click', () =>
-    dom.btnGenCL.classList.contains('btn-stop') ? stopGeneration() : runGeneration('cover-letter'));
-  dom.btnGenBoth.addEventListener('click', () =>
-    dom.btnGenBoth.classList.contains('btn-stop') ? stopGeneration() : runGeneration('both'));
+  // Cover letter length pills
+  dom.lengthPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      dom.lengthPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      state.clLength = pill.dataset.length;
+    });
+  });
 
-  // Revision
+  // Tone slider
+  dom.rangeTone.addEventListener('input', () => {
+    state.tone = Number(dom.rangeTone.value);
+    dom.toneDescriptor.textContent = toneLabel(state.tone);
+  });
+
+  // Generation — same handler doubles as Stop when in generating state.
+  // Shows a confirmation before overwriting an existing draft.
+  dom.btnGenResume.addEventListener('click', async () => {
+    if (dom.btnGenResume.classList.contains('btn-stop')) { stopGeneration(); return; }
+    if (await confirmOverwrite('resume')) runGeneration('resume');
+  });
+  dom.btnGenCL.addEventListener('click', async () => {
+    if (dom.btnGenCL.classList.contains('btn-stop')) { stopGeneration(); return; }
+    if (await confirmOverwrite('cover-letter')) runGeneration('cover-letter');
+  });
+  dom.btnGenBoth.addEventListener('click', async () => {
+    if (dom.btnGenBoth.classList.contains('btn-stop')) { stopGeneration(); return; }
+    if (await confirmOverwrite('both')) runGeneration('both');
+  });
+
+  // Revision — button stays disabled until the user has typed something
+  dom.fieldRevision.addEventListener('input', refreshRevisionButton);
   dom.btnApplyChanges.addEventListener('click', applyRevision);
-  dom.btnRegenerate.addEventListener('click', () => runGeneration(state.currentTab));
+  dom.btnRegenerate.addEventListener('click', resetToOriginal);
+
+  // ATS Check
+  dom.btnAtsScan.addEventListener('click', runAtsCheck);
+  dom.btnAtsApply.addEventListener('click', applyAtsKeywords);
 
   // Save as PDF (via print dialog)
   dom.btnPrintBoth.addEventListener('click', () => printDraft('resume', 'cover-letter'));
@@ -294,7 +405,6 @@ function bindEvents() {
   // Sync inputs
   dom.fieldTitle.addEventListener('input', () => state.jobData.jobTitle = dom.fieldTitle.value);
   dom.fieldCompany.addEventListener('input', () => state.jobData.company = dom.fieldCompany.value);
-  dom.fieldLocation.addEventListener('input', () => state.jobData.location = dom.fieldLocation.value);
   dom.fieldDesc.addEventListener('input', () => state.jobData.description = dom.fieldDesc.value);
 }
 
@@ -318,9 +428,9 @@ async function runGeneration(mode) {
 
       let raw;
       if (type === 'resume') {
-        raw = await generateResume(state.jobData, state.profile, state.settings, state.sourceResumeText, signal);
+        raw = await generateResume(state.jobData, state.profile, state.settings, state.sourceResumeText, signal, state.tone);
       } else {
-        raw = await generateCoverLetter(state.jobData, state.profile, state.settings, state.sourceResumeText, signal);
+        raw = await generateCoverLetter(state.jobData, state.profile, state.settings, state.sourceResumeText, signal, state.tone, state.clLength);
       }
 
       const parsed = tryParseJson(raw);
@@ -332,7 +442,8 @@ async function runGeneration(mode) {
     }
 
     updatePreviews();
-    
+    state.originalDrafts = JSON.parse(JSON.stringify(state.drafts));
+
     if (mode === 'both') {
       dom.tabBtnMerged.classList.remove('hidden');
       dom.btnPrintMerged.classList.remove('hidden');
@@ -347,12 +458,15 @@ async function runGeneration(mode) {
     // Persist so draft survives the panel being closed and reopened
     chrome.storage.local.set({
       savedDraft: {
-        drafts:      state.drafts,
-        jobData:     state.jobData,
-        lastRunMode: state.lastRunMode,
-        templateId:  state.templateId,
-        accentColor: state.accentColor,
-        spacingMode: state.spacingMode,
+        drafts:         state.drafts,
+        originalDrafts: state.originalDrafts,
+        jobData:        state.jobData,
+        lastRunMode:    state.lastRunMode,
+        templateId:     state.templateId,
+        accentColor:    state.accentColor,
+        spacingMode:    state.spacingMode,
+        tone:           state.tone,
+        clLength:       state.clLength,
       }
     });
   } catch (e) {
@@ -373,6 +487,121 @@ function stopGeneration() {
   }
 }
 
+// ── Job History ───────────────────────────────────────────────────────────
+
+async function appendJobHistory(targets) {
+  const docType = targets.includes('merged') || (targets.includes('resume') && targets.includes('cover-letter'))
+    ? 'Resume + Cover Letter'
+    : targets.includes('cover-letter') ? 'Cover Letter'
+    : 'Resume';
+
+  const entry = {
+    id:        Date.now(),
+    jobTitle:  state.jobData.jobTitle  || '(untitled)',
+    company:   state.jobData.company   || '',
+    sourceUrl: state.jobData.sourceUrl || '',
+    docType,
+    date:      new Date().toISOString(),
+  };
+
+  const { jobHistory = [] } = await chrome.storage.local.get('jobHistory');
+  jobHistory.unshift(entry);
+  if (jobHistory.length > 100) jobHistory.splice(100);
+  chrome.storage.local.set({ jobHistory });
+}
+
+// ── Welcome Modal ─────────────────────────────────────────────────────────
+
+function showWelcomeModal() {
+  const overlay   = document.getElementById('welcome-overlay');
+  const btnStart  = document.getElementById('welcome-btn-start');
+  const btnDonate = document.getElementById('welcome-btn-donate');
+  const btnSkip   = document.getElementById('welcome-btn-skip');
+
+  // Show the donate button only when a URL is configured
+  if (!SUPPORT_URL || SUPPORT_URL === '#') {
+    btnDonate.classList.add('hidden');
+  }
+
+  overlay.classList.remove('hidden');
+  btnStart.focus();
+
+  const dismiss = () => {
+    chrome.storage.local.set({ welcomeSeen: true });
+    overlay.classList.add('hidden');
+  };
+
+  btnStart.addEventListener('click', dismiss, { once: true });
+  btnSkip.addEventListener('click', dismiss, { once: true });
+  btnDonate.addEventListener('click', () => {
+    window.open(SUPPORT_URL, '_blank', 'noopener');
+    dismiss();
+  }, { once: true });
+}
+
+// ── Confirm Dialog ────────────────────────────────────────────────────────
+
+function showConfirmDialog(title, body, confirmLabel = 'Continue') {
+  return new Promise(resolve => {
+    const overlay   = document.getElementById('confirm-overlay');
+    const btnOk     = document.getElementById('confirm-btn-ok');
+    const btnCancel = document.getElementById('confirm-btn-cancel');
+
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-body').textContent  = body;
+    btnOk.textContent = confirmLabel;
+    overlay.classList.remove('hidden');
+    btnCancel.focus();
+
+    const cleanup = result => {
+      overlay.classList.add('hidden');
+      overlay.removeEventListener('click', onBackdrop);
+      btnOk.removeEventListener('click', onOk);
+      btnCancel.removeEventListener('click', onCancel);
+      resolve(result);
+    };
+
+    const onOk       = () => cleanup(true);
+    const onCancel   = () => cleanup(false);
+    const onBackdrop = e => { if (e.target === overlay) cleanup(false); };
+
+    btnOk.addEventListener('click', onOk);
+    btnCancel.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onBackdrop);
+  });
+}
+
+async function confirmOverwrite(mode) {
+  const hasResume = !!state.drafts.resume;
+  const hasCL    = !!state.drafts['cover-letter'];
+  const affected  = mode === 'both'   ? (hasResume || hasCL)
+                  : mode === 'resume' ? hasResume
+                  : hasCL;
+
+  if (!affected) return true;
+
+  const label = mode === 'both'   ? 'resume and cover letter'
+              : mode === 'resume' ? 'resume'
+              :                     'cover letter';
+
+  return showConfirmDialog(
+    'Replace existing draft?',
+    `You already have a ${label} draft. Generating a new one will replace it.`,
+    'Replace'
+  );
+}
+
+function resetToOriginal() {
+  const docType = state.currentTab;
+  if (!state.originalDrafts?.[docType]) return;
+
+  state.drafts[docType] = JSON.parse(JSON.stringify(state.originalDrafts[docType]));
+  updatePreviews();
+  dom.fieldRevision.value = '';
+  refreshRevisionButton();
+  showToast('↩ Draft reset to original.');
+}
+
 async function applyRevision() {
   const request = dom.fieldRevision.value.trim();
   if (!request) return;
@@ -380,7 +609,11 @@ async function applyRevision() {
   const docType = state.currentTab;
   if (!state.drafts[docType]) return;
 
-  setGenerating(true, 'Refining draft...');
+  dom.btnApplyChanges.disabled = true;
+  dom.btnApplyChanges.textContent = 'Applying…';
+  dom.btnApplyChanges.classList.add('btn--loading');
+  dom.btnRegenerate.disabled = true;
+
   try {
     const raw = await reviseDraft(state.drafts[docType], request, docType, state.jobData, state.profile, state.settings);
     const parsed = tryParseJson(raw);
@@ -389,11 +622,16 @@ async function applyRevision() {
       updatePreviews();
       dom.fieldRevision.value = '';
       showToast('✅ Changes applied!');
+    } else {
+      showToast('⚠️ Could not apply changes — try rephrasing your request.');
     }
   } catch (e) {
-    showError(e);
+    showToast(`⚠️ ${mapError(e).message}`);
   } finally {
-    setGenerating(false);
+    dom.btnApplyChanges.classList.remove('btn--loading');
+    dom.btnApplyChanges.textContent = 'Apply Changes';
+    refreshRevisionButton();
+    dom.btnRegenerate.disabled = !state.originalDrafts?.[docType];
   }
 }
 
@@ -471,6 +709,9 @@ function printDraft(...types) {
     }
   }
 
+  // User is saving as PDF — record to history as a signal of a completed application
+  appendJobHistory(targets);
+
   const options = {
     accentColor: state.accentColor,
     spacingMode: state.spacingMode
@@ -530,24 +771,29 @@ function printDraft(...types) {
 // ── Draft Persistence ─────────────────────────────────────────────────────
 
 function restoreSavedDraft(saved) {
-  state.drafts      = saved.drafts      || { resume: null, 'cover-letter': null };
-  state.jobData     = saved.jobData     || state.jobData;
+  state.drafts         = saved.drafts         || { resume: null, 'cover-letter': null };
+  state.originalDrafts = saved.originalDrafts || { resume: null, 'cover-letter': null };
+  state.jobData        = saved.jobData        || state.jobData;
   state.lastRunMode = saved.lastRunMode || null;
   state.templateId  = saved.templateId  || 'classic';
   state.accentColor = saved.accentColor || '#2563eb';
   state.spacingMode = saved.spacingMode || 'standard';
+  state.tone        = saved.tone        ?? 30;
+  state.clLength    = saved.clLength    || 'standard';
 
   // Restore form fields
-  dom.fieldTitle.value    = state.jobData.jobTitle   || '';
-  dom.fieldCompany.value  = state.jobData.company    || '';
-  dom.fieldLocation.value = state.jobData.location   || '';
-  dom.fieldUrl.value      = state.jobData.sourceUrl  || '';
+  dom.fieldTitle.value   = state.jobData.jobTitle  || '';
+  dom.fieldCompany.value = state.jobData.company   || '';
+  dom.fieldUrl.value     = state.jobData.sourceUrl || '';
   dom.fieldDesc.value     = state.jobData.description || '';
 
   // Restore style controls
   dom.templateOptions.forEach(o => o.classList.toggle('active', o.dataset.template === state.templateId));
   dom.colorDots.forEach(d => d.classList.toggle('active', d.dataset.color === state.accentColor));
-  dom.selectSpacing.value = state.spacingMode;
+  dom.selectSpacing.value  = state.spacingMode;
+  dom.rangeTone.value      = state.tone;
+  dom.toneDescriptor.textContent = toneLabel(state.tone);
+  dom.lengthPills.forEach(p => p.classList.toggle('active', p.dataset.length === state.clLength));
 
   // Restore merged tab
   if (state.lastRunMode === 'both') {
@@ -566,12 +812,11 @@ async function clearSession() {
   await chrome.storage.local.remove(['savedDraft']);
 
   state.drafts      = { resume: null, 'cover-letter': null };
-  state.jobData     = { jobTitle: '', company: '', location: '', sourceUrl: '', description: '' };
+  state.jobData     = { jobTitle: '', company: '', sourceUrl: '', description: '' };
   state.lastRunMode = null;
 
   dom.fieldTitle.value = '';
   dom.fieldCompany.value = '';
-  dom.fieldLocation.value = '';
   dom.fieldUrl.value = '';
   dom.fieldDesc.value = '';
   dom.selectionNotice.classList.add('hidden');
@@ -591,12 +836,16 @@ async function clearSession() {
   showToast('Draft cleared.');
 }
 
+function refreshRevisionButton() {
+  dom.btnApplyChanges.disabled = !state.drafts[state.currentTab] || !dom.fieldRevision.value.trim();
+}
+
 function switchTab(tab) {
   state.currentTab = tab;
   dom.tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   dom.tabPanels.forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
-  dom.btnApplyChanges.disabled = !state.drafts[tab];
-  dom.btnRegenerate.disabled = !state.drafts[tab];
+  refreshRevisionButton();
+  dom.btnRegenerate.disabled = !state.originalDrafts?.[tab];
   refreshExportButtons();
 }
 
@@ -667,6 +916,98 @@ function refreshExportButtons() {
   dom.btnPrintBoth.disabled = !hasResume;
   dom.btnPrintCL.disabled = !hasCL;
   dom.btnPrintMerged.disabled = !(hasResume && hasCL);
+  dom.btnAtsScan.disabled = !hasResume || !state.jobData.description;
+}
+
+// ── ATS Check ─────────────────────────────────────────────────────────────
+
+async function runAtsCheck() {
+  if (!state.drafts.resume || !state.jobData.description) return;
+
+  dom.atsStatus.classList.remove('hidden');
+  dom.atsResults.classList.add('hidden');
+  dom.atsEmpty.classList.add('hidden');
+  dom.btnAtsScan.disabled = true;
+
+  try {
+    const keywords = await extractAtsKeywords(state.jobData.description, state.settings);
+    if (!keywords.length) {
+      showToast('⚠️ Could not extract keywords from job description.');
+      dom.atsEmpty.classList.remove('hidden');
+      return;
+    }
+
+    const resumeText = JSON.stringify(state.drafts.resume).toLowerCase();
+    const matched = keywords.filter(k => resumeText.includes(k.toLowerCase()));
+    const missing  = keywords.filter(k => !resumeText.includes(k.toLowerCase()));
+    renderAtsResults(matched, missing, keywords.length);
+  } catch {
+    showToast('⚠️ ATS scan failed.');
+    dom.atsEmpty.classList.remove('hidden');
+  } finally {
+    dom.atsStatus.classList.add('hidden');
+    dom.btnAtsScan.disabled = !state.drafts.resume || !state.jobData.description;
+  }
+}
+
+function renderAtsResults(matched, missing, total) {
+  dom.atsResults.classList.remove('hidden');
+  dom.atsScore.textContent = `${matched.length} of ${total} keywords matched`;
+
+  // Matched — display only
+  if (matched.length) {
+    dom.atsMatchedGroup.classList.remove('hidden');
+    dom.atsMatchedChips.innerHTML = matched.map(k => {
+      const span = document.createElement('span');
+      span.className = 'ats-chip ats-chip--matched';
+      span.textContent = k;
+      return span.outerHTML;
+    }).join('');
+  } else {
+    dom.atsMatchedGroup.classList.add('hidden');
+  }
+
+  // Missing — interactive buttons, all pre-selected by default
+  if (missing.length) {
+    dom.atsMissingGroup.classList.remove('hidden');
+    dom.atsMissingChips.innerHTML = '';
+    missing.forEach(k => {
+      const btn = document.createElement('button');
+      btn.className = 'ats-chip ats-chip--missing';
+      btn.type = 'button';
+      btn.textContent = k;
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('ats-chip--deselected');
+        updateAtsApplyButton();
+      });
+      dom.atsMissingChips.appendChild(btn);
+    });
+    dom.atsApplyRow.classList.remove('hidden');
+    updateAtsApplyButton();
+  } else {
+    dom.atsMissingGroup.classList.add('hidden');
+    dom.atsApplyRow.classList.add('hidden');
+  }
+}
+
+function updateAtsApplyButton() {
+  const count = dom.atsMissingChips.querySelectorAll('.ats-chip--missing:not(.ats-chip--deselected)').length;
+  dom.btnAtsApply.textContent = `Apply ${count} keyword${count !== 1 ? 's' : ''} to resume`;
+  dom.btnAtsApply.disabled = count === 0;
+}
+
+function applyAtsKeywords() {
+  const selected = Array.from(
+    dom.atsMissingChips.querySelectorAll('.ats-chip--missing:not(.ats-chip--deselected)')
+  ).map(el => el.textContent.trim());
+
+  if (!selected.length) return;
+
+  dom.fieldRevision.value = `Naturally incorporate the following keywords into the resume where they genuinely apply to my experience: ${selected.join(', ')}`;
+  refreshRevisionButton();
+  document.getElementById('card-revision').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  dom.fieldRevision.focus();
+  showToast('✦ Keywords added to Refine — review and click Apply Changes.');
 }
 
 let toastTimer;
@@ -706,6 +1047,48 @@ async function loadSettings() {
     endpoint:        config.endpoint  || '',
     simulateFailure: raw.simulateFailure || 'none',
   };
+}
+
+async function populateProfileStrip() {
+  const { profiles, activeId } = await loadProfiles();
+  dom.profileSwitcher.innerHTML = '';
+  profiles.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    if (p.id === activeId) opt.selected = true;
+    dom.profileSwitcher.appendChild(opt);
+  });
+}
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'dark')  root.dataset.theme = 'dark';
+  else if (theme === 'light') root.dataset.theme = 'light';
+  else delete root.dataset.theme;
+
+  const isDark = theme === 'dark' ||
+    (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  dom.btnTheme.textContent   = isDark ? '☀' : '🌙';
+  dom.btnTheme.title         = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+  dom.btnTheme.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme;
+  const isDark  = current === 'dark' ||
+    (!current && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const next = isDark ? 'light' : 'dark';
+  applyTheme(next);
+  chrome.storage.local.set({ theme: next });
+}
+
+function toneLabel(value) {
+  if (value <= 20) return 'Formal';
+  if (value <= 40) return 'Professional';
+  if (value <= 60) return 'Balanced';
+  if (value <= 80) return 'Conversational';
+  return 'Casual';
 }
 
 function tryParseJson(str) {

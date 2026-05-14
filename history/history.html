@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job History — Job Application Assistant</title>
+  <link rel="stylesheet" href="history.css" />
+</head>
+<body>
+
+  <div class="history-header">
+    <div>
+      <h1 class="page-title">Job History</h1>
+      <p class="page-subtitle">Jobs where you saved a document as PDF</p>
+    </div>
+    <button id="btn-clear-all" class="btn-danger-outline" type="button">Clear all</button>
+  </div>
+
+  <main class="history-main">
+
+    <div id="empty-state" class="empty-state hidden">
+      <div class="empty-icon">📄</div>
+      <p class="empty-title">No history yet</p>
+      <p class="empty-body">When you save a resume or cover letter as PDF, it will appear here.</p>
+    </div>
+
+    <table id="history-table" class="history-table hidden" aria-label="Job history">
+      <thead>
+        <tr>
+          <th class="col-date">Date</th>
+          <th class="col-title">Job Title</th>
+          <th class="col-company">Company</th>
+          <th class="col-type">Saved</th>
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+
+  </main>
+
+  <!-- Confirm Dialog -->
+  <div id="confirm-overlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="confirm-modal">
+      <p class="confirm-modal-title" id="confirm-title"></p>
+      <p class="confirm-modal-body" id="confirm-body"></p>
+      <div class="confirm-modal-actions">
+        <button id="confirm-btn-cancel" class="btn-secondary" type="button">Cancel</button>
+        <button id="confirm-btn-ok" class="btn-danger" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="history.js"></script>
+</body>
+</html>

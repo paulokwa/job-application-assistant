@@ -19,8 +19,10 @@
       </div>
     </div>
     <div class="header-right">
-      <button id="btn-new-draft" class="icon-btn header-new-btn" title="Clear draft and start fresh" aria-label="New draft">New</button>
+      <button id="btn-history" class="icon-btn" title="Job history" aria-label="View job history">History</button>
       <button id="btn-tour" class="icon-btn header-tour-btn" title="Feature tour" aria-label="Start feature tour">?</button>
+      <button id="btn-theme" class="icon-btn" title="Toggle theme" aria-label="Toggle light/dark mode">🌙</button>
+      <button id="btn-support" class="icon-btn" title="Support development" aria-label="Support development">☕</button>
       <button id="btn-settings" class="icon-btn" title="Open Settings" aria-label="Open Settings">⚙</button>
     </div>
   </header>
@@ -40,9 +42,22 @@
     </div>
   </div>
 
+  <!-- ── History Overlay ── -->
+  <div id="history-view" class="settings-overlay" role="dialog" aria-label="Job History">
+    <div class="overlay-header">
+      <button id="btn-close-history" class="back-btn" aria-label="Back to dashboard">
+        <span aria-hidden="true">←</span> Dashboard
+      </button>
+      <span class="overlay-title">Job History</span>
+    </div>
+    <div class="overlay-content">
+      <iframe id="history-frame" src="../history/history.html" frameborder="0" title="Job History"></iframe>
+    </div>
+  </div>
+
   <!-- Mock Mode Banner -->
   <div id="mock-mode-banner" class="mock-mode-banner hidden" role="status">
-    <strong>Mock Mode Active</strong> — AI responses are simulated. No real API is being called.
+    <strong>Demo Mode active</strong> — AI responses are simulated. No real API key is being used.
   </div>
 
   <!-- ═══════════════════════════════════════════════════
@@ -53,6 +68,13 @@
     <!-- ─── LEFT COLUMN ──────────────────────────── -->
     <div id="left-col">
 
+      <!-- Profile Strip -->
+      <div class="profile-strip" id="profile-strip">
+        <span class="profile-strip-icon" aria-hidden="true">👤</span>
+        <select id="profile-switcher" class="profile-switcher" aria-label="Active profile"></select>
+        <button id="btn-manage-profiles" class="btn-scan" type="button" title="Manage profiles">Manage</button>
+      </div>
+
       <!-- Job Info Card -->
       <section class="card" id="card-job-info">
         <div class="card-header">
@@ -60,6 +82,7 @@
           <div class="card-header-right">
             <span class="card-hint" id="source-indicator"></span>
             <button id="btn-scan-page" class="btn-scan" type="button" title="Scan the current browser tab for job details" aria-label="Scan current page for job details">Scan page</button>
+            <button id="btn-new-draft" class="btn-scan btn-scan--clear" type="button" title="Clear all fields and start a new draft" aria-label="Clear and start new draft">Clear</button>
           </div>
         </div>
         <div class="form-grid">
@@ -68,9 +91,6 @@
 
           <label for="field-company">Employer</label>
           <input type="text" id="field-company" placeholder="e.g. Nova Scotia Health" />
-
-          <label for="field-location">Location</label>
-          <input type="text" id="field-location" placeholder="e.g. Halifax, NS" />
 
           <label for="field-url">Posting URL</label>
           <input type="text" id="field-url" placeholder="Job posting URL" readonly aria-label="Job posting URL (auto-filled)" />
@@ -114,6 +134,7 @@
         </div>
 
         <div class="customization-controls">
+          <div class="ctrl-section-label">Layout</div>
           <div class="control-group">
             <label for="color-preset-group">Accent</label>
             <div class="color-presets" id="color-preset-group" role="group" aria-label="Choose document accent colour">
@@ -130,6 +151,26 @@
               <option value="standard">Standard</option>
               <option value="compact">Compact</option>
             </select>
+          </div>
+          <div class="ctrl-section-label">Writing</div>
+          <div class="control-group">
+            <label>Length</label>
+            <div class="length-pills" role="group" aria-label="Cover letter length">
+              <button class="length-pill" data-length="short"    type="button">Short</button>
+              <button class="length-pill active" data-length="standard" type="button">Standard</button>
+              <button class="length-pill" data-length="detailed" type="button">Detailed</button>
+            </div>
+          </div>
+          <div class="control-group tone-group">
+            <label for="range-tone">Tone</label>
+            <div class="tone-slider-col">
+              <div class="tone-slider-wrap">
+                <span class="tone-label">Formal</span>
+                <input type="range" id="range-tone" min="0" max="100" step="10" value="30" aria-label="Writing tone from formal to casual">
+                <span class="tone-label">Casual</span>
+              </div>
+              <span id="tone-descriptor" class="tone-descriptor">Professional</span>
+            </div>
           </div>
         </div>
       </section>
@@ -222,7 +263,36 @@
         ></textarea>
         <div class="revision-buttons">
           <button id="btn-apply-changes" class="btn-primary" disabled>Apply Changes</button>
-          <button id="btn-regenerate" class="btn-secondary" disabled aria-label="Reset to original draft">Reset</button>
+          <button id="btn-regenerate" class="btn-secondary" disabled aria-label="Revert to original draft">↩ Revert</button>
+        </div>
+      </section>
+
+      <!-- ATS Check Card -->
+      <section class="card" id="card-ats">
+        <div class="card-header">
+          <span class="card-title">ATS Check</span>
+          <button id="btn-ats-scan" class="btn-scan" type="button" disabled>Scan keywords</button>
+        </div>
+        <div id="ats-empty" class="ats-empty">
+          Generate a resume first, then scan for keyword gaps.
+        </div>
+        <div id="ats-status" class="gen-status hidden" role="status" aria-live="polite">
+          <div class="spinner" aria-hidden="true"></div>
+          <span>Scanning keywords…</span>
+        </div>
+        <div id="ats-results" class="ats-results hidden">
+          <div id="ats-score" class="ats-score"></div>
+          <div id="ats-matched-group" class="ats-keyword-group hidden">
+            <div class="ats-group-label ats-group-label--matched">Matched</div>
+            <div id="ats-matched-chips" class="ats-chips"></div>
+          </div>
+          <div id="ats-missing-group" class="ats-keyword-group hidden">
+            <div class="ats-group-label ats-group-label--missing">Missing — tap to deselect</div>
+            <div id="ats-missing-chips" class="ats-chips"></div>
+          </div>
+          <div id="ats-apply-row" class="ats-apply-row hidden">
+            <button id="btn-ats-apply" class="btn-secondary btn-sm" type="button">Apply keywords to resume</button>
+          </div>
         </div>
       </section>
 
@@ -260,6 +330,34 @@
           <button id="tour-btn-prev" class="tour-btn-secondary" type="button">← Back</button>
           <button id="tour-btn-next" class="tour-btn-primary" type="button">Next →</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Welcome Modal ── -->
+  <div id="welcome-overlay" class="welcome-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+    <div class="welcome-modal">
+      <div class="welcome-icon">✦</div>
+      <h2 class="welcome-title" id="welcome-title">Welcome to Job Page Draft Assistant</h2>
+      <div class="welcome-body">
+        <p>Job hunting is repetitive. This extension reduces the friction — scan a job posting, add your profile details, and get a tailored resume or cover letter draft without copying everything manually.</p>
+        <p>The extension is <strong>free</strong>. For real AI generation, connect your own API key in Settings. <strong>Demo Mode</strong> lets you try the full workflow with no key required.</p>
+        <p>If this tool saves you time, you can optionally support future updates.</p>
+      </div>
+      <button id="welcome-btn-start" class="btn-primary welcome-btn-primary" type="button">Get started</button>
+      <button id="welcome-btn-donate" class="btn-secondary welcome-btn-secondary" type="button">Support development</button>
+      <button id="welcome-btn-skip" class="welcome-skip" type="button">Maybe later</button>
+    </div>
+  </div>
+
+  <!-- ── Overwrite Confirm Dialog ── -->
+  <div id="confirm-overlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="confirm-modal">
+      <p class="confirm-modal-title" id="confirm-title"></p>
+      <p class="confirm-modal-body" id="confirm-body"></p>
+      <div class="confirm-modal-actions">
+        <button id="confirm-btn-cancel" class="btn-secondary" type="button">Cancel</button>
+        <button id="confirm-btn-ok" class="btn-primary" type="button"></button>
       </div>
     </div>
   </div>

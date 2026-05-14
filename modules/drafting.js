@@ -3,7 +3,7 @@
 
 import { callAI } from './provider.js';
 import { profileToPromptText } from './profile.js';
-import { generateMockResume, generateMockCoverLetter, mockReviseDraft } from './mock.js';
+import { generateMockResume, generateMockCoverLetter, mockReviseDraft, mockExtractAtsKeywords } from './mock.js';
 
 /** Returns true if the settings specify Mock Mode. */
 const isMock = settings => settings?.provider === 'mock';
@@ -37,13 +37,27 @@ function buildSourceTruthBlock(profileText, sourceResumeText) {
   return blocks.join('\n');
 }
 
+function toneInstruction(tone = 30) {
+  if (tone <= 20) return 'TONE: Highly formal and polished. No contractions. Precise, measured language throughout.';
+  if (tone <= 40) return 'TONE: Clear and professional. Direct and confident without being stiff.';
+  if (tone <= 60) return 'TONE: Balanced — professional but warm and approachable. Avoid overly corporate phrasing.';
+  if (tone <= 80) return 'TONE: Conversational and warm. Contractions are welcome. Sound like a person, not a template.';
+  return           'TONE: Casual and friendly. Be direct and personable. Avoid stiff corporate language entirely.';
+}
+
+function clLengthInstruction(length = 'standard') {
+  if (length === 'short')    return 'LENGTH: Write 3 paragraphs maximum — an opening, one body paragraph, and a closing. Be concise and direct.';
+  if (length === 'detailed') return 'LENGTH: Write 6 or more paragraphs. Explore the candidate\'s background, achievements, and company fit in depth.';
+  return 'LENGTH: Write 4–5 paragraphs — an opening, 2–3 body paragraphs covering key strengths, and a closing.';
+}
+
 const JSON_OUTPUT_INSTRUCTION = `OUTPUT FORMAT:
 Your final response must be valid JSON ONLY. No markdown code blocks, no preamble, no trailing text.
 Follow the provided schema exactly.`;
 
 // ── Resume Generation ─────────────────────────────────────────────────────
 
-export async function generateResume(jobData, profile, settings, sourceResumeText = '', signal) {
+export async function generateResume(jobData, profile, settings, sourceResumeText = '', signal, tone = 30) {
   if (isMock(settings)) return generateMockResume(jobData, profile, sourceResumeText);
   const profileText = profileToPromptText(profile);
   const truthBlock = buildSourceTruthBlock(profileText, sourceResumeText);
@@ -51,6 +65,7 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
   const systemPrompt = [
     'You are an expert resume writer helping a job seeker tailor their resume to a specific job posting.',
     HALLUCINATION_GUARD,
+    toneInstruction(tone),
     'You must return a structured JSON object containing tailored content. The layout is controlled by the application; you only provide the words.',
     'Focus on highlighting achievements relevant to the target job description.',
   ].join('\n\n');
@@ -107,7 +122,7 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
 
 // ── Cover Letter Generation ───────────────────────────────────────────────
 
-export async function generateCoverLetter(jobData, profile, settings, sourceResumeText = '', signal) {
+export async function generateCoverLetter(jobData, profile, settings, sourceResumeText = '', signal, tone = 30, clLength = 'standard') {
   if (isMock(settings)) return generateMockCoverLetter(jobData, profile, sourceResumeText);
   const profileText = profileToPromptText(profile);
   const truthBlock = buildSourceTruthBlock(profileText, sourceResumeText);
@@ -115,6 +130,8 @@ export async function generateCoverLetter(jobData, profile, settings, sourceResu
   const systemPrompt = [
     'You are an expert cover letter writer and career coach.',
     HALLUCINATION_GUARD,
+    toneInstruction(tone),
+    clLengthInstruction(clLength),
     'Return a structured JSON object containing greetings and body paragraphs.',
     'Write in a professional, engaging, and personalized tone that shows fit for the role and company.',
   ].join('\n\n');
@@ -177,6 +194,33 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
   ].join('\n');
 
   return callAI(systemPrompt, userPrompt, settings);
+}
+
+// ── ATS Keyword Extraction ────────────────────────────────────────────────
+
+export async function extractAtsKeywords(jobDescription, settings, signal) {
+  if (isMock(settings)) return mockExtractAtsKeywords();
+
+  const systemPrompt = [
+    'You are an ATS keyword analyst.',
+    'Extract the most important skills, qualifications, and requirements from the job description.',
+    'Return a JSON array of strings only. Each item is a keyword or short phrase (1–3 words).',
+    'Aim for 10–15 keywords covering: technical skills, soft skills, qualifications, tools, and certifications.',
+    'OUTPUT FORMAT: valid JSON array only. No markdown, no preamble, no trailing text.',
+    'Example: ["case management", "Microsoft Office", "team leadership", "Bachelor\'s degree"]',
+  ].join('\n');
+
+  const userPrompt = `Extract ATS keywords from this job description:\n\n${jobDescription}`;
+
+  try {
+    const raw = await callAI(systemPrompt, userPrompt, settings, signal);
+    const start = raw.indexOf('[');
+    const end   = raw.lastIndexOf(']');
+    if (start === -1 || end === -1) return [];
+    return JSON.parse(raw.slice(start, end + 1));
+  } catch {
+    return [];
+  }
 }
 
 // ── Special Instructions Extraction via AI ────────────────────────────────

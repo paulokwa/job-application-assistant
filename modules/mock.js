@@ -9,7 +9,7 @@ export function generateMockResume(jobData, profile, sourceResumeText) {
       {
         jobTitle: jobData.jobTitle || "Senior Professional",
         employer: jobData.company || "Leading Corporation",
-        location: jobData.location || "Remote",
+        location: "Remote",
         startDate: "Jan 2021",
         endDate: "Present",
         bulletPoints: [
@@ -52,6 +52,15 @@ export function generateMockCoverLetter(jobData, profile, sourceResumeText) {
     closing: "Sincerely,",
     signOff: profile.personalInfo?.fullName || "Candidate Name"
   }, null, 2);
+}
+
+export function mockExtractAtsKeywords() {
+  return [
+    'team leadership', 'data analysis', 'strategic planning', 'communication',
+    'project management', 'stakeholder engagement', 'Microsoft Office',
+    'problem solving', "Bachelor's degree", 'cross-functional collaboration',
+    'budget management', 'process improvement'
+  ];
 }
 
 export function mockReviseDraft(currentDraft, request, docType) {

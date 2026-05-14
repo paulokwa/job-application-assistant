@@ -1,7 +1,7 @@
 // settings/settings.js — Settings page controller (Redesigned for HTML-First System)
 
 import { extractProfileFromResume, extractTextFromDocx, fileToArrayBuffer } from '../modules/extraction.js';
-import { loadProfile, saveProfile } from '../modules/profile.js';
+import { loadProfile, saveProfile, loadProfiles, createProfile, renameProfile, deleteProfile, switchProfile, updateProfileMeta } from '../modules/profile.js';
 import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
 
@@ -51,6 +51,11 @@ async function init() {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('embed') === 'true') document.body.classList.add('embedded');
 
+  // Apply stored theme before page renders to prevent flash
+  const { theme } = await chrome.storage.local.get(['theme']);
+  if (theme === 'dark')  document.documentElement.setAttribute('data-theme', 'dark');
+  else if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+
   // Load saved data
   const stored = await chrome.storage.sync.get(['providerSettings', 'docSettings']);
   settings = migrateSettings(stored.providerSettings);
@@ -62,6 +67,7 @@ async function init() {
   populateDocSection(docSettings);
   populateProfile(profile);
   await populateSourceStatus();
+  await populateProfilesSection();
 
   // Navigation
   document.querySelectorAll('.nav-btn[data-section]').forEach(btn => {
@@ -118,6 +124,11 @@ async function init() {
   $('btn-add-edu').addEventListener('click',  () => addEducationEntry());
   $('btn-add-cert').addEventListener('click', () => addCertEntry());
   $('btn-add-summary').addEventListener('click', () => addSummaryEntry());
+
+  $('btn-add-profile').addEventListener('click', handleAddProfile);
+  $('btn-go-to-profile').addEventListener('click', () => {
+    document.querySelector('.nav-btn[data-section="profile"]').click();
+  });
 
   updateFilenamePreview();
 }
@@ -234,7 +245,7 @@ async function testConnection() {
   const result = $('test-result');
   const provider = $('sel-provider').value;
   if (provider === 'mock') {
-    result.textContent = '✅ Mock Mode — no connection needed!';
+    result.textContent = '✅ Demo Mode — no API key needed!';
     return;
   }
   result.textContent = '⏳ Testing…';
@@ -523,6 +534,15 @@ async function saveDocuments() {
 }
 
 // ── Source Resume & Profile ───────────────────────────────────────────────
+function clearSourceResumeUI() {
+  $('source-upload-text').textContent = 'Click to upload your source resume (.docx or .pdf)';
+  $('source-resume-active-bar').textContent = '';
+  $('source-resume-active-bar').classList.add('hidden');
+  $('profile-autofill-status').textContent = '';
+  $('profile-autofill-status').classList.add('hidden');
+  $('inp-source-resume').value = '';
+}
+
 async function populateSourceStatus() {
   const localData = await chrome.storage.local.get(['sourceResumeName']);
   if (!localData.sourceResumeName) return;
@@ -620,6 +640,9 @@ async function handleSourceResumeUpload(event) {
       sourceResumeText: plainText,
       sourceResumeName: file.name
     });
+
+    const { activeId } = await loadProfiles();
+    if (activeId) await updateProfileMeta(activeId, { sourceResumeName: file.name });
 
     $('source-upload-text').textContent = `${file.name} uploaded ✓`;
     $('source-resume-active-bar').textContent = `📄 Active Source: ${file.name}`;
@@ -727,35 +750,39 @@ function addCertEntry(data = {}) {
   $('certifications-list').appendChild(div);
 }
 
-async function saveProfileData() {
+function collectProfileFromForm() {
   const readList = (sel, mapFn) => [...document.querySelectorAll(sel)].map(mapFn);
-  profile = {
-    personalInfo: { 
-      fullName:     $('p-name').value, 
-      email:        $('p-email').value, 
-      phone:        $('p-phone').value, 
-      cityProvince: $('p-address').value, 
-      linkedin:     $('p-linkedin').value, 
-      portfolio:    $('p-portfolio').value 
+  return {
+    personalInfo: {
+      fullName:     $('p-name').value,
+      email:        $('p-email').value,
+      phone:        $('p-phone').value,
+      cityProvince: $('p-address').value,
+      linkedin:     $('p-linkedin').value,
+      portfolio:    $('p-portfolio').value
     },
     summaries: readList('.summary-label-input', (el, i) => ({ label: el.value, text: document.querySelectorAll('.summary-text-input')[i].value })),
     skills: $('p-skills').value.split('\n').filter(Boolean),
-    experience: readList('.exp-entry', el => ({ 
-      jobTitle: el.querySelector('.exp-title').value, 
-      employer: el.querySelector('.exp-company').value, 
-      dates:    el.querySelector('.exp-dates').value, // normalizeResumeContent handles splitting this into start/end
+    experience: readList('.exp-entry', el => ({
+      jobTitle: el.querySelector('.exp-title').value,
+      employer: el.querySelector('.exp-company').value,
+      dates:    el.querySelector('.exp-dates').value,
       bulletPoints: el.querySelector('.exp-bullets').value.split('\n').filter(Boolean)
     })),
-    education: readList('.edu-entry', el => ({ 
-      credential:  el.querySelector('.edu-degree').value, 
-      institution: el.querySelector('.edu-school').value 
+    education: readList('.edu-entry', el => ({
+      credential:  el.querySelector('.edu-degree').value,
+      institution: el.querySelector('.edu-school').value
     })),
-    certifications: readList('.cert-entry', el => ({ 
-      name:   el.querySelector('.cert-name').value, 
-      issuer: el.querySelector('.cert-issuer').value 
+    certifications: readList('.cert-entry', el => ({
+      name:   el.querySelector('.cert-name').value,
+      issuer: el.querySelector('.cert-issuer').value
     })),
     doNotClaimNotes: $('p-do-not-claim').value
   };
+}
+
+async function saveProfileData() {
+  profile = collectProfileFromForm();
   await saveProfile(profile);
 
   const btn = $('btn-save-profile');
@@ -1006,6 +1033,119 @@ function settingsTourKeyHandler(e) {
   if (e.key === 'Escape') endSettingsTour();
   if (e.key === 'ArrowRight' && settingsTourIndex < SETTINGS_TOUR_STEPS.length - 1) showSettingsTourStep(settingsTourIndex + 1);
   if (e.key === 'ArrowLeft'  && settingsTourIndex > 0) showSettingsTourStep(settingsTourIndex - 1);
+}
+
+// ── Profiles Section ──────────────────────────────────────────────────────
+
+async function populateProfilesSection() {
+  const { profiles, activeId } = await loadProfiles();
+  renderProfilesList(profiles, activeId);
+}
+
+function renderProfilesList(profiles, activeId) {
+  const list = $('profiles-list');
+  list.innerHTML = '';
+
+  profiles.forEach(p => {
+    const isActive = p.id === activeId;
+    const row = document.createElement('div');
+    row.className = 'profile-row' + (isActive ? ' profile-row--active' : '');
+    row.dataset.id = p.id;
+
+    row.innerHTML = `
+      <div class="profile-row-left">
+        <div class="profile-row-name-wrap">
+          <span class="profile-row-name">${escHtml(p.name)}</span>
+          ${p.sourceResumeName ? `<span class="profile-row-file" title="${escHtml(p.sourceResumeName)}">📄 ${escHtml(p.sourceResumeName)}</span>` : ''}
+        </div>
+        ${isActive ? '<span class="profile-row-badge">Active</span>' : ''}
+      </div>
+      <div class="profile-row-actions">
+        ${!isActive ? `<button class="profile-row-btn" data-action="switch" data-id="${p.id}" type="button">Switch</button>` : ''}
+        <button class="profile-row-btn" data-action="rename" data-id="${p.id}" type="button">Rename</button>
+        ${profiles.length > 1 ? `<button class="profile-row-btn profile-row-btn--danger" data-action="delete" data-id="${p.id}" type="button">Delete</button>` : ''}
+      </div>
+    `;
+    list.appendChild(row);
+  });
+
+  list.addEventListener('click', handleProfileRowAction);
+}
+
+async function handleProfileRowAction(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+
+  const id     = btn.dataset.id;
+  const action = btn.dataset.action;
+
+  if (action === 'switch') {
+    await saveProfile(collectProfileFromForm());
+    await switchProfile(id);
+    profile = await loadProfile();
+    populateProfile(profile);
+    clearSourceResumeUI();
+    await populateProfilesSection();
+    document.querySelector('.nav-btn[data-section="profile"]').click();
+    showToast('✦ Profile saved and switched.');
+  }
+
+  if (action === 'rename') {
+    const row      = btn.closest('.profile-row');
+    const nameSpan = row.querySelector('.profile-row-name');
+    const current  = nameSpan.textContent.trim();
+
+    const input = document.createElement('input');
+    input.type  = 'text';
+    input.value = current;
+    input.className = 'profile-rename-input';
+    nameSpan.replaceWith(input);
+    input.focus();
+    input.select();
+
+    const commit = async () => {
+      const newName = input.value.trim() || current;
+      await renameProfile(id, newName);
+      await populateProfilesSection();
+    };
+    input.addEventListener('blur', commit, { once: true });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') { input.value = current; input.blur(); }
+    });
+  }
+
+  if (action === 'delete') {
+    const { profiles } = await loadProfiles();
+    const p = profiles.find(p => p.id === id);
+    const ok = await showConfirmDialog(
+      'Delete profile?',
+      `"${p?.name || 'This profile'}" and all its data will be permanently deleted.`,
+      'Delete'
+    );
+    if (!ok) return;
+    await deleteProfile(id);
+    profile = await loadProfile();
+    populateProfile(profile);
+    await populateProfilesSection();
+    showToast('Profile deleted.');
+  }
+}
+
+async function handleAddProfile() {
+  const { profiles } = await loadProfiles();
+  const name = `Profile ${profiles.length + 1}`;
+  const id   = await createProfile(name);
+  await saveProfile(collectProfileFromForm());
+  await switchProfile(id);
+  profile = await loadProfile();
+  populateProfile(profile);
+  clearSourceResumeUI();
+  await populateProfilesSection();
+  // Trigger inline rename on the new row, then navigate to My Profile
+  const newBtn = $('profiles-list').querySelector(`[data-action="rename"][data-id="${id}"]`);
+  if (newBtn) newBtn.click();
+  document.querySelector('.nav-btn[data-section="profile"]').click();
 }
 
 init().catch(console.error);

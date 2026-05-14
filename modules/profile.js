@@ -1,22 +1,98 @@
 // modules/profile.js
-// Reads and writes the structured user profile from chrome.storage.sync.
+// Multi-profile storage. Each profile lives under its own sync key (profile_{id})
+// so it gets an individual 8 KB budget. An index (profileIndex) tracks names and order.
 
 import { normalizeResumeContent } from './schema.js';
 
-const PROFILE_KEY = 'userProfile';
+const INDEX_KEY  = 'profileIndex';
+const ACTIVE_KEY = 'activeProfileId';
+const LEGACY_KEY = 'userProfile';
+
+function profileKey(id) { return `profile_${id}`; }
+function makeId()       { return 'p' + Date.now(); }
+
+// ── Migration ─────────────────────────────────────────────────────────────
+
+async function migrateIfNeeded() {
+  const data = await chrome.storage.sync.get([INDEX_KEY, LEGACY_KEY]);
+  if (data[INDEX_KEY]) return; // already migrated
+
+  const id = makeId();
+  await chrome.storage.sync.set({
+    [INDEX_KEY]:  [{ id, name: 'General' }],
+    [ACTIVE_KEY]: id,
+    [profileKey(id)]: data[LEGACY_KEY] || {},
+  });
+}
+
+// ── Core reads ────────────────────────────────────────────────────────────
+
+export async function loadProfiles() {
+  await migrateIfNeeded();
+  const data = await chrome.storage.sync.get([INDEX_KEY, ACTIVE_KEY]);
+  const profiles = data[INDEX_KEY] || [];
+  const activeId = data[ACTIVE_KEY] || profiles[0]?.id || null;
+  return { profiles, activeId };
+}
 
 export async function loadProfile() {
-  const data = await chrome.storage.sync.get(PROFILE_KEY);
-  return normalizeResumeContent(data[PROFILE_KEY] || {});
+  const { profiles, activeId } = await loadProfiles();
+  const id = activeId || profiles[0]?.id;
+  if (!id) return normalizeResumeContent({});
+  const data = await chrome.storage.sync.get(profileKey(id));
+  return normalizeResumeContent(data[profileKey(id)] || {});
 }
+
+// ── Core writes ───────────────────────────────────────────────────────────
 
 export async function saveProfile(profile) {
-  await chrome.storage.sync.set({ [PROFILE_KEY]: profile });
+  const { activeId } = await loadProfiles();
+  if (!activeId) return;
+  await chrome.storage.sync.set({ [profileKey(activeId)]: profile });
 }
 
-/**
- * Converts the profile into a compact text block for injection into AI prompts.
- */
+export async function switchProfile(id) {
+  await chrome.storage.sync.set({ [ACTIVE_KEY]: id });
+  const data = await chrome.storage.sync.get(profileKey(id));
+  return normalizeResumeContent(data[profileKey(id)] || {});
+}
+
+// ── Profile management ────────────────────────────────────────────────────
+
+export async function createProfile(name) {
+  const { profiles, activeId } = await loadProfiles();
+  const id = makeId();
+  await chrome.storage.sync.set({
+    [INDEX_KEY]:      [...profiles, { id, name: name || 'New Profile' }],
+    [profileKey(id)]: {},
+  });
+  return id;
+}
+
+export async function renameProfile(id, name) {
+  const { profiles, activeId } = await loadProfiles();
+  const updated = profiles.map(p => p.id === id ? { ...p, name } : p);
+  await chrome.storage.sync.set({ [INDEX_KEY]: updated });
+}
+
+export async function updateProfileMeta(id, meta) {
+  const { profiles, activeId } = await loadProfiles();
+  const updated = profiles.map(p => p.id === id ? { ...p, ...meta } : p);
+  await chrome.storage.sync.set({ [INDEX_KEY]: updated });
+}
+
+export async function deleteProfile(id) {
+  const { profiles, activeId } = await loadProfiles();
+  if (profiles.length <= 1) return activeId;
+  const remaining  = profiles.filter(p => p.id !== id);
+  const newActive  = activeId === id ? remaining[0].id : activeId;
+  await chrome.storage.sync.remove(profileKey(id));
+  await chrome.storage.sync.set({ [INDEX_KEY]: remaining, [ACTIVE_KEY]: newActive });
+  return newActive;
+}
+
+// ── AI prompt helper ──────────────────────────────────────────────────────
+
 export function profileToPromptText(profile) {
   const p = profile.personalInfo;
   const lines = [];
@@ -26,33 +102,25 @@ export function profileToPromptText(profile) {
   lines.push(`Email: ${p.email || '(not provided)'}`);
   lines.push(`Phone: ${p.phone || '(not provided)'}`);
   if (p.cityProvince) lines.push(`Location: ${p.cityProvince}`);
-  if (p.linkedin)      lines.push(`LinkedIn: ${p.linkedin}`);
-  if (p.portfolio)     lines.push(`Portfolio: ${p.portfolio}`);
-  if (p.website)       lines.push(`Website: ${p.website}`);
+  if (p.linkedin)     lines.push(`LinkedIn: ${p.linkedin}`);
+  if (p.portfolio)    lines.push(`Portfolio: ${p.portfolio}`);
+  if (p.website)      lines.push(`Website: ${p.website}`);
 
-  // Summary
-  if (profile.summary) {
-    lines.push(`\nSummary: ${profile.summary}`);
-  }
+  if (profile.summary) lines.push(`\nSummary: ${profile.summary}`);
 
-  // Skills
   if (profile.skills?.length) {
     lines.push('\n--- Skills ---');
     lines.push(profile.skills.join(', '));
   }
 
-  // Experience
   if (profile.experience?.length) {
     lines.push('\n--- Work Experience ---');
     profile.experience.forEach((exp, i) => {
       lines.push(`\nRole ${i + 1}: ${exp.jobTitle} at ${exp.employer} (${exp.startDate} - ${exp.endDate}) — ${exp.location}`);
-      if (exp.bulletPoints?.length) {
-        lines.push(`Responsibilities:\n- ${exp.bulletPoints.join('\n- ')}`);
-      }
+      if (exp.bulletPoints?.length) lines.push(`Responsibilities:\n- ${exp.bulletPoints.join('\n- ')}`);
     });
   }
 
-  // Education
   if (profile.education?.length) {
     lines.push('\n--- Education ---');
     profile.education.forEach(ed => {
@@ -61,7 +129,6 @@ export function profileToPromptText(profile) {
     });
   }
 
-  // Projects
   if (profile.projects?.length) {
     lines.push('\n--- Projects ---');
     profile.projects.forEach(proj => {
@@ -72,15 +139,11 @@ export function profileToPromptText(profile) {
     });
   }
 
-  // Certifications
   if (profile.certifications?.length) {
     lines.push('\n--- Certifications ---');
-    profile.certifications.forEach(cert => {
-      lines.push(cert);
-    });
+    profile.certifications.forEach(cert => lines.push(cert));
   }
 
   lines.push('\n=== END USER PROFILE ===');
   return lines.join('\n');
 }
-
