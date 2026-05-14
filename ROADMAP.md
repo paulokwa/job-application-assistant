@@ -6,6 +6,11 @@ Ideas and planned features. Nothing here is committed or scheduled — it is a p
 
 ## High priority
 
+### Welcome banner: clearer AI setup path
+Update the first-run welcome banner so AI setup is harder to miss. It should make clear that the app needs an AI provider/API key or local Ollama setup before real generation will work, and should offer a direct action into AI Provider settings.
+
+---
+
 ### Export / Import settings (JSON)
 A single "Export settings" button in the AI Provider or Profile section that downloads all `chrome.storage.sync` and `chrome.storage.local` data (minus large blobs like source resume text) as a JSON file. A matching "Import" button restores from that file.
 
@@ -22,6 +27,11 @@ Allow exporting a single profile (not all settings) as a shareable JSON file, an
 
 ### More document style templates
 Explore expanding the resume and cover letter template library beyond the current styles. Possibilities include more conservative corporate layouts, warmer community/nonprofit layouts, compact one-page variants, and role-specific templates. Keep the existing restrained design quality bar: templates should feel professional and usable, not decorative for its own sake.
+
+---
+
+### Support / feedback entry point
+Decide whether the app should include a convenient support or feedback link, and where it belongs. Possible placements: welcome banner, header support button, Settings footer, or a small "Help / Feedback" item near the tour button. Keep it useful without making the dashboard feel promotional.
 
 ---
 
