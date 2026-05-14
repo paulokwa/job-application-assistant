@@ -71,7 +71,12 @@
       <!-- Profile Strip -->
       <div class="profile-strip" id="profile-strip">
         <span class="profile-strip-icon" aria-hidden="true">👤</span>
-        <select id="profile-switcher" class="profile-switcher" aria-label="Active profile"></select>
+        <div class="profile-menu">
+          <button id="profile-switcher" class="profile-switcher" type="button" aria-haspopup="listbox" aria-expanded="false">
+            General
+          </button>
+          <div id="profile-menu-list" class="profile-menu-list hidden" role="listbox" aria-label="Choose active profile"></div>
+        </div>
         <button id="btn-manage-profiles" class="btn-scan" type="button" title="Manage profiles">Manage</button>
       </div>
 
@@ -145,7 +150,7 @@
               <button class="color-dot" style="background: #0f172a" data-color="#0f172a" type="button" aria-label="Dark accent"></button>
             </div>
           </div>
-          <div class="control-group">
+          <div class="control-group layout-spacing-group">
             <label for="select-spacing">Spacing</label>
             <select id="select-spacing" aria-label="Document spacing">
               <option value="standard">Standard</option>

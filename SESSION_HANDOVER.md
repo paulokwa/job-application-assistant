@@ -1,6 +1,40 @@
 # Session Handover — Job Application Assistant
 
-**Last updated:** 2026-05-13 (Session 5 — Inline draft editing)
+**Last updated:** 2026-05-14 (Session 6 — Dashboard UI polish)
+
+---
+
+# Session 6 additions (2026-05-14)
+
+**Branch:** `main`
+
+---
+
+### 45. Dashboard Style card polish
+
+Small layout refinements in the Style card:
+
+- Added extra vertical spacing between the Accent row and Spacing row using `.layout-spacing-group`.
+- Fixed the Tone row label alignment so the "Tone" label sits on the same horizontal plane as the "Formal" slider label instead of aligning against the slider plus descriptor block.
+
+**Files changed:** `dashboard/dashboard.html`, `dashboard/dashboard.css`
+
+---
+
+### 46. Custom profile switcher menu
+
+Replaced the native browser `<select>` used for the dashboard profile switcher with an app-styled menu so the profile dropdown matches the dashboard's visual system instead of using the OS/browser default dropdown.
+
+**How it works:**
+
+- `#profile-switcher` is now a button with `aria-haspopup="listbox"` and `aria-expanded`.
+- `#profile-menu-list` renders profile options as `.profile-menu-option` buttons.
+- `populateProfileStrip()` now fills the menu, marks the active option, and updates the closed button label.
+- `switchToProfile(profileId)` keeps the existing `switchProfile()` behavior and repopulates the menu after a switch.
+- Keyboard support: `Enter` / `Space` / `ArrowDown` open the menu, arrow keys move between options, `Escape` closes it.
+- Clicking outside the profile strip closes the menu.
+
+**Files changed:** `dashboard/dashboard.html`, `dashboard/dashboard.css`, `dashboard/dashboard.js`
 
 ---
 

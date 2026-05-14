@@ -105,6 +105,8 @@ const dom = {
   btnTheme:           $('btn-theme'),
   btnHistory:         $('btn-history'),
   profileSwitcher:    $('profile-switcher'),
+  profileMenuList:    $('profile-menu-list'),
+  profileStrip:       $('profile-strip'),
   btnManageProfiles:  $('btn-manage-profiles'),
   historyView:        $('history-view'),
   btnCloseHistory:    $('btn-close-history'),
@@ -298,9 +300,42 @@ function bindEvents() {
   dom.btnNewDraft.addEventListener('click', clearSession);
 
   // Profile strip
-  dom.profileSwitcher.addEventListener('change', async () => {
-    state.profile = await switchProfile(dom.profileSwitcher.value);
-    showToast('✦ Profile switched.');
+  dom.profileSwitcher.addEventListener('click', toggleProfileMenu);
+  dom.profileSwitcher.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openProfileMenu();
+      dom.profileMenuList.querySelector('.profile-menu-option')?.focus();
+    }
+  });
+  dom.profileMenuList.addEventListener('click', async e => {
+    const btn = e.target.closest('.profile-menu-option');
+    if (btn) await switchToProfile(btn.dataset.profileId);
+  });
+  dom.profileMenuList.addEventListener('keydown', async e => {
+    const options = [...dom.profileMenuList.querySelectorAll('.profile-menu-option')];
+    const index = options.indexOf(document.activeElement);
+
+    if (e.key === 'Escape') {
+      closeProfileMenu();
+      dom.profileSwitcher.focus();
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      options[Math.min(index + 1, options.length - 1)]?.focus();
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      options[Math.max(index - 1, 0)]?.focus();
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const btn = document.activeElement.closest('.profile-menu-option');
+      if (btn) await switchToProfile(btn.dataset.profileId);
+    }
+  });
+  document.addEventListener('click', e => {
+    if (!dom.profileStrip.contains(e.target)) closeProfileMenu();
   });
   dom.btnManageProfiles.addEventListener('click', () => {
     dom.settingsView.classList.add('visible');
@@ -1129,14 +1164,50 @@ async function loadSettings() {
 
 async function populateProfileStrip() {
   const { profiles, activeId } = await loadProfiles();
-  dom.profileSwitcher.innerHTML = '';
+  const activeProfile = profiles.find(p => p.id === activeId) || profiles[0];
+  dom.profileSwitcher.textContent = activeProfile?.name || 'General';
+  dom.profileSwitcher.dataset.profileId = activeProfile?.id || '';
+  dom.profileMenuList.innerHTML = '';
+
   profiles.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name;
-    if (p.id === activeId) opt.selected = true;
-    dom.profileSwitcher.appendChild(opt);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'profile-menu-option';
+    btn.dataset.profileId = p.id;
+    btn.textContent = p.name;
+    btn.setAttribute('role', 'option');
+    btn.setAttribute('aria-selected', String(p.id === activeProfile?.id));
+    btn.classList.toggle('active', p.id === activeProfile?.id);
+    dom.profileMenuList.appendChild(btn);
   });
+}
+
+function openProfileMenu() {
+  dom.profileMenuList.classList.remove('hidden');
+  dom.profileSwitcher.setAttribute('aria-expanded', 'true');
+}
+
+function closeProfileMenu() {
+  dom.profileMenuList.classList.add('hidden');
+  dom.profileSwitcher.setAttribute('aria-expanded', 'false');
+}
+
+function toggleProfileMenu() {
+  if (dom.profileMenuList.classList.contains('hidden')) openProfileMenu();
+  else closeProfileMenu();
+}
+
+async function switchToProfile(profileId) {
+  if (!profileId) return;
+  if (profileId === dom.profileSwitcher.dataset.profileId) {
+    closeProfileMenu();
+    return;
+  }
+
+  state.profile = await switchProfile(profileId);
+  await populateProfileStrip();
+  closeProfileMenu();
+  showToast('✦ Profile switched.');
 }
 
 function applyTheme(theme) {
