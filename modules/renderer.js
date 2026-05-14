@@ -14,6 +14,11 @@ const templates = {
   compact
 };
 
+function safeHexColor(value, fallback = '#2563eb') {
+  const color = String(value || '').trim();
+  return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color) ? color : fallback;
+}
+
 /**
  * Renders a full HTML document for a resume or cover letter.
  * @param {string} templateId - 'classic' | 'modern' | 'sidebar' | 'compact'
@@ -23,7 +28,7 @@ const templates = {
  */
 export function renderDocument(templateId, type, data, options = {}) {
   const template = templates[templateId] || templates.classic;
-  const accentColor = options.accentColor || data.metadata?.accentColor || '#2563eb';
+  const accentColor = safeHexColor(options.accentColor || data.metadata?.accentColor);
   const spacingMode = options.spacingMode || data.metadata?.spacingMode || 'standard';
   const safeData = escapeHtmlStrings(data);
 
@@ -131,7 +136,7 @@ export function renderDocument(templateId, type, data, options = {}) {
  */
 export function renderMergedDocument(templateId, resumeData, clData, options = {}) {
   const template = templates[templateId] || templates.classic;
-  const accentColor = options.accentColor || '#2563eb';
+  const accentColor = safeHexColor(options.accentColor);
   const spacingMode = options.spacingMode || 'standard';
   const safeResumeData = escapeHtmlStrings(resumeData);
   const safeClData = escapeHtmlStrings(clData);

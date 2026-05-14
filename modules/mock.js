@@ -135,13 +135,37 @@ export function generateMockCoverLetter(jobData, profile, sourceResumeText) {
   }, null, 2);
 }
 
-export function mockExtractAtsKeywords() {
-  return [
-    'team leadership', 'data analysis', 'strategic planning', 'communication',
-    'project management', 'stakeholder engagement', 'Microsoft Office',
-    'problem solving', "Bachelor's degree", 'cross-functional collaboration',
-    'budget management', 'process improvement'
-  ];
+const ATS_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'you', 'your', 'our', 'are', 'this', 'that',
+  'will', 'from', 'have', 'has', 'must', 'can', 'all', 'any', 'into', 'such',
+  'their', 'they', 'them', 'who', 'what', 'when', 'where', 'why', 'how', 'job',
+  'role', 'work', 'team', 'company', 'candidate', 'position', 'including'
+]);
+
+export function mockExtractAtsKeywords(jobDescription = '') {
+  const words = String(jobDescription)
+    .toLowerCase()
+    .replace(/[^a-z0-9+#.\s-]/g, ' ')
+    .split(/\s+/)
+    .map(word => word.replace(/^[.-]+|[.-]+$/g, ''))
+    .filter(word => word.length > 2 && !ATS_STOPWORDS.has(word));
+
+  if (!words.length) {
+    return ['[Demo placeholder] Add a job description to scan ATS keywords.'];
+  }
+
+  const counts = new Map();
+  const add = keyword => counts.set(keyword, (counts.get(keyword) || 0) + 1);
+
+  words.forEach(add);
+  for (let i = 0; i < words.length - 1; i++) {
+    if (words[i] !== words[i + 1]) add(`${words[i]} ${words[i + 1]}`);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .map(([keyword]) => keyword)
+    .slice(0, 15);
 }
 
 export function mockReviseDraft(currentDraft, request, docType) {
