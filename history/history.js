@@ -1,5 +1,8 @@
 // history/history.js — Job History page controller
 // Entries are written by dashboard.js when the user saves a document as PDF.
+const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
+const MAX_SYNC_HISTORY_SUMMARIES = 12;
+const MAX_SYNC_HISTORY_BYTES = 7000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -46,12 +49,72 @@ function generationModeForEntry(entry) {
 // ── Storage ───────────────────────────────────────────────────────────────
 
 async function loadHistory() {
+  const [localData, syncData] = await Promise.all([
+    chrome.storage.local.get('jobHistory'),
+    chrome.storage.sync.get(SYNC_HISTORY_SUMMARY_KEY),
+  ]);
+  const syncedSummaries = Array.isArray(syncData[SYNC_HISTORY_SUMMARY_KEY])
+    ? syncData[SYNC_HISTORY_SUMMARY_KEY]
+    : [];
+  const localEntries = Array.isArray(localData.jobHistory)
+    ? localData.jobHistory
+    : [];
+  return mergeHistoryEntries(
+    localEntries,
+    syncedSummaries
+  );
+}
+
+async function loadLocalHistory() {
   const { jobHistory = [] } = await chrome.storage.local.get('jobHistory');
   return jobHistory;
 }
 
-async function saveHistory(entries) {
+async function loadSyncedSummaries() {
+  const data = await chrome.storage.sync.get(SYNC_HISTORY_SUMMARY_KEY);
+  return Array.isArray(data[SYNC_HISTORY_SUMMARY_KEY])
+    ? data[SYNC_HISTORY_SUMMARY_KEY]
+    : [];
+}
+
+async function saveLocalHistory(entries) {
   await chrome.storage.local.set({ jobHistory: entries });
+}
+
+async function saveSyncedSummaries(entries) {
+  await chrome.storage.sync.set({ [SYNC_HISTORY_SUMMARY_KEY]: compactSyncedSummaries(entries) });
+}
+
+function mergeHistoryEntries(localEntries, syncedSummaries) {
+  const byId = new Map();
+
+  for (const entry of syncedSummaries) {
+    if (!entry?.id) continue;
+    byId.set(entry.id, { ...entry, isSyncedSummary: true });
+  }
+
+  for (const entry of localEntries) {
+    if (!entry?.id) continue;
+    byId.set(entry.id, { ...entry, isSyncedSummary: false });
+  }
+
+  return [...byId.values()].sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+function syncPayloadBytes(summaries) {
+  return new TextEncoder().encode(JSON.stringify({ [SYNC_HISTORY_SUMMARY_KEY]: summaries })).length;
+}
+
+function compactSyncedSummaries(summaries) {
+  const compacted = summaries.slice(0, MAX_SYNC_HISTORY_SUMMARIES);
+  while (compacted.length > 1 && syncPayloadBytes(compacted) > MAX_SYNC_HISTORY_BYTES) {
+    compacted.pop();
+  }
+  return compacted;
+}
+
+async function refreshHistory() {
+  render(await loadHistory());
 }
 
 // ── Render ────────────────────────────────────────────────────────────────
@@ -85,12 +148,18 @@ function render(entries) {
       : '';
     const regenerateTitle = canRegenerate
       ? 'Reload this job in the dashboard and regenerate'
-      : 'This older history entry does not include the job description needed to regenerate';
+      : entry.isSyncedSummary
+        ? 'This synced summary does not include the job description needed to regenerate'
+        : 'This history entry does not include the job description needed to regenerate';
+    const syncedLabel = entry.isSyncedSummary
+      ? '<span class="date-origin">Synced summary</span>'
+      : '';
 
     tr.innerHTML = `
       <td class="col-date">
         <span class="date-primary">${escHtml(formatDate(entry.date))}</span>
         <span class="date-secondary">${escHtml(formatTime(entry.date))}</span>
+        ${syncedLabel}
       </td>
       <td class="col-title">${escHtml(entry.jobTitle || '—')}</td>
       <td class="col-company">${escHtml(entry.company || '—')}</td>
@@ -142,19 +211,27 @@ function showConfirm(title, body, confirmLabel) {
 // ── Actions ───────────────────────────────────────────────────────────────
 
 async function deleteEntry(id) {
-  const entries = await loadHistory();
-  const updated = entries.filter(e => e.id !== id);
-  await saveHistory(updated);
-  render(updated);
+  const [localEntries, syncedSummaries] = await Promise.all([
+    loadLocalHistory(),
+    loadSyncedSummaries(),
+  ]);
+  await Promise.all([
+    saveLocalHistory(localEntries.filter(e => e.id !== id)),
+    saveSyncedSummaries(syncedSummaries.filter(e => e.id !== id)),
+  ]);
+  await refreshHistory();
 }
 
 async function clearAll() {
-  await saveHistory([]);
+  await Promise.all([
+    saveLocalHistory([]),
+    saveSyncedSummaries([]),
+  ]);
   render([]);
 }
 
 async function regenerateEntry(id) {
-  const entries = await loadHistory();
+  const entries = await loadLocalHistory();
   const entry = entries.find(e => e.id === id);
   const jobData = entry?.jobData;
   if (!jobData?.description) return;
@@ -228,7 +305,11 @@ async function init() {
     }
 
     if (area === 'local' && changes.jobHistory) {
-      render(changes.jobHistory.newValue || []);
+      refreshHistory();
+    }
+
+    if (area === 'sync' && changes[SYNC_HISTORY_SUMMARY_KEY]) {
+      refreshHistory();
     }
   });
 }

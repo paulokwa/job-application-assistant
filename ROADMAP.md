@@ -20,6 +20,11 @@ Allow exporting a single profile (not all settings) as a shareable JSON file, an
 
 ---
 
+### More document style templates
+Explore expanding the resume and cover letter template library beyond the current styles. Possibilities include more conservative corporate layouts, warmer community/nonprofit layouts, compact one-page variants, and role-specific templates. Keep the existing restrained design quality bar: templates should feel professional and usable, not decorative for its own sake.
+
+---
+
 ## Not planned (and why)
 
 | Idea | Why not |
@@ -34,6 +39,7 @@ Allow exporting a single profile (not all settings) as a shareable JSON file, an
 
 | Feature | Session | Notes |
 |---|---|---|
+| Synced job history summary | Session 6 | Saves a lightweight `chrome.storage.sync` summary with job title, company, date, document type, and source URL. Full drafts and job-description regenerate data stay local, so synced-only rows can show the URL while Regenerate remains disabled. |
 | In-line draft editing | Session 5 | Edit button in the preview enables direct `contenteditable` changes inside generated resume and cover letter iframes before saving as PDF. |
 | History quick-action: Regenerate | Session 5 | History rows now expose Regenerate when the saved entry includes job description data. It reloads the job into the dashboard and triggers the matching generation mode. |
 | Job History page | Session 4 | History viewer at `history/history.html`, accessible from dashboard header. Sortable table with job title, company, date, doc type, URL, delete. |

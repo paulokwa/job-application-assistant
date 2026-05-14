@@ -10,6 +10,15 @@ import { mapError } from '../modules/errorMapper.js';
 // Support/Ko-fi URL — used by the header button and the first-run welcome modal.
 // Change this one line to update both places at once.
 const SUPPORT_URL = 'https://ko-fi.com/mwakelabs';
+const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
+const MAX_SYNC_HISTORY_SUMMARIES = 12;
+const MAX_SYNC_HISTORY_BYTES = 7000;
+const MAX_SYNC_FIELD_LENGTHS = {
+  jobTitle: 140,
+  company: 120,
+  sourceUrl: 1200,
+  docType: 40,
+};
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
@@ -564,7 +573,53 @@ async function appendJobHistory(targets) {
   const { jobHistory = [] } = await chrome.storage.local.get('jobHistory');
   jobHistory.unshift(entry);
   if (jobHistory.length > 100) jobHistory.splice(100);
-  chrome.storage.local.set({ jobHistory });
+  await chrome.storage.local.set({ jobHistory });
+  await syncJobHistorySummary(entry);
+}
+
+function trimSyncField(value, maxLength) {
+  const text = String(value || '').trim();
+  return text.length > maxLength ? text.slice(0, maxLength) : text;
+}
+
+function createJobHistorySummary(entry) {
+  return {
+    id: entry.id,
+    jobTitle: trimSyncField(entry.jobTitle, MAX_SYNC_FIELD_LENGTHS.jobTitle),
+    company: trimSyncField(entry.company, MAX_SYNC_FIELD_LENGTHS.company),
+    sourceUrl: trimSyncField(entry.sourceUrl, MAX_SYNC_FIELD_LENGTHS.sourceUrl),
+    docType: trimSyncField(entry.docType, MAX_SYNC_FIELD_LENGTHS.docType),
+    date: entry.date,
+  };
+}
+
+function syncPayloadBytes(summaries) {
+  return new TextEncoder().encode(JSON.stringify({ [SYNC_HISTORY_SUMMARY_KEY]: summaries })).length;
+}
+
+function compactSyncedSummaries(summaries) {
+  const compacted = summaries.slice(0, MAX_SYNC_HISTORY_SUMMARIES);
+  while (compacted.length > 1 && syncPayloadBytes(compacted) > MAX_SYNC_HISTORY_BYTES) {
+    compacted.pop();
+  }
+  return compacted;
+}
+
+async function syncJobHistorySummary(entry) {
+  try {
+    const summary = createJobHistorySummary(entry);
+    const data = await chrome.storage.sync.get(SYNC_HISTORY_SUMMARY_KEY);
+    const existing = Array.isArray(data[SYNC_HISTORY_SUMMARY_KEY])
+      ? data[SYNC_HISTORY_SUMMARY_KEY]
+      : [];
+    const summaries = compactSyncedSummaries([
+      summary,
+      ...existing.filter(item => item?.id !== summary.id),
+    ]);
+    await chrome.storage.sync.set({ [SYNC_HISTORY_SUMMARY_KEY]: summaries });
+  } catch (err) {
+    console.warn('Could not sync lightweight job history summary:', err);
+  }
 }
 
 // ── Welcome Modal ─────────────────────────────────────────────────────────
@@ -1268,48 +1323,53 @@ function tryParseJson(str) {
 const TOUR_STEPS = [
   {
     target: '#card-job-info',
-    title: 'Step 1 — Job Info',
-    body: 'Start here. Fill in the job title, employer, and location. If you right-clicked a job posting and used the context menu, these auto-fill from the page.',
+    title: 'Step 1 - Job Info',
+    body: 'Start here. Fill in the job title and employer. If you scan a page or use the context menu, these fields can fill from the job posting automatically.',
   },
   {
     target: '#card-job-desc',
-    title: 'Step 2 — Job Description',
+    title: 'Step 2 - Job Description',
     body: 'Paste the full job posting here. The more detail the AI has, the more precisely it tailors your documents to this specific role.',
   },
   {
     target: '#card-template',
-    title: 'Step 3 — Style',
-    body: 'Choose a document layout, accent colour, and spacing. Changes update the preview instantly — try a few before generating.',
+    title: 'Step 3 - Style',
+    body: 'Choose the document layout, accent colour, spacing, cover letter length, and writing tone. These settings shape both the preview and the next draft you generate.',
   },
   {
     target: '#card-generate',
-    title: 'Step 4 — Generate',
+    title: 'Step 4 - Generate',
     body: 'Generate a tailored resume, cover letter, or both with one click. A Stop button replaces this while the AI is working, in case you need to cancel.',
   },
   {
     target: '#card-drafts',
     title: 'Preview',
-    body: 'Your tailored documents appear here. Switch between the Resume and Cover Letter tabs to review each one before saving.',
+    body: 'Your tailored documents appear here. Switch tabs to review each draft, then use Edit in the preview for final wording changes before saving.',
+  },
+  {
+    target: '#card-ats',
+    title: 'ATS Check',
+    body: 'After a resume is generated, scan the job description for important keywords. Missing terms appear as selectable chips you can send to Refine.',
   },
   {
     target: '#card-revision',
     title: 'Refine',
-    body: 'Not quite right? Type what you\'d like changed — "more confident tone" or "emphasise leadership" — and the AI revises the current document.',
+    body: 'Not quite right? Type what you\'d like changed, such as "more confident tone" or "emphasise leadership", and the AI revises the current document.',
   },
   {
     target: '#card-save',
     title: 'Save as PDF',
-    body: 'When you\'re happy, open the browser print dialog to save your documents as PDF. Choose "Save as PDF" as the destination.',
+    body: 'When you\'re happy, open the browser print dialog for resume only, cover letter only, or both. Choose "Save as PDF" as the destination.',
   },
   {
     target: '#btn-settings',
     title: 'Settings',
-    body: 'Set up your AI provider and API key here. Fill in your profile too — the AI uses your background details in every application.',
+    body: 'Set up your AI provider and API key here. Fill in your profile too, since the AI uses your background details in every application.',
   },
   {
-    target: '#btn-new-draft',
-    title: 'New Draft',
-    body: 'Clear everything and start fresh for a new job. Your current draft is saved automatically, so closing the panel never loses your work.',
+    target: '#profile-strip',
+    title: 'Active Profile',
+    body: 'Choose which saved profile the AI should use for this application. Manage profiles from Settings when you need to add, rename, or edit one.',
   },
 ];
 
