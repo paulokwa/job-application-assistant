@@ -199,7 +199,7 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
 // ── ATS Keyword Extraction ────────────────────────────────────────────────
 
 export async function extractAtsKeywords(jobDescription, settings, signal) {
-  if (isMock(settings)) return mockExtractAtsKeywords();
+  if (isMock(settings)) return mockExtractAtsKeywords(jobDescription);
 
   const systemPrompt = [
     'You are an ATS keyword analyst.',

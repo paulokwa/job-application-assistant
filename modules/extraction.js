@@ -210,7 +210,7 @@ Schema:
     
     return JSON.parse(cleanJson);
   } catch (e) {
-    console.error('Failed to parse AI resume extraction JSON:', e, responseText);
+    console.error('Failed to parse AI resume extraction JSON:', e?.message || e);
     throw new Error('AI returned invalid profile data layout.');
   }
 }

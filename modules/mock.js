@@ -1,66 +1,171 @@
 // modules/mock.js
 // Mock AI responses for testing workflows without API costs.
 
+function firstText(...values) {
+  return values.find(value => typeof value === 'string' && value.trim())?.trim() || '';
+}
+
+function asArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return [value].filter(Boolean);
+}
+
+function sourceExcerpt(sourceResumeText) {
+  const cleaned = String(sourceResumeText || '').replace(/\s+/g, ' ').trim();
+  return cleaned ? cleaned.slice(0, 320) + (cleaned.length > 320 ? '...' : '') : '';
+}
+
+function normalizeExperience(exp = {}) {
+  const dates = firstText(exp.dates);
+  const [startDate, endDate] = dates.includes(' - ') ? dates.split(' - ') : ['', ''];
+  return {
+    jobTitle: firstText(exp.jobTitle, exp.title),
+    employer: firstText(exp.employer, exp.company),
+    location: firstText(exp.location),
+    startDate: firstText(exp.startDate, startDate),
+    endDate: firstText(exp.endDate, endDate),
+    bulletPoints: asArray(exp.bulletPoints || exp.bullets)
+  };
+}
+
+function normalizeEducation(edu = {}) {
+  return {
+    institution: firstText(edu.institution, edu.school),
+    credential: firstText(edu.credential, edu.degree),
+    location: firstText(edu.location),
+    dates: firstText(edu.dates, edu.year),
+    notes: asArray(edu.notes)
+  };
+}
+
+function normalizeCertification(cert) {
+  if (typeof cert === 'string') return cert;
+  return [cert?.name, cert?.issuer, cert?.year].filter(Boolean).join(' - ');
+}
+
+function profileSummary(profile = {}, sourceResumeText = '') {
+  const summary = firstText(
+    profile.summary,
+    profile.summaries?.find(s => s?.text)?.text,
+    profile.coverLetterProfile?.strengths,
+    profile.coverLetterProfile?.notableAchievements
+  );
+  if (summary) return summary;
+
+  const excerpt = sourceExcerpt(sourceResumeText);
+  if (excerpt) return `Demo mode source resume excerpt: ${excerpt}`;
+
+  return '[Demo placeholder] Add a profile summary or source resume before using this draft.';
+}
+
+function profileExperience(profile = {}, sourceResumeText = '') {
+  const experience = asArray(profile.experience).map(normalizeExperience).filter(exp =>
+    exp.jobTitle || exp.employer || exp.bulletPoints.length
+  );
+  if (experience.length) return experience;
+
+  if (sourceResumeText) {
+    return [{
+      jobTitle: '[Demo placeholder] Role from uploaded source resume',
+      employer: '[Demo placeholder] Employer from uploaded source resume',
+      location: '',
+      startDate: '',
+      endDate: '',
+      bulletPoints: ['Demo mode cannot reliably structure this resume text. Review your uploaded source resume and add verified role details before submitting.']
+    }];
+  }
+
+  return [{
+    jobTitle: '[Demo placeholder] Add your job title',
+    employer: '[Demo placeholder] Add your employer',
+    location: '',
+    startDate: '',
+    endDate: '',
+    bulletPoints: ['[Demo placeholder] Add verified responsibilities and achievements from your own experience.']
+  }];
+}
+
 export function generateMockResume(jobData, profile, sourceResumeText) {
+  const personalInfo = profile?.personalInfo || {};
+  const summary = profileSummary(profile, sourceResumeText);
+  const skills = asArray(profile?.skills);
+  const experience = profileExperience(profile, sourceResumeText);
+  const education = asArray(profile?.education).map(normalizeEducation).filter(edu =>
+    edu.institution || edu.credential || edu.notes.length
+  );
+  const projects = asArray(profile?.projects);
+  const certifications = asArray(profile?.certifications).map(normalizeCertification).filter(Boolean);
+
   return JSON.stringify({
-    summary: `Dedicated professional eager to join ${jobData.company || 'the team'} as a ${jobData.jobTitle || 'specialist'}. Proven track record of leveraging skills to drive results.`,
-    skills: ["Strategic Planning", "Team Leadership", "Data Analysis", "Communication"],
-    experience: [
-      {
-        jobTitle: jobData.jobTitle || "Senior Professional",
-        employer: jobData.company || "Leading Corporation",
-        location: "Remote",
-        startDate: "Jan 2021",
-        endDate: "Present",
-        bulletPoints: [
-          "Delivered high-impact solutions for cross-functional teams.",
-          "Optimized internal processes reducing overhead by 15%.",
-          "Mentored junior staff and fostered a culture of excellence."
-        ]
-      }
-    ],
-    education: [
-      {
-        institution: "State University",
-        credential: "Bachelor of Science",
-        location: "City, ST",
-        dates: "2015 - 2019",
-        notes: ["Dean's List for 4 consecutive semesters"]
-      }
-    ],
-    projects: [
-      {
-        name: "Project Excellence",
-        role: "Project Lead",
-        description: "Headed a diverse team to implement a new CRM system.",
-        technologies: ["JavaScript", "Node.js", "PostgreSQL"],
-        link: "https://project.example.com"
-      }
-    ],
-    certifications: ["Project Management Professional (PMP)", "Six Sigma Green Belt"]
+    summary: `${summary}\n\n[Demo mode] This is simulated wording based only on the profile/source resume data available in the extension. Review all facts before using it.`,
+    skills: skills.length ? skills : ['[Demo placeholder] Add verified skills from your profile or source resume.'],
+    experience,
+    education,
+    projects,
+    certifications
   }, null, 2);
 }
 
 export function generateMockCoverLetter(jobData, profile, sourceResumeText) {
+  const personalInfo = profile?.personalInfo || {};
+  const fullName = firstText(personalInfo.fullName, 'Candidate Name');
+  const summary = profileSummary(profile, sourceResumeText);
+  const firstRole = normalizeExperience(profile?.experience?.[0] || {});
+  const skills = asArray(profile?.skills).slice(0, 5);
+  const roleText = firstText(jobData.jobTitle, 'the role');
+  const companyText = firstText(jobData.company, 'your organization');
+  const experienceText = firstRole.jobTitle || firstRole.employer
+    ? `My background includes ${[firstRole.jobTitle, firstRole.employer].filter(Boolean).join(' at ')}.`
+    : '[Demo placeholder] Add verified work experience before submitting this paragraph.';
+  const skillsText = skills.length
+    ? `Relevant skills from my profile include ${skills.join(', ')}.`
+    : '[Demo placeholder] Add verified skills before submitting this paragraph.';
+
   return JSON.stringify({
-    greeting: `Dear Hiring Manager at ${jobData.company || 'the company'},`,
+    greeting: `Dear Hiring Manager${jobData.company ? ` at ${jobData.company}` : ''},`,
     paragraphs: [
-      `I am writing to express my strong interest in the ${jobData.jobTitle || 'Specialist'} position. With my background in the industry and my commitment to excellence, I am confident I would be a valuable addition to your team.`,
-      `In my previous roles, I have consistently demonstrated the ability to tackle complex challenges and deliver meaningful results. My experience aligns perfectly with the requirements mentioned in your job posting.`,
-      `Thank you for your time and consideration. I look forward to discussing how my skills can contribute to the continued success of ${jobData.company || 'your organization'}.`
+      `I am writing to express my interest in ${roleText} at ${companyText}. [Demo mode] This simulated draft is based only on the profile/source resume data currently available.`,
+      `${summary}`,
+      `${experienceText} ${skillsText}`,
+      `Thank you for your time and consideration. I would welcome the chance to discuss how my verified background may fit ${companyText}.`
     ],
     closing: "Sincerely,",
-    signOff: profile.personalInfo?.fullName || "Candidate Name"
+    signOff: fullName
   }, null, 2);
 }
 
-export function mockExtractAtsKeywords() {
-  return [
-    'team leadership', 'data analysis', 'strategic planning', 'communication',
-    'project management', 'stakeholder engagement', 'Microsoft Office',
-    'problem solving', "Bachelor's degree", 'cross-functional collaboration',
-    'budget management', 'process improvement'
-  ];
+const ATS_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'you', 'your', 'our', 'are', 'this', 'that',
+  'will', 'from', 'have', 'has', 'must', 'can', 'all', 'any', 'into', 'such',
+  'their', 'they', 'them', 'who', 'what', 'when', 'where', 'why', 'how', 'job',
+  'role', 'work', 'team', 'company', 'candidate', 'position', 'including'
+]);
+
+export function mockExtractAtsKeywords(jobDescription = '') {
+  const words = String(jobDescription)
+    .toLowerCase()
+    .replace(/[^a-z0-9+#.\s-]/g, ' ')
+    .split(/\s+/)
+    .map(word => word.replace(/^[.-]+|[.-]+$/g, ''))
+    .filter(word => word.length > 2 && !ATS_STOPWORDS.has(word));
+
+  if (!words.length) {
+    return ['[Demo placeholder] Add a job description to scan ATS keywords.'];
+  }
+
+  const counts = new Map();
+  const add = keyword => counts.set(keyword, (counts.get(keyword) || 0) + 1);
+
+  words.forEach(add);
+  for (let i = 0; i < words.length - 1; i++) {
+    if (words[i] !== words[i + 1]) add(`${words[i]} ${words[i + 1]}`);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .map(([keyword]) => keyword)
+    .slice(0, 15);
 }
 
 export function mockReviseDraft(currentDraft, request, docType) {

@@ -91,7 +91,6 @@ modules/
   template.js          ← .docx template filling
 lib/
   pizzip.js            ← .docx ZIP handler
-  docxtemplater.js     ← .docx template renderer
 ```
 
 ---
