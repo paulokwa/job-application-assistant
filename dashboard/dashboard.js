@@ -45,6 +45,7 @@ const state = {
 };
 
 let currentAbortController = null;
+let generationStatusTimers = [];
 
 // ── DOM refs ──────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -567,7 +568,7 @@ async function runGeneration(mode) {
 
   try {
     for (const type of toGenerate) {
-      dom.genStatusText.textContent = `Tailoring ${type === 'resume' ? 'resume' : 'cover letter'}...`;
+      startGenerationStatusMessages(type);
 
       let raw;
       if (type === 'resume') {
@@ -576,12 +577,13 @@ async function runGeneration(mode) {
         raw = await generateCoverLetter(state.jobData, state.profile, state.settings, state.sourceResumeText, signal, state.tone, state.clLength);
       }
 
-      const parsed = tryParseJson(raw);
+      const parsed = normalizeDraftContent(type, tryParseJson(raw));
       if (parsed) {
         state.drafts[type] = parsed;
       } else {
         throw new Error(`AI returned invalid content format for ${type}.`);
       }
+      clearGenerationStatusMessages();
     }
 
     updatePreviews();
@@ -817,7 +819,7 @@ async function applyRevision() {
 
   try {
     const raw = await reviseDraft(state.drafts[docType], request, docType, state.jobData, state.profile, state.settings);
-    const parsed = tryParseJson(raw);
+    const parsed = normalizeDraftContent(docType, tryParseJson(raw));
     if (parsed) {
       state.drafts[docType] = parsed;
       updatePreviews();
@@ -1123,6 +1125,7 @@ async function validateForGeneration(mode) {
 
 function setGenerating(on) {
   dom.genStatus.classList.toggle('hidden', !on);
+  if (!on) clearGenerationStatusMessages();
 
   const allGenBtns = [dom.btnGenBoth, dom.btnGenResume, dom.btnGenCL];
   const modeMap = { both: dom.btnGenBoth, resume: dom.btnGenResume, 'cover-letter': dom.btnGenCL };
@@ -1149,6 +1152,40 @@ function setGenerating(on) {
       }
     });
   }
+}
+
+function startGenerationStatusMessages(type) {
+  clearGenerationStatusMessages();
+
+  const isResume = type === 'resume';
+  dom.genStatusText.textContent = isResume
+    ? 'Tailoring resume...'
+    : 'Writing cover letter...';
+
+  if (state.settings?.provider !== 'ollama') return;
+
+  const messages = isResume
+    ? [
+        { delay: 15000, text: 'Local AI is working. Ollama can take a minute or two depending on your computer.' },
+        { delay: 45000, text: 'Still tailoring the resume. Larger job descriptions and local models can take longer.' },
+        { delay: 90000, text: 'Still working. You can stop this run if you want to try a smaller Ollama model.' },
+      ]
+    : [
+        { delay: 15000, text: 'Local AI is drafting the letter. Ollama can take a minute or two depending on your computer.' },
+        { delay: 45000, text: 'Still writing the cover letter. Smaller models are faster but may need a retry.' },
+        { delay: 90000, text: 'Still working. You can stop this run if you want to try a smaller Ollama model.' },
+      ];
+
+  generationStatusTimers = messages.map(({ delay, text }) => setTimeout(() => {
+    if (!dom.genStatus.classList.contains('hidden')) {
+      dom.genStatusText.textContent = text;
+    }
+  }, delay));
+}
+
+function clearGenerationStatusMessages() {
+  generationStatusTimers.forEach(timerId => clearTimeout(timerId));
+  generationStatusTimers = [];
 }
 
 function showError(err) {
@@ -1404,6 +1441,7 @@ function toneLabel(value) {
 
 function tryParseJson(str) {
   try {
+    if (typeof str !== 'string') return null;
     // Robust parsing: find the first { and last }
     const start = str.indexOf('{');
     const end = str.lastIndexOf('}');
@@ -1412,6 +1450,86 @@ function tryParseJson(str) {
   } catch {
     return null;
   }
+}
+
+function normalizeDraftContent(type, parsed) {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  return type === 'cover-letter'
+    ? normalizeCoverLetterDraft(parsed)
+    : normalizeResumeDraft(parsed);
+}
+
+function normalizeResumeDraft(parsed) {
+  const experience = toArray(parsed.experience).map(exp => ({
+    jobTitle: String(exp?.jobTitle || ''),
+    employer: String(exp?.employer || ''),
+    location: String(exp?.location || ''),
+    startDate: String(exp?.startDate || ''),
+    endDate: String(exp?.endDate || ''),
+    bulletPoints: toStringArray(exp?.bulletPoints || exp?.bullets || exp?.responsibilities),
+  }));
+
+  return {
+    summary: String(parsed.summary || parsed.professionalSummary || ''),
+    skills: toStringArray(parsed.skills),
+    experience,
+    education: toArray(parsed.education).map(edu => ({
+      institution: String(edu?.institution || ''),
+      credential: String(edu?.credential || edu?.degree || ''),
+      location: String(edu?.location || ''),
+      dates: String(edu?.dates || edu?.date || ''),
+      notes: toStringArray(edu?.notes),
+    })),
+    certifications: toStringArray(parsed.certifications),
+    projects: toArray(parsed.projects).map(project => ({
+      name: String(project?.name || ''),
+      role: String(project?.role || ''),
+      description: String(project?.description || ''),
+      technologies: toStringArray(project?.technologies),
+    })),
+  };
+}
+
+function normalizeCoverLetterDraft(parsed) {
+  const draft = parsed.content && typeof parsed.content === 'object' ? parsed.content : parsed;
+  const paragraphs = toParagraphs(draft.paragraphs || draft.body || draft.letterBody || draft.letter);
+
+  if (!paragraphs.length) return null;
+
+  return {
+    greeting: String(draft.greeting || 'Dear Hiring Manager,'),
+    paragraphs,
+    closing: String(draft.closing || 'Sincerely,'),
+    signOff: String(draft.signOff || draft.signature || state.profile?.personalInfo?.fullName || ''),
+  };
+}
+
+function toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') return [value];
+  return [];
+}
+
+function toStringArray(value) {
+  if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean);
+  if (typeof value === 'string') {
+    return value
+      .split(/\n|;|•| - /)
+      .map(item => item.replace(/^[-*]\s*/, '').trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function toParagraphs(value) {
+  if (Array.isArray(value)) return toStringArray(value);
+  if (typeof value === 'string') {
+    return value
+      .split(/\n{2,}/)
+      .map(paragraph => paragraph.replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+  }
+  return [];
 }
 
 // ── Feature Tour ──────────────────────────────────────────────────────────

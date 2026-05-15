@@ -473,7 +473,7 @@ Removed broad permissions ahead of Chrome Web Store submission.
 
 **Manifest changes:**
 - `content_scripts` block removed entirely — `content.js` is no longer auto-injected on every page load
-- `host_permissions` replaced `<all_urls>` with five specific entries: `https://api.openai.com/*`, `https://generativelanguage.googleapis.com/*`, `https://openrouter.ai/*`, `http://localhost:*/*`, `http://127.0.0.1:*/*`
+- `host_permissions` replaced `<all_urls>` with five specific entries: `https://api.openai.com/*`, `https://generativelanguage.googleapis.com/*`, `https://openrouter.ai/*`, `http://localhost/*`, `http://127.0.0.1/*`. Chrome match patterns do not accept `localhost:*`; `http://localhost/*` is the publishable pattern that still matches any localhost port for Ollama.
 - `web_accessible_resources` block removed — no module currently imports `lib/docxtemplater.js`, and extension pages can always load their own resources without this declaration
 
 **`lib/docxtemplater.js` note:** This file is present in the repo but is not imported by any current module (`renderer.js`, `drafting.js`, `extraction.js`, etc. all use native JS). If docxtemplater is ever needed in the future, add back `web_accessible_resources` — but only if a content script needs to expose the file to a web page. Extension pages do not require it. Do not add `<all_urls>` back as the match; use the narrowest match that covers only the pages that genuinely need it.
@@ -787,6 +787,90 @@ The remaining packaged legacy name references were removed. Notably:
 - `README.md`, `DESIGN.md`, `DESIGN.json`, CSS comments, and handover text no longer contain the old app name
 
 `manifest.json` was already correct. If Chrome Web Store still shows the old name after uploading a fresh zip, check the Web Store listing metadata in the Developer Dashboard.
+
+---
+
+### 19. Chrome Web Store localhost permission fix
+
+Chrome Web Store rejected the old localhost host permission patterns because Chrome match patterns do not accept `http://localhost:*/*` or `http://127.0.0.1:*/*`.
+
+Updated `manifest.json` to use:
+- `http://localhost/*`
+- `http://127.0.0.1/*`
+
+This remains compatible with local Ollama at `http://localhost:11434`, because Chrome treats `http://localhost/*` as matching any localhost port.
+
+---
+
+### 20. Ollama model detection in AI Provider settings
+
+Added a small Ollama-only control in Settings -> AI Provider:
+- Button: **Detect installed models**
+- Calls the local Ollama `/api/tags` endpoint using the configured endpoint, defaulting to `http://localhost:11434`
+- Populates the model dropdown with installed local models
+- Selects the existing model if found, otherwise selects the first detected model
+- Shows clear inline messages for no models, blocked access, or unreachable Ollama
+
+The Ollama setup guide and provider tour copy now mention detection as the preferred path before falling back to manually typing the exact `ollama list` model name.
+
+---
+
+### 21. Ollama JSON reliability tuning
+
+Updated `modules/provider.js` so Ollama requests are more suitable for the app's structured drafting workflow:
+- Sends `think: false` to avoid Qwen-style thinking responses returning empty `message.content`
+- Uses lower temperature for prompts that ask for JSON objects
+- Sends Ollama `format: "json"` when the prompt expects a JSON object
+
+This should reduce failures like "AI returned invalid content format for cover-letter" from small local models, while leaving cloud providers unchanged.
+
+---
+
+### 22. Draft JSON normalization before rendering
+
+Added dashboard-side normalization for AI draft JSON before it is saved to `state.drafts` or rendered:
+- Resume drafts now default missing list fields (`experience`, `education`, `skills`, `projects`, etc.) to arrays
+- Cover letter drafts now accept either the direct cover-letter shape or a nested `content` object
+- Cover letter body strings are converted into paragraph arrays when possible
+- Badly shaped cover-letter output now fails with the existing friendly invalid-format error instead of crashing template rendering with errors like `Cannot read properties of undefined (reading 'length')`
+- The same normalization is applied to revision responses
+
+---
+
+### 23. Ollama long-running generation status messages
+
+Added provider-aware waiting messages for dashboard generation. Cloud providers still use the concise default messages. When the active provider is Ollama, the status text now updates if a stage takes longer:
+- immediate: tailoring resume / writing cover letter
+- after 15 seconds: explains local AI is working and Ollama can take a minute or two
+- after 45 seconds: reassures that larger inputs and local models can take longer
+- after 90 seconds: reminds the user they can stop the run and try a smaller model
+
+Timers are cleared whenever a stage finishes, the run stops, or an error is shown.
+
+---
+
+### 24. Dashboard left-column scrollbar/layout polish
+
+Adjusted the dashboard left column so the scrollbar no longer sits directly on top of card edges:
+- Added right padding, bottom padding, hidden horizontal overflow, and `scrollbar-gutter: stable`
+- Let the Job Info header wrap its scan/clear controls onto their own row inside the card
+- Truncated the source indicator so the Scan page and Clear buttons remain visible at wider side-panel sizes
+
+---
+
+### 25. Save as PDF success-button tone
+
+Reviewed the Save as PDF section against the design system. Green is intentional for terminal export/save actions (`--color-success`), but the previous implementation made every export button solid green, which over-weighted the section visually.
+
+Updated `.btn-confirm` to use a success-subtle background with success text/border by default, then fill solid green on hover/focus interaction. This preserves the export-ready semantic while keeping the section consistent with the quieter dashboard tone.
+
+---
+
+### 26. Dashboard right-column scrollbar/layout polish
+
+Mirrored the left-column scrollbar treatment on the dashboard right column:
+- Added right padding, bottom padding, hidden horizontal overflow, and `scrollbar-gutter: stable`
+- Added `scrollbar-gutter: stable` to the document preview scroller so the preview scrollbar does not crowd the card edge
 
 ---
 

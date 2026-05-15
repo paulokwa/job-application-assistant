@@ -353,6 +353,10 @@ html, body {
   gap: 8px;
   min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  padding-bottom: 12px;
+  scrollbar-gutter: stable;
 }
 
 #right-col {
@@ -362,6 +366,10 @@ html, body {
   min-width: 0;
   height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  padding-bottom: 12px;
+  scrollbar-gutter: stable;
 }
 
 /* ══════════════════════════════════════════════
@@ -404,6 +412,27 @@ html, body {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+#card-job-info .card-header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+#card-job-info .card-header-right {
+  flex: 1 1 100%;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+#source-indicator {
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .btn-scan {
@@ -795,6 +824,7 @@ html, body {
   border-radius: var(--radius-md);
   flex: 1;
   overflow: auto;
+  scrollbar-gutter: stable;
   position: relative;
   padding: 24px;
 }
@@ -903,8 +933,15 @@ textarea { resize: vertical; min-height: 40px; }
   box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent);
 }
 
-.btn-confirm { background: var(--color-success); color: var(--color-success-on); }
-.btn-confirm:hover:not(:disabled) { background: oklch(50% 0.13 145); }
+.btn-confirm {
+  background: var(--color-success-subtle);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+.btn-confirm:hover:not(:disabled) {
+  background: var(--color-success);
+  color: var(--color-success-on);
+}
 .btn-confirm:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-success);

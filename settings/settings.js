@@ -135,6 +135,7 @@ async function init() {
   
   $('inp-separator').addEventListener('input', syncPatternInput);
   $('btn-test-provider').addEventListener('click', testConnection);
+  $('btn-detect-ollama-models').addEventListener('click', detectOllamaModels);
   $('inp-source-resume').addEventListener('change', handleSourceResumeUpload);
 
   // Dynamic lists
@@ -231,14 +232,17 @@ function updateProviderVisibility(providerChanged = false) {
     hintEl.classList.add('hidden');
   }
   $('provider-test-area').style.display = isMock ? 'none' : '';
+  $('ollama-model-tools').classList.toggle('hidden', p !== 'ollama');
+  $('ollama-model-status').textContent = '';
+  $('ollama-model-status').className = 'test-result';
   updateModelDropdown(p);
 }
 
-function updateModelDropdown(provider) {
+function updateModelDropdown(provider, preferredModel = '') {
   if (!provider) return;
   const selModel = $('sel-model');
   const storedModel = (settings.configs || {})[provider]?.modelName;
-  const currentVal = storedModel || DEFAULT_MODELS[provider] || '';
+  const currentVal = preferredModel || storedModel || DEFAULT_MODELS[provider] || '';
 
   selModel.innerHTML = '';
   (PROVIDER_MODELS[provider] || []).forEach(m => {
@@ -258,6 +262,63 @@ function updateModelDropdown(provider) {
     $('inp-custom-model').classList.add('hidden');
   }
   selModel.appendChild(customOpt);
+}
+
+function getOllamaEndpoint() {
+  return ($('inp-endpoint').value.trim() || 'http://localhost:11434').replace(/\/$/, '');
+}
+
+async function detectOllamaModels() {
+  if ($('sel-provider').value !== 'ollama') return;
+
+  const btn = $('btn-detect-ollama-models');
+  const status = $('ollama-model-status');
+  const endpoint = getOllamaEndpoint();
+
+  btn.disabled = true;
+  status.className = 'test-result';
+  status.textContent = 'Checking Ollama...';
+
+  try {
+    const response = await fetch(`${endpoint}/api/tags`);
+    if (response.status === 403) {
+      throw new Error('Ollama blocked the request. Check OLLAMA_ORIGINS and restart Ollama.');
+    }
+    if (!response.ok) {
+      throw new Error(`Ollama returned ${response.status}. Make sure it is running at ${endpoint}.`);
+    }
+
+    const data = await response.json();
+    const detectedModels = Array.isArray(data.models)
+      ? data.models.map(model => model.name || model.model).filter(Boolean)
+      : [];
+
+    if (!detectedModels.length) {
+      status.className = 'test-result test-fail';
+      status.textContent = 'Ollama is running, but no models were found. Run ollama pull llama3.';
+      return;
+    }
+
+    const currentModel = $('sel-model').value === 'custom'
+      ? $('inp-custom-model').value.trim()
+      : $('sel-model').value;
+    const knownModels = PROVIDER_MODELS.ollama || [];
+    PROVIDER_MODELS.ollama = Array.from(new Set([...detectedModels, ...knownModels]));
+
+    const selectedModel = detectedModels.includes(currentModel) ? currentModel : detectedModels[0];
+    $('inp-endpoint').value = endpoint;
+    updateModelDropdown('ollama', selectedModel);
+
+    status.className = 'test-result test-ok';
+    status.textContent = `${detectedModels.length} model${detectedModels.length === 1 ? '' : 's'} found. Pick one and save.`;
+  } catch (error) {
+    status.className = 'test-result test-fail';
+    status.textContent = error.message === 'Failed to fetch'
+      ? 'Could not reach Ollama. Make sure it is running, extension access is allowed, and Ollama was restarted.'
+      : (error.message || 'Could not reach Ollama. Make sure it is running and extension access is allowed.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function saveProvider() {
@@ -1087,7 +1148,7 @@ const SETTINGS_TOURS = {
     {
       targetId: 'group-model',
       title: 'Choose the model',
-      body: 'Select the model you want this provider to use. For Ollama, the model name must match a model you have downloaded locally.'
+      body: 'Select the model you want this provider to use. For Ollama, use Detect installed models or enter the exact name from ollama list.'
     },
     {
       targetId: 'provider-test-area',

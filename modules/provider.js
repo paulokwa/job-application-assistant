@@ -160,18 +160,26 @@ async function callOpenRouter(systemPrompt, userPrompt, apiKey, model, signal) {
 
 async function callOllama(systemPrompt, userPrompt, endpoint, model, signal) {
   const url = endpoint.replace(/\/$/, '') + '/api/chat';
+  const wantsJson = expectsJsonObject(systemPrompt, userPrompt);
+  const body = {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user',   content: userPrompt },
+    ],
+    stream: false,
+    think: false,
+    options: {
+      temperature: wantsJson ? 0.2 : 0.7,
+    },
+  };
+
+  if (wantsJson) body.format = 'json';
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user',   content: userPrompt },
-      ],
-      stream: false,
-    }),
+    body: JSON.stringify(body),
     signal,
   });
 
@@ -181,4 +189,13 @@ async function callOllama(systemPrompt, userPrompt, endpoint, model, signal) {
 
   const data = await response.json();
   return data.message?.content?.trim() || '';
+}
+
+function expectsJsonObject(systemPrompt = '', userPrompt = '') {
+  const prompt = `${systemPrompt}\n${userPrompt}`.toLowerCase();
+  return prompt.includes('valid json only')
+    || prompt.includes('json object')
+    || prompt.includes('structured json')
+    || prompt.includes('return the complete revised json')
+    || prompt.includes('raw json object');
 }

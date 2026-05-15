@@ -69,6 +69,10 @@
             <!-- Populated dynamically -->
           </select>
           <input type="text" id="inp-custom-model" class="hidden" placeholder="e.g. anthropic/claude-3.5-haiku or gpt-4o" style="margin-top: 8px;" />
+          <div id="ollama-model-tools" class="model-tools hidden">
+            <button id="btn-detect-ollama-models" class="btn-secondary btn-sm" type="button">Detect installed models</button>
+            <span id="ollama-model-status" class="test-result" role="status" aria-live="polite"></span>
+          </div>
           <p class="field-hint">Select the AI model, or choose Custom to type your own.</p>
         </div>
 
@@ -393,7 +397,7 @@
             <code>ollama pull qwen2.5:3b</code><span class="help-code-note">3B — faster, works on lower-spec machines</span><br>
             <code>ollama pull mistral</code><span class="help-code-note">7B — strong quality, good for writing tasks</span>
           </div>
-          <p>After downloading, go back to <strong>AI Provider</strong> settings, choose the model from the dropdown (or select Custom and type the model name exactly as shown above), and save.</p>
+          <p>After downloading, go back to <strong>AI Provider</strong> settings and use <strong>Detect installed models</strong>, or select Custom and type the model name exactly as shown by <code>ollama list</code>.</p>
         </div>
 
         <div class="help-section">

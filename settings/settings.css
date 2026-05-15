@@ -401,6 +401,14 @@ input:focus, textarea:focus, select:focus {
 }
 .field-hint a:hover { text-decoration: underline; }
 
+.model-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
 .checkbox-row {
   display: flex;
   align-items: center;
