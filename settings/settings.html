@@ -40,15 +40,19 @@
 
       <div class="card">
         <div class="field-group">
-          <label for="sel-provider">Provider</label>
-          <select id="sel-provider">
-            <option value="">— Select a provider —</option>
-            <option value="mock">Demo Mode (no API key needed)</option>
-            <option value="openai">OpenAI (ChatGPT)</option>
-            <option value="gemini">Google Gemini</option>
-            <option value="openrouter">OpenRouter (multi-model)</option>
-            <option value="ollama">Ollama (Local AI)</option>
-          </select>
+          <label for="csel-provider-trigger">Provider</label>
+          <div class="csel" id="csel-provider">
+            <button class="csel-trigger" id="csel-provider-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">— Select a provider —</button>
+            <div class="csel-list hidden" role="listbox" aria-label="Provider">
+              <button class="csel-option active" data-value="" type="button" role="option" aria-selected="true">— Select a provider —</button>
+              <button class="csel-option" data-value="mock" type="button" role="option" aria-selected="false">Demo Mode (no API key needed)</button>
+              <button class="csel-option" data-value="openai" type="button" role="option" aria-selected="false">OpenAI (ChatGPT)</button>
+              <button class="csel-option" data-value="gemini" type="button" role="option" aria-selected="false">Google Gemini</button>
+              <button class="csel-option" data-value="openrouter" type="button" role="option" aria-selected="false">OpenRouter (multi-model)</button>
+              <button class="csel-option" data-value="ollama" type="button" role="option" aria-selected="false">Ollama (Local AI)</button>
+            </div>
+            <input type="hidden" id="sel-provider" value="" />
+          </div>
         </div>
 
         <div id="group-apikey" class="field-group hidden">
@@ -64,10 +68,14 @@
         </div>
 
         <div class="field-group" id="group-model">
-          <label for="sel-model">Model</label>
-          <select id="sel-model">
-            <!-- Populated dynamically -->
-          </select>
+          <label for="csel-model-trigger">Model</label>
+          <div class="csel" id="csel-model">
+            <button class="csel-trigger" id="csel-model-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">—</button>
+            <div class="csel-list hidden" role="listbox" aria-label="Model">
+              <!-- Populated dynamically -->
+            </div>
+            <input type="hidden" id="sel-model" value="" />
+          </div>
           <input type="text" id="inp-custom-model" class="hidden" placeholder="e.g. anthropic/claude-3.5-haiku or gpt-4o" style="margin-top: 8px;" />
           <div id="ollama-model-tools" class="model-tools hidden">
             <button id="btn-detect-ollama-models" class="btn-secondary btn-sm" type="button">Detect installed models</button>
@@ -114,12 +122,16 @@
 
       <div class="card">
         <div class="field-group">
-          <label for="sel-default-type">Default Document Mode</label>
-          <select id="sel-default-type">
-            <option value="both">Resume + Cover Letter</option>
-            <option value="resume">Resume Only</option>
-            <option value="cover-letter">Cover Letter Only</option>
-          </select>
+          <label for="csel-default-type-trigger">Default Document Mode</label>
+          <div class="csel" id="csel-default-type">
+            <button class="csel-trigger" id="csel-default-type-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">Resume + Cover Letter</button>
+            <div class="csel-list hidden" role="listbox" aria-label="Default Document Mode">
+              <button class="csel-option active" data-value="both" type="button" role="option" aria-selected="true">Resume + Cover Letter</button>
+              <button class="csel-option" data-value="resume" type="button" role="option" aria-selected="false">Resume Only</button>
+              <button class="csel-option" data-value="cover-letter" type="button" role="option" aria-selected="false">Cover Letter Only</button>
+            </div>
+            <input type="hidden" id="sel-default-type" value="both" />
+          </div>
         </div>
 
         <div class="field-group">
@@ -302,12 +314,16 @@
 
       <form id="feedback-form" class="card feedback-form">
         <div class="field-group">
-          <label for="feedback-type">Type</label>
-          <select id="feedback-type">
-            <option value="Bug report">Bug report</option>
-            <option value="Feature request">Feature request</option>
-            <option value="General feedback">General feedback</option>
-          </select>
+          <label for="csel-feedback-type-trigger">Type</label>
+          <div class="csel" id="csel-feedback-type">
+            <button class="csel-trigger" id="csel-feedback-type-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">Bug report</button>
+            <div class="csel-list hidden" role="listbox" aria-label="Feedback type">
+              <button class="csel-option active" data-value="Bug report" type="button" role="option" aria-selected="true">Bug report</button>
+              <button class="csel-option" data-value="Feature request" type="button" role="option" aria-selected="false">Feature request</button>
+              <button class="csel-option" data-value="General feedback" type="button" role="option" aria-selected="false">General feedback</button>
+            </div>
+            <input type="hidden" id="feedback-type" value="Bug report" />
+          </div>
         </div>
 
         <div class="field-group">

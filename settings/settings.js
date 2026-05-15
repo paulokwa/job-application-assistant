@@ -34,6 +34,101 @@ const PROVIDER_MODELS = {
   ollama: ['llama3', 'mistral', 'gemma', 'phi3']
 };
 
+let detectedOllamaModels = new Set();
+
+// ── CustomSelect ──────────────────────────────────────────────────────────
+class CustomSelect {
+  constructor(wrapperId) {
+    this._wrap    = document.getElementById(wrapperId);
+    this._trigger = this._wrap.querySelector('.csel-trigger');
+    this._list    = this._wrap.querySelector('.csel-list');
+    this._hidden  = this._wrap.querySelector('input[type="hidden"]');
+    this._bind();
+  }
+
+  get value() { return this._hidden.value; }
+
+  setValue(v, { silent = false } = {}) {
+    this._hidden.value = v;
+    const opt = this._list.querySelector(`[data-value=${JSON.stringify(v)}]`);
+    this._trigger.textContent = opt ? opt.textContent : (v || '—');
+    this._list.querySelectorAll('.csel-option').forEach(o => {
+      const sel = o.dataset.value === v;
+      o.classList.toggle('active', sel);
+      o.setAttribute('aria-selected', String(sel));
+    });
+    if (!silent) this._hidden.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  // items: flat [{value, label}] or grouped [{label, items:[{value,label}]}]
+  setOptions(items, selectedValue) {
+    this._list.innerHTML = '';
+    const allFlat = [];
+    items.forEach(item => {
+      if (item.items) {
+        const hdr = document.createElement('div');
+        hdr.className = 'csel-group-label';
+        hdr.textContent = item.label;
+        hdr.setAttribute('role', 'presentation');
+        this._list.appendChild(hdr);
+        item.items.forEach(i => { allFlat.push(i); this._appendOpt(i.value, i.label); });
+      } else {
+        allFlat.push(item);
+        this._appendOpt(item.value, item.label);
+      }
+    });
+    const sel = selectedValue !== undefined ? selectedValue : this._hidden.value;
+    const exists = allFlat.some(i => i.value === sel);
+    this.setValue(exists ? sel : (allFlat[0]?.value ?? ''), { silent: true });
+  }
+
+  _appendOpt(value, label) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'csel-option';
+    btn.dataset.value = value;
+    btn.textContent = label;
+    btn.setAttribute('role', 'option');
+    btn.setAttribute('aria-selected', 'false');
+    this._list.appendChild(btn);
+  }
+
+  open()   { this._list.classList.remove('hidden'); this._trigger.setAttribute('aria-expanded', 'true'); }
+  close()  { this._list.classList.add('hidden');    this._trigger.setAttribute('aria-expanded', 'false'); }
+  toggle() { this._list.classList.contains('hidden') ? this.open() : this.close(); }
+
+  _bind() {
+    this._trigger.addEventListener('click', () => this.toggle());
+    this._list.addEventListener('click', e => {
+      const opt = e.target.closest('.csel-option');
+      if (!opt) return;
+      this.setValue(opt.dataset.value);
+      this.close();
+    });
+    this._trigger.addEventListener('keydown', e => {
+      if (['ArrowDown', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault(); this.open();
+        this._list.querySelector('.csel-option')?.focus();
+      }
+    });
+    this._list.addEventListener('keydown', e => {
+      const opts = [...this._list.querySelectorAll('.csel-option')];
+      const idx  = opts.indexOf(document.activeElement);
+      if (e.key === 'Escape')    { this.close(); this._trigger.focus(); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); opts[Math.min(idx + 1, opts.length - 1)]?.focus(); }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); opts[Math.max(idx - 1, 0)]?.focus(); }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const opt = document.activeElement.closest('.csel-option');
+        if (opt) { this.setValue(opt.dataset.value); this.close(); }
+      }
+    });
+    document.addEventListener('click', e => { if (!this._wrap.contains(e.target)) this.close(); });
+  }
+}
+
+let providerSelect, modelSelect, defaultTypeSelect, feedbackTypeSelect;
+
 const DEFAULT_MODELS = {
   mock: 'mock-basic',
   openai: 'gpt-4o-mini',
@@ -54,6 +149,12 @@ const $ = id => document.getElementById(id);
 async function init() {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('embed') === 'true') document.body.classList.add('embedded');
+
+  // Custom selects must be instantiated before populateProviderSection runs
+  providerSelect    = new CustomSelect('csel-provider');
+  modelSelect       = new CustomSelect('csel-model');
+  defaultTypeSelect = new CustomSelect('csel-default-type');
+  feedbackTypeSelect = new CustomSelect('csel-feedback-type');
 
   // Apply stored theme before page renders to prevent flash
   const { theme } = await chrome.storage.local.get(['theme']);
@@ -196,7 +297,7 @@ async function markAiProviderSetupAcknowledged() {
 
 function populateProviderSection(s) {
   const provider = s.activeProvider || '';
-  if (provider) $('sel-provider').value = provider;
+  if (provider) providerSelect.setValue(provider, { silent: true });
   if (s.simulateFailure) $('sel-simulate-failure').value = s.simulateFailure;
   updateProviderVisibility(false);
 }
@@ -240,28 +341,31 @@ function updateProviderVisibility(providerChanged = false) {
 
 function updateModelDropdown(provider, preferredModel = '') {
   if (!provider) return;
-  const selModel = $('sel-model');
   const storedModel = (settings.configs || {})[provider]?.modelName;
-  const currentVal = preferredModel || storedModel || DEFAULT_MODELS[provider] || '';
+  const currentVal  = preferredModel || storedModel || DEFAULT_MODELS[provider] || '';
+  const allModels   = PROVIDER_MODELS[provider] || [];
+  const isCustom    = Boolean(currentVal && !allModels.includes(currentVal));
 
-  selModel.innerHTML = '';
-  (PROVIDER_MODELS[provider] || []).forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = opt.textContent = m;
-    if (m === currentVal) opt.selected = true;
-    selModel.appendChild(opt);
-  });
+  let items;
+  if (provider === 'ollama' && detectedOllamaModels.size > 0) {
+    const installed = allModels.filter(m => detectedOllamaModels.has(m));
+    const others    = allModels.filter(m => !detectedOllamaModels.has(m));
+    items = [];
+    if (installed.length) items.push({ label: 'Installed on this machine', items: installed.map(m => ({ value: m, label: m })) });
+    if (others.length)    items.push({ label: 'Other models', items: others.map(m => ({ value: m, label: m })) });
+    items.push({ value: 'custom', label: 'Custom...' });
+  } else {
+    items = [...allModels.map(m => ({ value: m, label: m })), { value: 'custom', label: 'Custom...' }];
+  }
 
-  const customOpt = document.createElement('option');
-  customOpt.value = 'custom'; customOpt.textContent = 'Custom...';
-  if (!PROVIDER_MODELS[provider]?.includes(currentVal) && currentVal) {
-    customOpt.selected = true;
+  modelSelect.setOptions(items, isCustom ? 'custom' : currentVal);
+
+  if (isCustom) {
     $('inp-custom-model').value = currentVal;
     $('inp-custom-model').classList.remove('hidden');
   } else {
     $('inp-custom-model').classList.add('hidden');
   }
-  selModel.appendChild(customOpt);
 }
 
 function getOllamaEndpoint() {
@@ -304,6 +408,7 @@ async function detectOllamaModels() {
       : $('sel-model').value;
     const knownModels = PROVIDER_MODELS.ollama || [];
     PROVIDER_MODELS.ollama = Array.from(new Set([...detectedModels, ...knownModels]));
+    detectedOllamaModels = new Set(detectedModels);
 
     const selectedModel = detectedModels.includes(currentModel) ? currentModel : detectedModels[0];
     $('inp-endpoint').value = endpoint;
@@ -621,7 +726,7 @@ function renderChipBuilder() {
 
 // ── Document Section ──────────────────────────────────────────────────────
 function populateDocSection(d) {
-  if (d.defaultType) $('sel-default-type').value = d.defaultType;
+  if (d.defaultType) defaultTypeSelect.setValue(d.defaultType, { silent: true });
   initChipBuilder(d.filenamePattern || '{docType} - {company} - {jobTitle}');
 }
 

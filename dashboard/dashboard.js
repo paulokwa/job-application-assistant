@@ -132,6 +132,8 @@ const dom = {
   settingsFrame:      $('settings-frame'),
   btnEditResume:      $('btn-edit-resume'),
   btnEditCL:          $('btn-edit-cl'),
+  btnClearResume:     $('btn-clear-resume'),
+  btnClearCL:         $('btn-clear-cl'),
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -448,6 +450,10 @@ function bindEvents() {
   // Inline editing
   dom.btnEditResume.addEventListener('click', () => toggleEditMode('resume'));
   dom.btnEditCL.addEventListener('click', () => toggleEditMode('cover-letter'));
+
+  // Clear individual draft
+  dom.btnClearResume.addEventListener('click', () => clearDraft('resume'));
+  dom.btnClearCL.addEventListener('click', () => clearDraft('cover-letter'));
 
   // Save as PDF (via print dialog)
   dom.btnPrintBoth.addEventListener('click', () => printDraft('resume', 'cover-letter'));
@@ -1064,6 +1070,36 @@ function restoreSavedDraft(saved) {
   switchTab(state.drafts.resume ? 'resume' : 'cover-letter');
 }
 
+async function clearDraft(tab) {
+  state.drafts[tab] = null;
+  if (state.originalDrafts) state.originalDrafts[tab] = null;
+
+  const emptyEl     = tab === 'resume' ? dom.draftResumeEmpty   : dom.draftCLEmpty;
+  const contentEl   = tab === 'resume' ? dom.draftResumeContent : dom.draftCLContent;
+  emptyEl.classList.remove('hidden');
+  contentEl.classList.add('hidden');
+  clearEditState(tab);
+
+  // If neither draft remains, also hide the merged tab
+  if (!state.drafts.resume && !state.drafts['cover-letter']) {
+    dom.draftMergedEmpty.classList.remove('hidden');
+    dom.draftMergedContent.classList.add('hidden');
+    dom.tabBtnMerged.classList.add('hidden');
+    dom.btnPrintMerged.classList.add('hidden');
+    await chrome.storage.local.remove(['savedDraft']);
+  } else {
+    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    if (savedDraft) {
+      savedDraft.drafts[tab] = null;
+      if (savedDraft.originalDrafts) savedDraft.originalDrafts[tab] = null;
+      await chrome.storage.local.set({ savedDraft });
+    }
+  }
+
+  refreshExportButtons();
+  showToast(`${tab === 'resume' ? 'Resume' : 'Cover letter'} draft cleared.`);
+}
+
 async function clearSession() {
   await chrome.storage.local.remove(['savedDraft']);
 
@@ -1404,19 +1440,18 @@ function applyTheme(theme) {
   else if (theme === 'light') root.dataset.theme = 'light';
   else delete root.dataset.theme;
 
-  const isDark = theme === 'dark' ||
-    (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  dom.btnTheme.textContent   = isDark ? '☀' : '🌙';
-  dom.btnTheme.title         = isDark ? 'Switch to light mode' : 'Switch to dark mode';
-  dom.btnTheme.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+  const icons  = { light: '☀️', dark: '🌙', system: '🖥️' };
+  const labels = { light: 'Switch to dark mode', dark: 'Switch to system theme', system: 'Switch to light mode' };
+  const t = (theme === 'light' || theme === 'dark') ? theme : 'system';
+  dom.btnTheme.textContent = icons[t];
+  dom.btnTheme.title       = labels[t];
+  dom.btnTheme.setAttribute('aria-label', labels[t]);
   syncEmbeddedTheme(theme);
 }
 
 function toggleTheme() {
-  const current = document.documentElement.dataset.theme;
-  const isDark  = current === 'dark' ||
-    (!current && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  const next = isDark ? 'light' : 'dark';
+  const current = document.documentElement.dataset.theme || 'system';
+  const next = current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system';
   applyTheme(next);
   chrome.storage.local.set({ theme: next });
 }

@@ -787,6 +787,8 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
+  display: flex;
+  gap: 6px;
 }
 
 .btn-edit-toggle {
@@ -816,6 +818,28 @@ html, body {
   color: var(--color-accent-on);
   background: var(--color-accent);
   font-weight: 600;
+}
+
+.btn-clear-draft {
+  font-size: 11px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-3);
+  cursor: pointer;
+  line-height: 1.4;
+  transition: background var(--dur-fast) var(--ease-std),
+              color var(--dur-fast) var(--ease-std),
+              border-color var(--dur-fast) var(--ease-std);
+}
+
+.btn-clear-draft:hover {
+  border-color: #e53e3e;
+  color: #e53e3e;
+  background: #fff5f5;
 }
 
 .draft-preview-wrapper {
