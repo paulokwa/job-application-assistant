@@ -118,13 +118,15 @@ const dom = {
   profileSwitcher:    $('profile-switcher'),
   profileMenuList:    $('profile-menu-list'),
   profileStrip:       $('profile-strip'),
-  btnManageProfiles:  $('btn-manage-profiles'),
+  btnOpenProfile:     $('btn-open-profile'),
+  btnOpenProfiles:    $('btn-open-profiles'),
   historyView:        $('history-view'),
   btnCloseHistory:    $('btn-close-history'),
   btnSupport:         $('btn-support'),
   btnSettings:        $('btn-settings'),
   mockBanner:         $('mock-mode-banner'),
   settingsView:       $('settings-view'),
+  settingsOverlayTitle: $('settings-overlay-title'),
   btnCloseSettings:   $('btn-close-settings'),
   btnNewDraft:        $('btn-new-draft'),
   btnTour:            $('btn-tour'),
@@ -353,9 +355,8 @@ function bindEvents() {
   document.addEventListener('click', e => {
     if (!dom.profileStrip.contains(e.target)) closeProfileMenu();
   });
-  dom.btnManageProfiles.addEventListener('click', () => {
-    openSettingsSection('profiles');
-  });
+  dom.btnOpenProfile.addEventListener('click', () => openSettingsSection('profile'));
+  dom.btnOpenProfiles.addEventListener('click', () => openSettingsSection('profiles'));
 
   // Theme toggle
   dom.btnTheme.addEventListener('click', toggleTheme);
@@ -487,6 +488,16 @@ function bindEvents() {
 
 function openSettingsSection(section = 'provider') {
   dom.settingsView.classList.add('visible');
+  const sectionTitles = {
+    provider: 'AI Provider',
+    documents: 'Documents',
+    profiles: 'Manage Profiles',
+    profile: 'My Profile',
+    feedback: 'Help & Feedback',
+  };
+  const overlayTitle = sectionTitles[section] || 'Settings';
+  dom.settingsOverlayTitle.textContent = overlayTitle;
+  dom.settingsView.setAttribute('aria-label', overlayTitle);
 
   const activateSection = () => {
     const nav = dom.settingsFrame.contentDocument?.querySelector(`.nav-btn[data-section="${section}"]`);
@@ -1234,7 +1245,13 @@ function showError(err) {
   dom.btnErrorSettings.classList.toggle('hidden', mapped.action !== 'settings');
   const settingsSection = mapped.settingsSection || 'provider';
   dom.btnErrorSettings.dataset.section = settingsSection;
-  dom.btnErrorSettings.textContent = settingsSection === 'provider' ? 'Open AI Provider Settings' : 'Open Settings';
+  const settingsButtonLabels = {
+    provider: 'Open AI Provider',
+    profile: 'Open My Profile',
+    profiles: 'Open Manage Profiles',
+    documents: 'Open Documents',
+  };
+  dom.btnErrorSettings.textContent = settingsButtonLabels[settingsSection] || 'Open Settings';
   dom.btnErrorDemo.classList.toggle('hidden', mapped.type !== 'setup_required');
   dom.genError.classList.remove('hidden');
   setGenerating(false);
@@ -1612,13 +1629,13 @@ const TOUR_STEPS = [
   },
   {
     target: '#btn-settings',
-    title: 'Settings',
-    body: 'Set up your AI provider and API key here. Fill in your profile too, since the AI uses your background details in every application.',
+    title: 'AI settings',
+    body: 'Set up your AI provider and document preferences here. Profile details now have their own dashboard shortcuts.',
   },
   {
     target: '#profile-strip',
-    title: 'Active Profile',
-    body: 'Choose which saved profile the AI should use for this application. Manage profiles from Settings when you need to add, rename, or edit one.',
+    title: 'Profile Select',
+    body: 'Choose which saved profile the AI should use for this application. Use My Profile to edit details or Manage Profiles to add and rename saved profiles.',
   },
 ];
 

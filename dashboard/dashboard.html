@@ -19,6 +19,17 @@
       </div>
     </div>
     <div class="header-right">
+      <div class="profile-strip" id="profile-strip" aria-label="Profile select">
+        <span class="profile-strip-label">Profile Select</span>
+        <div class="profile-menu">
+          <button id="profile-switcher" class="profile-switcher" type="button" aria-haspopup="listbox" aria-expanded="false">
+            General
+          </button>
+          <div id="profile-menu-list" class="profile-menu-list hidden" role="listbox" aria-label="Choose active profile"></div>
+        </div>
+      </div>
+      <button id="btn-open-profiles" class="header-link-btn" type="button">Manage Profiles</button>
+      <button id="btn-open-profile" class="header-link-btn" type="button">My Profile</button>
       <button id="btn-history" class="icon-btn" title="Job history" aria-label="View job history">History</button>
       <button id="btn-tour" class="icon-btn header-tour-btn" title="Feature tour" aria-label="Start feature tour">?</button>
       <button id="btn-theme" class="icon-btn" title="Switch to light mode" aria-label="Switch to light mode">🖥️</button>
@@ -35,7 +46,7 @@
       <button id="btn-close-settings" class="back-btn" aria-label="Back to dashboard">
         <span aria-hidden="true">←</span> Dashboard
       </button>
-      <span class="overlay-title">Settings</span>
+      <span id="settings-overlay-title" class="overlay-title">Settings</span>
     </div>
     <div class="overlay-content">
       <iframe id="settings-frame" src="../settings/settings.html?embed=true" frameborder="0" title="Settings"></iframe>
@@ -67,18 +78,6 @@
 
     <!-- ─── LEFT COLUMN ──────────────────────────── -->
     <div id="left-col">
-
-      <!-- Profile Strip -->
-      <div class="profile-strip" id="profile-strip">
-        <span class="profile-strip-icon" aria-hidden="true">👤</span>
-        <div class="profile-menu">
-          <button id="profile-switcher" class="profile-switcher" type="button" aria-haspopup="listbox" aria-expanded="false">
-            General
-          </button>
-          <div id="profile-menu-list" class="profile-menu-list hidden" role="listbox" aria-label="Choose active profile"></div>
-        </div>
-        <button id="btn-manage-profiles" class="btn-scan" type="button" title="Manage profiles">Manage</button>
-      </div>
 
       <!-- Job Info Card -->
       <section class="card" id="card-job-info">

@@ -33,7 +33,7 @@ export function mapError(error) {
   if (msg === 'no_profile') {
     return {
       type: 'validation',
-      message: 'Your profile is missing. Please go to Settings → My Profile and add your professional details (or upload your resume for auto-fill) before generating.',
+      message: 'Your profile is missing. Open My Profile from the dashboard header and add your professional details, or upload your resume for auto-fill, before generating.',
       action: 'settings',
       settingsSection: 'profile',
     };
@@ -61,6 +61,20 @@ export function mapError(error) {
       return {
         type: 'ollama_model',
         message: 'Ollama is running but the selected model is not installed. Open a terminal and run `ollama pull <model-name>`, or choose a different model in Settings → AI Provider.',
+        action: 'retry',
+      };
+    }
+    if (msg.includes('memory') || msg.includes('system memory') || msg.includes('out of memory')) {
+      return {
+        type: 'ollama_memory',
+        message: 'Ollama ran out of available memory while using the selected model. Close other apps, try again, or choose a smaller Ollama model.',
+        action: 'retry',
+      };
+    }
+    if (msg.includes('context') || msg.includes('prompt') && msg.includes('long')) {
+      return {
+        type: 'ollama_context',
+        message: 'The resume text was too large for the selected local model. Try the auto-fill again, or use a smaller/simpler source resume.',
         action: 'retry',
       };
     }

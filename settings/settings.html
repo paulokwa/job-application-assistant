@@ -25,7 +25,7 @@
     <nav class="settings-nav" id="settings-nav" aria-label="Settings sections">
       <button class="nav-btn active" data-section="provider">AI Provider</button>
       <button class="nav-btn" data-section="documents">Documents</button>
-      <button class="nav-btn" data-section="profiles">Profiles</button>
+      <button class="nav-btn" data-section="profiles">Manage Profiles</button>
       <button class="nav-btn" data-section="profile">My Profile</button>
       <button class="nav-btn" data-section="feedback">Help & Feedback</button>
       <button id="btn-settings-tour" class="settings-tour-btn" title="Take a tour of Settings" aria-label="Start settings tour">?</button>
@@ -86,8 +86,8 @@
 
         <div id="group-endpoint" class="field-group hidden">
           <label for="inp-endpoint">Local Endpoint</label>
-          <input type="text" id="inp-endpoint" placeholder="http://localhost:11434" />
-          <p class="field-hint">Only needed for Ollama. Make sure Ollama is running before testing. <button id="btn-ollama-help" class="link-btn" type="button">Setup guide →</button></p>
+          <input type="text" id="inp-endpoint" value="http://localhost:11434" />
+          <p class="field-hint">Ollama commonly runs at this local address by default. Change it only if your Ollama configuration uses a different local endpoint. Make sure Ollama is running before testing. <button id="btn-ollama-help" class="link-btn" type="button">Setup guide →</button></p>
         </div>
 
         <!-- Debug: simulate failure — hidden in production, readable by JS -->
@@ -159,11 +159,11 @@
     </section>
 
     <!-- ══════════════════════════════════════════
-         SECTION: PROFILES
+         SECTION: MANAGE PROFILES
     ══════════════════════════════════════════ -->
     <section id="section-profiles" class="settings-section" aria-labelledby="profiles-heading">
-      <h2 class="section-title" id="profiles-heading">Profiles</h2>
-      <p class="section-desc">Maintain separate profiles for different career paths or application styles. Switch between them here or directly on the dashboard.</p>
+      <h2 class="section-title" id="profiles-heading">Manage Profiles</h2>
+      <p class="section-desc">Maintain separate profiles for different career paths or application styles. Switch between them here or with Profile Select on the dashboard.</p>
 
       <div class="card">
         <div id="profiles-list" class="profiles-list"></div>
@@ -375,10 +375,17 @@
       </div>
       <div class="help-modal-body">
 
-        <p class="help-intro">Ollama runs AI models directly on your computer — no API key or internet connection needed. Two things are required before it works with this extension.</p>
+        <p class="help-intro">Ollama runs AI models directly on your computer — no API key needed. First install Ollama, then allow this extension to reach it, download a model, and verify it is running.</p>
 
         <div class="help-section">
-          <h3 class="help-section-title">Step 1 — Allow extension access (CORS)</h3>
+          <h3 class="help-section-title">Step 1 — Download and install Ollama</h3>
+          <p>Download Ollama from the official site, run the installer, and complete the installation before continuing.</p>
+          <p><a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Download Ollama</a></p>
+          <p>After installing, open Ollama once so it can start its local service on your computer.</p>
+        </div>
+
+        <div class="help-section">
+          <h3 class="help-section-title">Step 2 — Allow extension access (CORS)</h3>
           <p>By default Ollama only accepts browser requests from <code>localhost</code>, not Chrome extensions. You need to set one environment variable and restart Ollama.</p>
 
           <div class="help-platform">
@@ -406,7 +413,7 @@
         </div>
 
         <div class="help-section">
-          <h3 class="help-section-title">Step 2 — Download a model</h3>
+          <h3 class="help-section-title">Step 3 — Download a model</h3>
           <p>Ollama needs at least one AI model downloaded. Open a terminal (or Command Prompt on Windows) and run one of these:</p>
           <div class="help-code-block">
             <code>ollama pull llama3</code><span class="help-code-note">7B — good general use, needs ~4 GB RAM</span><br>
@@ -417,14 +424,14 @@
         </div>
 
         <div class="help-section">
-          <h3 class="help-section-title">Step 3 — Verify it is running</h3>
+          <h3 class="help-section-title">Step 4 — Verify it is running</h3>
           <p>Open your browser and go to <code>http://localhost:11434</code>. If you see <strong>"Ollama is running"</strong> the address is correct and Ollama is ready.</p>
         </div>
 
         <div class="help-section help-section--trouble">
           <h3 class="help-section-title">Troubleshooting</h3>
           <ul class="help-trouble-list">
-            <li><strong>"Ollama blocked the request (CORS)"</strong> — the environment variable was not set, or Ollama was not fully restarted after setting it. Repeat Step 1.</li>
+            <li><strong>"Ollama blocked the request (CORS)"</strong> — the environment variable was not set, or Ollama was not fully restarted after setting it. Repeat Step 2.</li>
             <li><strong>"Model not found"</strong> — the model has not been downloaded yet, or the name does not match exactly. Run <code>ollama list</code> in a terminal to see installed models.</li>
             <li><strong>"Could not reach Ollama"</strong> — the app is not running. Open Ollama and check for its icon in the system tray (Windows) or menu bar (Mac).</li>
             <li><strong>Using a remote or non-localhost endpoint</strong> — this extension can only reach Ollama at <code>localhost</code> or <code>127.0.0.1</code>. If you point the endpoint at another machine or IP address (e.g. <code>http://192.168.1.10:11434</code>), Chrome will block the request because the extension does not have permission for arbitrary IP addresses. To use Ollama, it must be running on the same computer as Chrome.</li>

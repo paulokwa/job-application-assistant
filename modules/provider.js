@@ -184,11 +184,25 @@ async function callOllama(systemPrompt, userPrompt, endpoint, model, signal) {
   });
 
   if (!response.ok) {
-    throw new Error(`Ollama error ${response.status}: ${response.statusText}. Is Ollama running at ${endpoint}?`);
+    const detail = await readOllamaError(response);
+    const suffix = detail ? ` ${detail}` : ` ${response.statusText}`;
+    throw new Error(`Ollama error ${response.status}:${suffix}. Is Ollama running at ${endpoint}?`);
   }
 
   const data = await response.json();
   return data.message?.content?.trim() || '';
+}
+
+async function readOllamaError(response) {
+  const text = await response.text().catch(() => '');
+  if (!text) return '';
+
+  try {
+    const json = JSON.parse(text);
+    return String(json?.error || json?.message || text).trim();
+  } catch (_) {
+    return text.trim();
+  }
 }
 
 function expectsJsonObject(systemPrompt = '', userPrompt = '') {

@@ -874,6 +874,83 @@ Mirrored the left-column scrollbar treatment on the dashboard right column:
 
 ---
 
+### 27. Ollama resume auto-fill reliability fixes
+
+Investigated a user-reported DOCX import / AI auto-fill failure with local Ollama:
+- Machine had Ollama running at `http://localhost:11434`
+- Installed model was `qwen2.5:3b`
+- Small `/api/chat` requests succeeded, but long resume-style prompts could run for several minutes or fail with Ollama 500s
+
+Changes applied:
+- `modules/extraction.js` now shortens resume text for Ollama profile extraction to a bounded head/tail excerpt (`OLLAMA_RESUME_TEXT_LIMIT = 9000`) instead of sending the entire extracted resume text to a small local model.
+- `modules/provider.js` now reads Ollama error response bodies and includes the actual model/server error instead of only `Internal Server Error`.
+- `modules/errorMapper.js` now maps Ollama memory/context errors to clearer user-facing messages.
+- `settings/settings.js` now maps auto-fill errors through `mapError()` and shows long-running Ollama auto-fill status updates at 15/45/90 seconds.
+
+Verified with `node --check` on changed JS files and a real local Ollama smoke test returning `Connected`.
+
+---
+
+### 28. Dashboard profile navigation promoted to header
+
+Moved profile access from the left-column workflow area into the dashboard header:
+- Active profile chooser is now a header control labeled **Profile Select**
+- **Manage Profiles** and **My Profile** are direct header buttons
+- Removed the old left-column profile strip and the ambiguous **Manage** button
+- Dashboard Settings overlay title now changes based on section (`AI Provider`, `Manage Profiles`, `My Profile`, etc.)
+- Generation error recovery now uses clearer button labels such as **Open My Profile**
+- Dashboard tour copy was updated for the new profile controls
+
+Product rationale: profile selection and profile editing are prerequisites for generation, so they should be accessible from the main dashboard, not hidden behind a settings/manage button.
+
+---
+
+### 29. Ollama settings friction and setup guide updates
+
+Reduced setup friction in Settings -> AI Provider for Ollama:
+- Local Endpoint field now visibly defaults to `http://localhost:11434` instead of using placeholder-only text
+- Helper copy explains that this is the common default and should only be changed for a different local configuration
+- Ollama Setup Guide now starts with **Step 1 - Download and install Ollama**
+- Added official download link: `https://ollama.com/download`
+- Existing CORS/model/verification steps were renumbered
+- Troubleshooting CORS copy now points back to the new CORS step
+
+---
+
+### 30. Settings section tours now auto-run once per section
+
+Settings tours now behave per section:
+- Each section (`provider`, `documents`, `profiles`, `profile`, `feedback`) auto-runs the first time the user enters it
+- Works when reached through Settings nav or dashboard buttons such as **Manage Profiles** and **My Profile**
+- Seen flags are stored in `chrome.storage.local` under `settingsTourSeenSections`, so browser/app/computer restarts do not replay completed auto tours
+- Manual `?` help still always replays the current section tour
+- Each section tour gets a final step pointing at the `?` help icon with copy explaining that the page tour can be rerun there
+- A request guard prevents a stale tour from starting if the user changes Settings sections quickly
+
+Important detail: a section is marked seen when its tour starts, not only when it completes. If a user skips the tour, it still will not auto-run again.
+
+---
+
+### 31. Dashboard tone slider thumb fix
+
+Fixed the Writing -> Tone range slider so the thumb visually reaches both ends of the track:
+- Added explicit WebKit and Firefox track/thumb CSS
+- Increased range input hit height while keeping the visual track 4px
+- Used a negative WebKit thumb margin to center the thumb on the true track endpoints
+
+---
+
+### 32. Naming consistency for profiles
+
+Standardized profile-management copy:
+- Dashboard button: **Manage Profiles**
+- Settings nav: **Manage Profiles**
+- Settings section heading: **Manage Profiles**
+- Dashboard active chooser label: **Profile Select**
+- Tour and overlay copy updated to use the same language
+
+---
+
 ## Files changed this session
 
 | File | Nature of change |
@@ -883,8 +960,10 @@ Mirrored the left-column scrollbar treatment on the dashboard right column:
 | `dashboard/dashboard.js` | Major additions: tour, persistence, stop button, error fix |
 | `settings/settings.html` | Targeted edits throughout |
 | `settings/settings.css` | Full rewrite + additions throughout session |
-| `settings/settings.js` | Autofill refactor, chip builder, clear profile, Gemini model fix |
-| `modules/provider.js` | Added `signal` parameter to `callAI` and all provider fetch calls |
+| `settings/settings.js` | Autofill refactor, chip builder, clear profile, Gemini model fix, Ollama endpoint default, per-section one-time tours |
+| `modules/provider.js` | Added `signal` parameter to `callAI` and all provider fetch calls; added Ollama error-body reporting |
+| `modules/extraction.js` | Added Ollama resume-text shortening for local auto-fill reliability |
+| `modules/errorMapper.js` | Added clearer Ollama memory/context errors and updated missing-profile recovery copy |
 | `modules/drafting.js` | Added `signal` parameter to `generateResume`, `generateCoverLetter`, `reviseDraft` |
 | `manifest.json` | Name and default_title updated |
 | `PRODUCT.md` | Created (impeccable teach flow) |

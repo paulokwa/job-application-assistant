@@ -2,6 +2,8 @@
 // Parses raw job page text to extract structured job fields and detect special instructions.
 // Also handles DOCX text extraction for profile auto-fill.
 
+const OLLAMA_RESUME_TEXT_LIMIT = 9000;
+
 /**
  * Attempts to extract structured job fields from raw text.
  * @param {string} rawText - The raw text from the page or selection
@@ -195,7 +197,8 @@ Schema:
   ]
 }`;
 
-  const userPrompt = `Here is the user's resume text:\n\n${resumeText}\n\nParse this into the requested JSON schema now.`;
+  const preparedResumeText = prepareResumeTextForProfileExtraction(resumeText, settings);
+  const userPrompt = `Here is the user's resume text:\n\n${preparedResumeText}\n\nParse this into the requested JSON schema now.`;
 
   // We are importing callAI dynamically to avoid circular dependencies
   const { callAI } = await import('./provider.js');
@@ -213,6 +216,30 @@ Schema:
     console.error('Failed to parse AI resume extraction JSON:', e?.message || e);
     throw new Error('AI returned invalid profile data layout.');
   }
+}
+
+function prepareResumeTextForProfileExtraction(resumeText = '', settings = {}) {
+  const normalized = String(resumeText)
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (settings.provider !== 'ollama' || normalized.length <= OLLAMA_RESUME_TEXT_LIMIT) {
+    return normalized;
+  }
+
+  const headLength = Math.floor(OLLAMA_RESUME_TEXT_LIMIT * 0.72);
+  const tailLength = OLLAMA_RESUME_TEXT_LIMIT - headLength;
+  const omitted = normalized.length - OLLAMA_RESUME_TEXT_LIMIT;
+
+  return [
+    normalized.slice(0, headLength).trimEnd(),
+    '',
+    `[Resume shortened for local Ollama context: ${omitted} characters omitted from the middle.]`,
+    '',
+    normalized.slice(-tailLength).trimStart(),
+  ].join('\n');
 }
 
 /**

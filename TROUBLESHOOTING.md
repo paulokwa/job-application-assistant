@@ -153,3 +153,46 @@ Do not revert `.overlay-content` back to `height: 100%` — this will break the 
 **Root cause:** The nav event listener was bound to `.querySelectorAll('.nav-btn')`, which matched all elements with that class — including the tour button, which has no `data-section` attribute. The handler tried `$('section-' + undefined)` which returned null.
 
 **Fix (already applied):** Changed the selector to `.querySelectorAll('.nav-btn[data-section]')` so only buttons with an explicit section attribute receive the click handler. Do not broaden this selector back to `.nav-btn` without adding a guard for missing `data-section`.
+
+---
+
+## 13. Ollama auto-fill fails with 500 or takes several minutes after DOCX import
+
+**Symptom:** After uploading a DOCX resume and running profile auto-fill with Ollama, the UI shows an error like `Ollama error 500: Internal Server Error`, or appears to run for several minutes on a small local model such as `qwen2.5:3b`.
+
+**Root cause:** The DOCX import could send the entire extracted resume text plus the full JSON schema to a local model with a small context window. On low-memory machines or small models, this can cause very slow generation, context pressure, memory pressure, or opaque Ollama 500 responses. The provider wrapper also discarded Ollama's response body, hiding useful details.
+
+**Fix (already applied):**
+- `modules/extraction.js` shortens resume text for Ollama auto-fill to a bounded head/tail excerpt.
+- `modules/provider.js` reads the Ollama error response body before throwing.
+- `modules/errorMapper.js` maps memory/context Ollama failures to clearer guidance.
+- `settings/settings.js` shows long-running Ollama auto-fill status messages and maps auto-fill errors through `mapError()`.
+
+If this recurs, verify `prepareResumeTextForProfileExtraction()` is still used before calling `callAI()` for resume auto-fill, and verify `readOllamaError()` is still called in `callOllama()` for non-OK responses.
+
+---
+
+## 14. Settings page tours auto-run more than once
+
+**Symptom:** A Settings section tour auto-runs again after closing/reopening the extension, restarting Chrome, or rebooting the computer.
+
+**Root cause:** The one-time section tour state should be stored persistently in `chrome.storage.local`, not in memory. If the storage key is renamed, cleared, or bypassed, the app will think the section has never been toured.
+
+**Fix (already applied):** `settings.js` stores section tour flags under `settingsTourSeenSections` in `chrome.storage.local`. `scheduleSettingsTourIfFirstVisit(section)` reads that object before auto-starting a tour. `markSettingsTourSeen(section)` writes `{ [section]: true }` when a tour starts.
+
+Expected behavior:
+- Each Settings section auto-runs once only.
+- Skipping a tour still counts as seen because the flag is set when the tour starts.
+- Manual `?` help ignores the seen flag and can replay the current page tour anytime.
+
+If this recurs, check for accidental removal of `SETTINGS_TOUR_SEEN_KEY`, `scheduleSettingsTourIfFirstVisit()`, or `markSettingsTourSeen()`.
+
+---
+
+## 15. Dashboard tone slider thumb does not reach track ends
+
+**Symptom:** The Tone slider's round thumb appears inset from the left and right ends even when set to Formal or Casual.
+
+**Root cause:** Browser default range input styling reserves thumb space inside the control. With only a styled input background, the visible thumb does not align with the visual track endpoints.
+
+**Fix (already applied):** `dashboard.css` now styles `#range-tone::-webkit-slider-runnable-track`, `#range-tone::-webkit-slider-thumb`, `#range-tone::-moz-range-track`, and `#range-tone::-moz-range-thumb` explicitly. The WebKit thumb uses `margin-top: -5px` so its center aligns with the 4px track.

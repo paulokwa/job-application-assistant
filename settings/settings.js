@@ -10,12 +10,15 @@ let profile = null;
 let settings = {};
 let docSettings = {};
 let profileDirty = false;
+let autofillStatusTimers = [];
 
 const ALL_CHIPS = ['{docType}', '{company}', '{jobTitle}', '{date}'];
 let activeChips = ['{docType}', '{company}', '{jobTitle}'];
 const MAX_SOURCE_RESUME_BYTES = 10 * 1024 * 1024;
 const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
 const FEEDBACK_EMAIL = 'mwake.dev@gmail.com';
+const DEFAULT_OLLAMA_ENDPOINT = 'http://localhost:11434';
+const SETTINGS_TOUR_SEEN_KEY = 'settingsTourSeenSections';
 
 const PROVIDER_MODELS = {
   mock: ['mock-basic'],
@@ -148,7 +151,8 @@ const $ = id => document.getElementById(id);
 // ── Init ──────────────────────────────────────────────────────────────────
 async function init() {
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('embed') === 'true') document.body.classList.add('embedded');
+  const isEmbedded = urlParams.get('embed') === 'true';
+  if (isEmbedded) document.body.classList.add('embedded');
 
   // Custom selects must be instantiated before populateProviderSection runs
   providerSelect    = new CustomSelect('csel-provider');
@@ -186,10 +190,7 @@ async function init() {
   // Navigation
   document.querySelectorAll('.nav-btn[data-section]').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
-      btn.classList.add('active');
-      $(`section-${btn.dataset.section}`).classList.add('active');
+      activateSettingsSection(btn.dataset.section);
     });
   });
 
@@ -202,7 +203,7 @@ async function init() {
   $('feedback-form').addEventListener('submit', openFeedbackEmail);
 
   // Tour
-  $('btn-settings-tour').addEventListener('click', startSettingsTour);
+  $('btn-settings-tour').addEventListener('click', () => startSettingsTour());
   $('settings-tour-btn-skip').addEventListener('click', endSettingsTour);
   $('settings-tour-btn-prev').addEventListener('click', () => { if (settingsTourIndex > 0) showSettingsTourStep(settingsTourIndex - 1); });
   $('settings-tour-btn-next').addEventListener('click', () => {
@@ -258,6 +259,10 @@ async function init() {
   });
 
   updateFilenamePreview();
+
+  if (!isEmbedded) {
+    scheduleSettingsTourIfFirstVisit('provider');
+  }
 }
 
 function applyTheme(theme) {
@@ -267,6 +272,19 @@ function applyTheme(theme) {
 }
 
 // ── Provider Section ──────────────────────────────────────────────────────
+
+function activateSettingsSection(section, { autoTour = true } = {}) {
+  const navBtn = document.querySelector(`.nav-btn[data-section="${section}"]`);
+  const sectionEl = $(`section-${section}`);
+  if (!navBtn || !sectionEl) return;
+
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+  navBtn.classList.add('active');
+  sectionEl.classList.add('active');
+
+  if (autoTour) scheduleSettingsTourIfFirstVisit(section);
+}
 
 // Migrate old flat format { provider, apiKey, ... } to per-provider configs format
 function migrateSettings(raw) {
@@ -311,7 +329,9 @@ function updateProviderVisibility(providerChanged = false) {
   // Restore saved config for this provider when switching
   const config = (settings.configs || {})[p] || {};
   $('inp-apikey').value   = config.apiKey   || '';
-  $('inp-endpoint').value = config.endpoint || '';
+  $('inp-endpoint').value = p === 'ollama'
+    ? (config.endpoint || DEFAULT_OLLAMA_ENDPOINT)
+    : (config.endpoint || '');
   // Reset toggle to masked state and update saved-key hint
   $('inp-apikey').type = 'password';
   $('btn-toggle-key').textContent = 'Show';
@@ -369,7 +389,7 @@ function updateModelDropdown(provider, preferredModel = '') {
 }
 
 function getOllamaEndpoint() {
-  return ($('inp-endpoint').value.trim() || 'http://localhost:11434').replace(/\/$/, '');
+  return ($('inp-endpoint').value.trim() || DEFAULT_OLLAMA_ENDPOINT).replace(/\/$/, '');
 }
 
 async function detectOllamaModels() {
@@ -515,6 +535,7 @@ async function attemptAutofill(statusEl) {
   loadingMsg.textContent = 'AI is analyzing your resume…';
   statusEl.appendChild(spinner);
   statusEl.appendChild(loadingMsg);
+  startAutofillStatusMessages(loadingMsg, effectiveSettings);
 
   try {
     const extractedData = await extractProfileFromResume(plainText, effectiveSettings);
@@ -533,8 +554,30 @@ async function attemptAutofill(statusEl) {
     await saveProfile(profile);
     renderSuccessStatus(statusEl);
   } catch (e) {
-    renderErrorStatus(statusEl, e.message);
+    renderErrorStatus(statusEl, mapError(e).message);
+  } finally {
+    clearAutofillStatusMessages();
   }
+}
+
+function startAutofillStatusMessages(target, effectiveSettings) {
+  clearAutofillStatusMessages();
+  if (effectiveSettings.provider !== 'ollama') return;
+
+  const messages = [
+    { delay: 15000, text: 'Local AI is analyzing your resume. Ollama can take a minute or two on this computer.' },
+    { delay: 45000, text: 'Still working. Larger resumes take longer with local models.' },
+    { delay: 90000, text: 'Still working. If this fails, try closing other apps or using a shorter source resume.' },
+  ];
+
+  autofillStatusTimers = messages.map(({ delay, text }) => setTimeout(() => {
+    target.textContent = text;
+  }, delay));
+}
+
+function clearAutofillStatusMessages() {
+  autofillStatusTimers.forEach(timerId => clearTimeout(timerId));
+  autofillStatusTimers = [];
 }
 
 function mergeAutofillArray(nextValue, fallbackValue) {
@@ -1242,6 +1285,8 @@ function hideOllamaHelp() {
 // ── Settings Feature Tour ─────────────────────────────────────────────────
 let settingsTourIndex = 0;
 let currentSettingsTourSteps = [];
+let pendingSettingsTourTimer = null;
+let settingsTourRequestId = 0;
 
 const SETTINGS_TOURS = {
   provider: [
@@ -1291,8 +1336,8 @@ const SETTINGS_TOURS = {
   profiles: [
     {
       targetId: 'profiles-list',
-      title: 'Manage saved profiles',
-      body: 'Profiles let you keep separate background details for different career paths, industries, or application styles.'
+      title: 'Manage profiles',
+      body: 'Manage Profiles lets you keep separate background details for different career paths, industries, or application styles.'
     },
     {
       targetId: 'profiles-list',
@@ -1307,7 +1352,7 @@ const SETTINGS_TOURS = {
     {
       targetId: 'btn-go-to-profile',
       title: 'Edit profile details',
-      body: 'Profiles controls which profile is active. My Profile is where you edit the actual details inside the active profile.'
+      body: 'Manage Profiles controls which profile is active. My Profile is where you edit the actual details inside the active profile.'
     },
   ],
   profile: [
@@ -1371,9 +1416,48 @@ const SETTINGS_TOURS = {
   ],
 };
 
-function startSettingsTour() {
-  const activeSection = document.querySelector('.nav-btn.active')?.dataset.section || 'provider';
-  currentSettingsTourSteps = SETTINGS_TOURS[activeSection] || SETTINGS_TOURS.provider;
+function getSettingsTourSteps(section) {
+  const steps = SETTINGS_TOURS[section] || SETTINGS_TOURS.provider;
+  return [
+    ...steps,
+    {
+      targetId: 'btn-settings-tour',
+      title: 'Run this help again',
+      body: 'You can replay this page tour anytime by clicking the ? help icon in Settings.',
+    },
+  ];
+}
+
+async function scheduleSettingsTourIfFirstVisit(section) {
+  clearTimeout(pendingSettingsTourTimer);
+  const requestId = ++settingsTourRequestId;
+  if (!SETTINGS_TOURS[section] || !$('settings-tour-overlay').classList.contains('hidden')) return;
+
+  const data = await chrome.storage.local.get([SETTINGS_TOUR_SEEN_KEY]);
+  if (requestId !== settingsTourRequestId) return;
+  const seen = data[SETTINGS_TOUR_SEEN_KEY] || {};
+  if (seen[section]) return;
+
+  const delay = document.body.classList.contains('embedded') ? 260 : 120;
+  pendingSettingsTourTimer = setTimeout(() => {
+    startSettingsTour({ section });
+  }, delay);
+}
+
+async function markSettingsTourSeen(section) {
+  const data = await chrome.storage.local.get([SETTINGS_TOUR_SEEN_KEY]);
+  const seen = data[SETTINGS_TOUR_SEEN_KEY] || {};
+  await chrome.storage.local.set({
+    [SETTINGS_TOUR_SEEN_KEY]: { ...seen, [section]: true },
+  });
+}
+
+function startSettingsTour({ section = null } = {}) {
+  clearTimeout(pendingSettingsTourTimer);
+  settingsTourRequestId++;
+  const activeSection = section || document.querySelector('.nav-btn.active')?.dataset.section || 'provider';
+  currentSettingsTourSteps = getSettingsTourSteps(activeSection);
+  markSettingsTourSeen(activeSection);
   settingsTourIndex = 0;
   $('settings-tour-overlay').classList.remove('hidden');
   document.addEventListener('keydown', settingsTourKeyHandler);
@@ -1397,7 +1481,9 @@ function showSettingsTourStep(index) {
   // Navigate to the correct section first
   if (step.section) {
     const nav = document.querySelector(`.nav-btn[data-section="${step.section}"]`);
-    if (nav && !nav.classList.contains('active')) nav.click();
+    if (nav && !nav.classList.contains('active')) {
+      activateSettingsSection(step.section, { autoTour: false });
+    }
   }
 
   const settle = step.section ? 80 : 0;
