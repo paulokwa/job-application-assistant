@@ -1291,7 +1291,7 @@ let settingsTourRequestId = 0;
 const SETTINGS_TOURS = {
   provider: [
     {
-      targetId: 'sel-provider',
+      targetId: 'csel-provider-trigger',
       title: 'Choose the AI provider',
       body: 'Pick what will power real draft generation. Ollama runs locally on your computer, while OpenAI, Gemini, and OpenRouter use your own cloud API key.'
     },
@@ -1313,7 +1313,7 @@ const SETTINGS_TOURS = {
   ],
   documents: [
     {
-      targetId: 'sel-default-type',
+      targetId: 'csel-default-type-trigger',
       title: 'Default document mode',
       body: 'Choose what the app should create by default when a workflow starts: resume, cover letter, or both.'
     },
@@ -1389,7 +1389,7 @@ const SETTINGS_TOURS = {
   ],
   feedback: [
     {
-      targetId: 'feedback-type',
+      targetId: 'csel-feedback-type-trigger',
       title: 'Choose the kind of note',
       body: 'Pick Bug report, Feature request, or General feedback so the email subject is easy to scan.'
     },
@@ -1456,6 +1456,9 @@ function startSettingsTour({ section = null } = {}) {
   clearTimeout(pendingSettingsTourTimer);
   settingsTourRequestId++;
   const activeSection = section || document.querySelector('.nav-btn.active')?.dataset.section || 'provider';
+  if (section && !document.querySelector(`.nav-btn[data-section="${section}"]`)?.classList.contains('active')) {
+    activateSettingsSection(section, { autoTour: false });
+  }
   currentSettingsTourSteps = getSettingsTourSteps(activeSection);
   markSettingsTourSeen(activeSection);
   settingsTourIndex = 0;
