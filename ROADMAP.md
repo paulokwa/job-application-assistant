@@ -1,63 +1,202 @@
-# Roadmap — Job Application Assistant
+# Roadmap - Job Application Assistant
 
-Ideas and planned features. Nothing here is committed or scheduled — it is a parking lot for things worth building when the time is right.
+This document captures release prep notes and future roadmap ideas. It is planning only and does not commit any feature to a specific release.
 
----
+## Current Status
 
-## High priority
+Version 1.0 has already been submitted to the Chrome Web Store and is pending review.
 
-### Export / Import settings (JSON)
-A single "Export settings" button in the AI Provider or Profile section that downloads all `chrome.storage.sync` and `chrome.storage.local` data (minus large blobs like source resume text) as a JSON file. A matching "Import" button restores from that file.
+`main` currently contains the v2.0 candidate foundation:
 
-**Why:** Profile data lives in `chrome.storage.sync` per profile and does not automatically transfer between browsers. Chrome syncs data across devices for the same account, but a manual export/import is a useful backup and migration path. No backend needed — just a file download/upload.
+- Saved Jobs workflow
+- Fit Analysis for Saved Jobs
+- Privacy/storage readiness fixes
+- Safe URL opening
+- Clear session cleanup
+- Storage quota guards
 
----
+## v2.0 Release Prep
 
-## Low priority / Exploratory
+- Decide version number. Recommended: `2.0.0`, because Saved Jobs and Fit Analysis are substantial user-facing additions.
+- Prepare release notes/changelog.
+- Confirm manifest version bump.
+- Confirm packaged extension loads cleanly.
+- Run final smoke tests.
+- Review Chrome Web Store listing and screenshots if the new features should be shown.
 
-### Profile export/import per profile
-Allow exporting a single profile (not all settings) as a shareable JSON file, and importing one. Useful for users who want to back up a specific profile or share it across devices without exporting everything.
+## Final v2.0 Smoke Test Checklist
 
----
+- Settings -> AI Provider still works.
+- Demo/Mock Mode works.
+- My Profile and Manage Profiles persist data.
+- Scan page -> Generate Resume.
+- Manual job description -> Generate.
+- Save to Jobs -> Load into generator.
+- Analyze Fit and Re-analyze.
+- History -> Regenerate.
+- Open URL safety allows normal HTTPS links.
+- Clear prevents old scanned job from reappearing.
+- No obvious console errors in dashboard/settings/jobs/history.
 
-### More document style templates
-Explore expanding the resume and cover letter template library beyond the current styles. Possibilities include more conservative corporate layouts, warmer community/nonprofit layouts, compact one-page variants, and role-specific templates. Keep the existing restrained design quality bar: templates should feel professional and usable, not decorative for its own sake.
+## Future Roadmap Ideas
 
----
+### 1. Application Pack Actions
 
-## Not planned (and why)
+Suggested branch: `feature/application-pack-actions`
 
-| Idea | Why not |
-|---|---|
-| Cloud sync via Supabase | Adds backend dependency, auth complexity, and a data-at-rest liability. Not worth it while Chrome sync covers provider/doc settings and export covers profile. |
-| Built-in PDF editor | Out of scope — the extension is a drafting tool, not a document editor. Save-as-PDF via the preview already covers the use case. |
-| Job board scraping / auto-apply | Moves into automation territory outside the extension's "assist, not replace" principle. |
+Goal: let a saved job become a launchpad for application materials.
 
----
+Possible first scope:
 
-## Completed
+- Generate tailored resume from saved job
+- Generate cover letter from saved job
+- Generate recruiter message
 
-| Feature | Session | Notes |
-|---|---|---|
-| Welcome banner: clearer AI setup path | Session 7 | First-run welcome is now a 2-step flow: value message, then AI setup. It routes directly to AI Provider Settings, keeps Demo Mode secondary, and stops reappearing once AI setup is acknowledged or existing real provider settings are detected. |
-| Help & Feedback settings section | Session 7 | Added Settings -> Help & Feedback with a `mailto:` form for bug reports, feature requests, and general feedback. Optional diagnostics include only app version, provider name, Demo Mode status, active settings page, and browser user agent. |
-| Section-specific Settings tours | Session 7 | The Settings `?` button now launches a tour for the active settings page only, including separate tours for Profiles and My Profile. |
-| Dashboard tour blur polish | Session 7 | Main dashboard tour now blurs and dims surrounding UI outside the spotlight while keeping the target element clear. |
-| Branding cleanup | Session 7 | Removed remaining packaged old-name strings so runtime UI and packaged docs consistently use "Job Application Assistant". |
-| Synced job history summary | Session 6 | Saves a lightweight `chrome.storage.sync` summary with job title, company, date, document type, and source URL. Full drafts and job-description regenerate data stay local, so synced-only rows can show the URL while Regenerate remains disabled. |
-| In-line draft editing | Session 5 | Edit button in the preview enables direct `contenteditable` changes inside generated resume and cover letter iframes before saving as PDF. |
-| History quick-action: Regenerate | Session 5 | History rows now expose Regenerate when the saved entry includes job description data. It reloads the job into the dashboard and triggers the matching generation mode. |
-| Job History page | Session 4 | History viewer at `history/history.html`, accessible from dashboard header. Sortable table with job title, company, date, doc type, URL, delete. |
-| Multiple saved profiles | Session 4 | Full multi-profile storage (`profile_{id}` sync keys), CRUD in settings, profile switcher on dashboard, source resume filename tracked per profile. |
-| Tone / formality slider | Session 4 | Formal ↔ Casual slider (0–100) with dynamic descriptor label. Injects tone instruction into generation prompt. |
-| Cover letter length control | Session 4 | Short / Standard / Detailed pills. Maps to `clLengthInstruction()` controlling paragraph count in prompt. |
-| ATS keyword scan | Session 4 | AI extracts 10–15 keywords from job description. Displayed as selectable chips; one-click injects missing keywords into the Refine textarea. |
-| Dark/light mode toggle | Session 4 | Sun/moon button overrides `prefers-color-scheme`. Stored as `{ theme }` in local storage. Applied via `data-theme` attribute on `<html>` in both dashboard and settings pages. |
-| Settings feature tour | Session 2 | 9-step spotlight tour triggered by `?` button in settings nav. |
-| Ollama setup guide | Session 2 | In-app modal with step-by-step CORS setup and model download instructions. |
-| Per-provider API config | Session 2 | Switching providers restores previously saved credentials for that provider. |
-| Draft persistence across close/reopen | Session 1 | Generated drafts saved to `chrome.storage.local` and restored on next open. |
-| Stop/cancel generation | Session 1 | AbortController wired through the full AI call chain; active button transforms to "■ Stop". |
-| Filename chip builder | Session 1 | Drag-to-reorder chips replace plain text pattern input in Document Settings. |
-| Apply Changes disabled until text entered | Session 3 | Button activates only when draft exists AND revision textarea has non-whitespace content. |
-| Overwrite confirmation before generation | Session 3 | Confirms before overwriting an existing draft. |
+Later scope:
+
+- Generate short application answers
+- Generate follow-up message
+- Suggest follow-up date/reminder text
+
+Product rule: the app prepares materials, but the user reviews and stays in control.
+
+### 2. Use Fit Analysis As Generation Context
+
+Suggested branch: `feature/use-fit-analysis-in-generation`
+
+Goal: when a saved job has Fit Analysis, generation can optionally use:
+
+- `suggestedAngle`
+- `strongMatches`
+- `possibleGaps`
+
+Important:
+
+- Do not invent qualifications.
+- Treat possible gaps as caution areas, not things to fake.
+- Keep generated content grounded in the profile/source resume.
+
+### 3. Batch/Manual Multi-Job Intake
+
+Suggested branch: `feature/batch-job-intake`
+
+Goal: let users add multiple jobs without scanning each one individually.
+
+Possible intake methods:
+
+- Manual multi-job paste
+- Paste multiple job URLs
+- CSV import later
+
+Recommended first version: manual multi-job paste using separators or multiple cards.
+
+### 4. Job URL Import
+
+Suggested branch: `feature/job-url-import`
+
+Goal: allow users to paste one or more job URLs and attempt generic extraction.
+
+Preferred behavior:
+
+- Try generic extraction.
+- Save successful results to Jobs.
+- Mark failed/partial imports clearly.
+- Suggest using Scan page when URL import fails.
+
+Important: do not promise universal extraction from every job board.
+
+### 5. Search Results Page Link Scan
+
+Suggested branch: `feature/job-link-scan`
+
+Goal: let the extension scan a job search results page and collect candidate job links.
+
+Preferred behavior:
+
+- Find possible job links on the visible page.
+- Show results for review.
+- User selects which to save/import.
+
+Treat it as a link collector first, not guaranteed full job-description extraction.
+
+### 6. Assisted Form Filling
+
+Suggested branch: `feature/assisted-form-fill`
+
+Goal: help users fill common application form fields using their saved profile.
+
+Possible fields:
+
+- Name
+- Email
+- Phone
+- Address
+- LinkedIn
+- Portfolio
+- Work authorization
+- Resume upload
+- Cover letter upload
+
+Guardrails:
+
+- User reviews all fields.
+- User manually submits the application.
+- No automatic submission.
+
+### 7. Job Dashboard Stats
+
+Suggested branch: `feature/job-dashboard-stats`
+
+Goal: make Saved Jobs feel more like an active job-search workspace.
+
+Possible stats:
+
+- Total saved jobs
+- Strong matches
+- Good matches
+- Ready to apply
+- Applied
+- Rejected
+
+### 8. Storage Cleanup After Migration Confidence
+
+Suggested branch: `maintenance/cleanup-old-sync-storage`
+
+Goal: eventually remove old sync copies of provider settings and profile data after the local-first migration has proven safe.
+
+Important: do not do this immediately. Wait until the local migration has been used successfully in a released version.
+
+### 9. Session Scan Payload Cap
+
+Suggested branch: `fix/session-scan-payload-cap`
+
+Goal: cap very large temporary scan payloads before writing to `chrome.storage.session`.
+
+Why later: persistent storage risks were handled first. Session storage is temporary, so this can wait unless huge pages cause practical issues.
+
+## Suggested Order After v2.0 Prep
+
+1. `release/v2.0-prep`
+2. `feature/application-pack-actions`
+3. `feature/use-fit-analysis-in-generation`
+4. `feature/batch-job-intake`
+5. `feature/job-url-import`
+6. `feature/assisted-form-fill`
+
+## Product Principle
+
+The app should remain an assistant, not an autopilot.
+
+Best direction:
+
+- Save jobs
+- Analyze fit
+- Prepare application materials
+- Help with common form fields
+- Keep the user in control
+
+Avoid:
+
+- Promising universal job board extraction
+- Building dozens of custom job-board extractors too early
+- Letting the app submit applications without user review
