@@ -11,6 +11,7 @@ Desktop.ini
 .idea/
 *.sublime-project
 *.sublime-workspace
+.claude/
 
 # ── Node (if you ever add a build step) ──────────────────────────────────────
 node_modules/
