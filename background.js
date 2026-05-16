@@ -2,6 +2,8 @@
 // Registers context menu and routes messages between content script and dashboard.
 // content.js is never injected automatically — only on explicit user action.
 
+const openSidePanelTabs = new Set();
+
 // ── Setup ──────────────────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -42,16 +44,70 @@ async function captureTab(tabId) {
   return chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_CONTENT' });
 }
 
-// ── Action Icon Click ───────────────────────────────────────────────────────
+function markSidePanelOpen(tabId, isOpen) {
+  if (!tabId) return;
 
-// If the user clicks the toolbar icon, enable and open for current tab
-chrome.action.onClicked.addListener((tab) => {
+  const key = String(tabId);
+  if (isOpen) openSidePanelTabs.add(key);
+  else openSidePanelTabs.delete(key);
+}
+
+function isSidePanelOpen(tabId) {
+  if (!tabId) return false;
+  return openSidePanelTabs.has(String(tabId));
+}
+
+async function openSidePanelForTab(tab) {
+  if (!tab?.id) return;
+
   chrome.sidePanel.setOptions({
     tabId: tab.id,
     path: 'dashboard/dashboard.html',
     enabled: true
+  }).catch(error => console.error(error?.message || error));
+
+  await chrome.sidePanel.open({ tabId: tab.id });
+  markSidePanelOpen(tab.id, true);
+}
+
+async function toggleSidePanelForTab(tab) {
+  if (!tab?.id) return;
+
+  if (chrome.sidePanel.close && isSidePanelOpen(tab.id)) {
+    try {
+      await chrome.sidePanel.close({ tabId: tab.id });
+      markSidePanelOpen(tab.id, false);
+      return;
+    } catch (err) {
+      console.warn('[JPDA] Failed to close side panel via action:', err?.message || err);
+      markSidePanelOpen(tab.id, false);
+    }
+  }
+
+  await openSidePanelForTab(tab);
+}
+
+if (chrome.sidePanel.onOpened) {
+  chrome.sidePanel.onOpened.addListener(info => {
+    if (info?.tabId) markSidePanelOpen(info.tabId, true);
   });
-  chrome.sidePanel.open({ tabId: tab.id }).catch(err => console.error('Failed to open side panel via action:', err?.message || err));
+}
+
+if (chrome.sidePanel.onClosed) {
+  chrome.sidePanel.onClosed.addListener(info => {
+    if (info?.tabId) markSidePanelOpen(info.tabId, false);
+  });
+}
+
+chrome.tabs.onRemoved.addListener(tabId => {
+  markSidePanelOpen(tabId, false);
+});
+
+// ── Action Icon Click ───────────────────────────────────────────────────────
+
+// If the user clicks the toolbar icon, enable and open for current tab
+chrome.action.onClicked.addListener((tab) => {
+  toggleSidePanelForTab(tab).catch(err => console.error('Failed to toggle side panel via action:', err?.message || err));
 });
 
 // ── Context Menu Click ─────────────────────────────────────────────────────
@@ -60,8 +116,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== 'jpda-main') return;
 
   // 1. OPEN SIDE PANEL IMMEDIATELY (must be synchronous inside the user gesture handler)
-  chrome.sidePanel.setOptions({ tabId: tab.id, path: 'dashboard/dashboard.html', enabled: true });
-  chrome.sidePanel.open({ tabId: tab.id }).catch(err => console.error('Failed to open side panel via context menu:', err?.message || err));
+  openSidePanelForTab(tab).catch(err => console.error('Failed to open side panel via context menu:', err?.message || err));
 
   // 2. SCAN PAGE IN BACKGROUND — user triggered this action, so we read content now
   (async () => {

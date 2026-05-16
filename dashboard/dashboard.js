@@ -3,7 +3,7 @@
 import { extractJobFields } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
 import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
-import { renderDocument, renderMergedDocument } from '../modules/renderer.js';
+import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { mapError } from '../modules/errorMapper.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -11,6 +11,8 @@ import { mapError } from '../modules/errorMapper.js';
 const SUPPORT_URL = 'https://ko-fi.com/mwakelabs';
 const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
 const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
+const EDITED_HTML_SAVE_DELAY_MS = 500;
+const MAX_EDITED_HTML_CHARS = 500000;
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
 const MAX_SYNC_FIELD_LENGTHS = {
@@ -19,6 +21,11 @@ const MAX_SYNC_FIELD_LENGTHS = {
   sourceUrl: 1200,
   docType: 40,
 };
+
+const urlParams = new URLSearchParams(window.location.search);
+const dashboardMode = urlParams.get('mode') === 'full' ? 'full' : 'panel';
+const sourceTabId = parsePositiveInt(urlParams.get('sourceTabId'));
+document.documentElement.dataset.dashboardMode = dashboardMode;
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
@@ -42,10 +49,12 @@ const state = {
   lastRunMode: null,
   editMode: { resume: false, 'cover-letter': false },
   hasEdits: { resume: false, 'cover-letter': false },
+  editedHtml: { resume: null, 'cover-letter': null },
 };
 
 let currentAbortController = null;
 let generationStatusTimers = [];
+const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -90,6 +99,7 @@ const dom = {
   draftMergedEmpty:   $('draft-merged-empty'),
   draftMergedContent: $('draft-merged-content'),
   tabBtnMerged:       $('tab-btn-merged'),
+  manualEditNotice:   $('manual-edit-notice'),
   
   fieldRevision:      $('field-revision'),
   btnApplyChanges:    $('btn-apply-changes'),
@@ -120,6 +130,7 @@ const dom = {
   profileStrip:       $('profile-strip'),
   btnOpenProfile:     $('btn-open-profile'),
   btnOpenProfiles:    $('btn-open-profiles'),
+  btnOpenFullPage:    $('btn-open-full-page'),
   historyView:        $('history-view'),
   btnCloseHistory:    $('btn-close-history'),
   btnSupport:         $('btn-support'),
@@ -213,7 +224,7 @@ function applyExtractedData(raw, url, usedSelection) {
   state.jobData = { jobTitle, company, sourceUrl: url, description: text };
 }
 
-function applySession(session) {
+async function applySession(session) {
   if (!session || !session.extractedData) {
     return;
   }
@@ -230,6 +241,8 @@ function applySession(session) {
     const mode = session.pendingMode || 'both';
     dom.historyView.classList.remove('visible');
     chrome.storage.session.remove(['regenerateRequested']);
+    await clearEditedHtml('resume');
+    await clearEditedHtml('cover-letter');
     showToast('Reloaded job from history. Regenerating...');
     runGeneration(mode);
   }
@@ -255,7 +268,7 @@ async function scanCurrentPage() {
   btn.textContent = 'Scanning…';
 
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = await getScanTargetTab();
 
     if (!tab?.id) {
       showToast('⚠️ No active tab found.');
@@ -357,6 +370,7 @@ function bindEvents() {
   });
   dom.btnOpenProfile.addEventListener('click', () => openSettingsSection('profile'));
   dom.btnOpenProfiles.addEventListener('click', () => openSettingsSection('profiles'));
+  dom.btnOpenFullPage.addEventListener('click', openFullPage);
 
   // Theme toggle
   dom.btnTheme.addEventListener('click', toggleTheme);
@@ -383,46 +397,8 @@ function bindEvents() {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
-  // Template Selection
-  dom.templateOptions.forEach(opt => {
-    opt.addEventListener('click', () => {
-      dom.templateOptions.forEach(o => o.classList.remove('active'));
-      opt.classList.add('active');
-      state.templateId = opt.dataset.template;
-      updatePreviews();
-    });
-  });
-
-  // Accent Color
-  dom.colorDots.forEach(dot => {
-    dot.addEventListener('click', () => {
-      dom.colorDots.forEach(d => d.classList.remove('active'));
-      dot.classList.add('active');
-      state.accentColor = dot.dataset.color;
-      updatePreviews();
-    });
-  });
-
-  // Spacing
-  dom.selectSpacing.addEventListener('change', () => {
-    state.spacingMode = dom.selectSpacing.value;
-    updatePreviews();
-  });
-
-  // Cover letter length pills
-  dom.lengthPills.forEach(pill => {
-    pill.addEventListener('click', () => {
-      dom.lengthPills.forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      state.clLength = pill.dataset.length;
-    });
-  });
-
-  // Tone slider
-  dom.rangeTone.addEventListener('input', () => {
-    state.tone = Number(dom.rangeTone.value);
-    dom.toneDescriptor.textContent = toneLabel(state.tone);
-  });
+  bindAppearanceControls();
+  bindDraftSettingsControls();
 
   // Generation — same handler doubles as Stop when in generating state.
   // Shows a confirmation before overwriting an existing draft.
@@ -485,6 +461,112 @@ function bindEvents() {
 }
 
 // ── Core Logic ────────────────────────────────────────────────────────────
+
+function parsePositiveInt(value) {
+  const number = Number.parseInt(value || '', 10);
+  return Number.isInteger(number) && number > 0 ? number : null;
+}
+
+async function getScanTargetTab() {
+  if (sourceTabId) {
+    try {
+      const tab = await chrome.tabs.get(sourceTabId);
+      if (tab?.id) return tab;
+    } catch (_) {
+      // Source tab was closed. Fall back to the active tab.
+    }
+  }
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab || null;
+}
+
+async function openFullPage() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const pageUrl = new URL(chrome.runtime.getURL('dashboard/dashboard.html'));
+  pageUrl.searchParams.set('mode', 'full');
+
+  const targetTabId = sourceTabId || (tab?.id && !isRestrictedUrl(tab.url) ? tab.id : null);
+  if (targetTabId) pageUrl.searchParams.set('sourceTabId', String(targetTabId));
+
+  await persistCurrentJobContextForFullPage();
+  await chrome.tabs.create({ url: pageUrl.href, active: true });
+}
+
+async function persistCurrentJobContextForFullPage() {
+  const jobTitle = dom.fieldTitle.value.trim();
+  const company = dom.fieldCompany.value.trim();
+  const sourceUrl = dom.fieldUrl.value.trim();
+  const description = dom.fieldDesc.value.trim();
+
+  if (!jobTitle && !company && !sourceUrl && !description) return;
+
+  await chrome.storage.session.set({
+    extractedData: {
+      jobTitle,
+      company,
+      pageText: description,
+      url: sourceUrl,
+    },
+    sourceUrl,
+    sourceTitle: jobTitle || company || 'Job draft',
+  });
+}
+
+function bindAppearanceControls() {
+  dom.templateOptions.forEach(opt => {
+    opt.addEventListener('click', async () => {
+      const nextTemplate = opt.dataset.template;
+      if (nextTemplate === state.templateId) return;
+      if (!await confirmTemplateRerenderIfNeeded()) return;
+
+      dom.templateOptions.forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      state.templateId = nextTemplate;
+      await clearEditedHtml('resume');
+      await clearEditedHtml('cover-letter');
+      updatePreviews();
+      await persistAppearanceSettingsToSavedDraft();
+    });
+  });
+
+  dom.colorDots.forEach(dot => {
+    dot.addEventListener('click', async () => {
+      const nextColor = dot.dataset.color;
+      if (nextColor === state.accentColor) return;
+
+      dom.colorDots.forEach(d => d.classList.remove('active'));
+      dot.classList.add('active');
+      state.accentColor = nextColor;
+      applyAppearanceToRenderedDocuments();
+      await persistAppearanceSettingsToSavedDraft();
+    });
+  });
+
+  dom.selectSpacing.addEventListener('change', async () => {
+    const nextSpacing = dom.selectSpacing.value;
+    if (nextSpacing === state.spacingMode) return;
+
+    state.spacingMode = nextSpacing;
+    applyAppearanceToRenderedDocuments();
+    await persistAppearanceSettingsToSavedDraft();
+  });
+}
+
+function bindDraftSettingsControls() {
+  dom.lengthPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      dom.lengthPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      state.clLength = pill.dataset.length;
+    });
+  });
+
+  dom.rangeTone.addEventListener('input', () => {
+    state.tone = Number(dom.rangeTone.value);
+    dom.toneDescriptor.textContent = toneLabel(state.tone);
+  });
+}
 
 function openSettingsSection(section = 'provider') {
   dom.settingsView.classList.add('visible');
@@ -597,6 +679,7 @@ async function runGeneration(mode) {
       const parsed = normalizeDraftContent(type, tryParseJson(raw));
       if (parsed) {
         state.drafts[type] = parsed;
+        await clearEditedHtml(type);
       } else {
         throw new Error(`AI returned invalid content format for ${type}.`);
       }
@@ -618,7 +701,7 @@ async function runGeneration(mode) {
     showToast('✨ Drafts ready!');
 
     // Persist so draft survives the panel being closed and reopened
-    chrome.storage.local.set({
+    await chrome.storage.local.set({
       savedDraft: {
         drafts:         state.drafts,
         originalDrafts: state.originalDrafts,
@@ -629,6 +712,7 @@ async function runGeneration(mode) {
         spacingMode:    state.spacingMode,
         tone:           state.tone,
         clLength:       state.clLength,
+        editedHtml:     getPersistableEditedHtml(),
       }
     });
   } catch (e) {
@@ -807,11 +891,12 @@ async function confirmOverwrite(mode) {
   );
 }
 
-function resetToOriginal() {
+async function resetToOriginal() {
   const docType = state.currentTab;
   if (!state.originalDrafts?.[docType]) return;
 
   state.drafts[docType] = JSON.parse(JSON.stringify(state.originalDrafts[docType]));
+  await clearEditedHtml(docType);
   updatePreviews();
   dom.fieldRevision.value = '';
   refreshRevisionButton();
@@ -839,6 +924,7 @@ async function applyRevision() {
     const parsed = normalizeDraftContent(docType, tryParseJson(raw));
     if (parsed) {
       state.drafts[docType] = parsed;
+      await clearEditedHtml(docType);
       updatePreviews();
       dom.fieldRevision.value = '';
       showToast('✅ Changes applied!');
@@ -852,6 +938,197 @@ async function applyRevision() {
     dom.btnApplyChanges.textContent = 'Apply Changes';
     refreshRevisionButton();
     dom.btnRegenerate.disabled = !state.originalDrafts?.[docType];
+  }
+}
+
+function hasUnsavedPreviewEdits() {
+  return Boolean(state.hasEdits.resume || state.hasEdits['cover-letter']);
+}
+
+function hasManualPreviewEdits() {
+  return Boolean(state.editedHtml.resume?.html || state.editedHtml['cover-letter']?.html || hasUnsavedPreviewEdits());
+}
+
+function updateManualEditNotice() {
+  dom.manualEditNotice.classList.toggle('hidden', !hasManualPreviewEdits());
+}
+
+async function confirmTemplateRerenderIfNeeded() {
+  if (!hasUnsavedPreviewEdits()) return true;
+
+  return showConfirmDialog(
+    'Change template?',
+    'Changing templates rebuilds the preview and may discard direct edits. Continue?',
+    'Continue'
+  );
+}
+
+function getPreviewFrame(tab) {
+  return tab === 'resume' ? dom.previewResumeFrame : dom.previewCLFrame;
+}
+
+function normalizeEditedHtmlEntry(entry) {
+  if (!entry?.html || typeof entry.html !== 'string') return null;
+  return {
+    html: entry.html,
+    updatedAt: entry.updatedAt || new Date().toISOString(),
+    differsFromDraft: true,
+  };
+}
+
+function getSanitizedIframeHtml(iframe) {
+  const doc = iframe?.contentDocument;
+  if (!doc?.documentElement) return '';
+
+  const cloned = doc.documentElement.cloneNode(true);
+  cloned.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+  cloned.querySelectorAll('[data-jpda-edit-listener-attached]').forEach(el => {
+    el.removeAttribute('data-jpda-edit-listener-attached');
+  });
+  cloned.querySelectorAll('#edit-mode-style').forEach(el => el.remove());
+
+  return '<!DOCTYPE html>\n' + cloned.outerHTML;
+}
+
+function getPersistableEditedHtml() {
+  const editedHtml = {};
+  ['resume', 'cover-letter'].forEach(tab => {
+    const entry = normalizeEditedHtmlEntry(state.editedHtml[tab]);
+    if (entry) editedHtml[tab] = entry;
+  });
+  return editedHtml;
+}
+
+function scheduleEditedHtmlAutosave(tab) {
+  clearTimeout(editedHtmlSaveTimers[tab]);
+  editedHtmlSaveTimers[tab] = setTimeout(() => {
+    persistEditedHtml(tab);
+  }, EDITED_HTML_SAVE_DELAY_MS);
+}
+
+async function persistEditedHtml(tab) {
+  clearTimeout(editedHtmlSaveTimers[tab]);
+  editedHtmlSaveTimers[tab] = null;
+
+  const html = getSanitizedIframeHtml(getPreviewFrame(tab));
+  if (!html) return;
+  if (html.length > MAX_EDITED_HTML_CHARS) {
+    showToast('Manual edits are too large to auto-save, but export still uses the current preview.');
+    return;
+  }
+
+  const entry = {
+    html,
+    updatedAt: new Date().toISOString(),
+    differsFromDraft: true,
+  };
+
+  state.editedHtml[tab] = entry;
+  state.hasEdits[tab] = true;
+  updateManualEditNotice();
+
+  try {
+    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    if (!savedDraft) return;
+
+    await chrome.storage.local.set({
+      savedDraft: {
+        ...savedDraft,
+        editedHtml: {
+          ...(savedDraft.editedHtml || {}),
+          [tab]: entry,
+        },
+      }
+    });
+  } catch (err) {
+    console.warn('Could not persist edited preview HTML:', err?.message || err);
+  }
+}
+
+async function clearEditedHtml(tab) {
+  clearTimeout(editedHtmlSaveTimers[tab]);
+  editedHtmlSaveTimers[tab] = null;
+  state.editedHtml[tab] = null;
+  state.hasEdits[tab] = false;
+
+  try {
+    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    if (!savedDraft?.editedHtml?.[tab]) {
+      updateManualEditNotice();
+      return;
+    }
+
+    const editedHtml = { ...savedDraft.editedHtml };
+    delete editedHtml[tab];
+    await chrome.storage.local.set({
+      savedDraft: {
+        ...savedDraft,
+        editedHtml,
+      }
+    });
+  } catch (err) {
+    console.warn('Could not clear edited preview HTML:', err?.message || err);
+  } finally {
+    updateManualEditNotice();
+  }
+}
+
+function restoreEditedHtml(tab) {
+  const entry = normalizeEditedHtmlEntry(state.editedHtml[tab]);
+  if (!entry) return false;
+
+  const iframe = getPreviewFrame(tab);
+  injectToIframe(iframe, entry.html);
+  applyAppearanceToIframe(iframe);
+  state.editedHtml[tab] = entry;
+  state.hasEdits[tab] = true;
+  updateManualEditNotice();
+  return true;
+}
+
+function applyAppearanceToRenderedDocuments() {
+  const frames = [];
+  if (state.drafts.resume) frames.push(dom.previewResumeFrame);
+  if (state.drafts['cover-letter']) frames.push(dom.previewCLFrame);
+  if (state.drafts.resume && state.drafts['cover-letter']) frames.push(dom.previewMergedFrame);
+
+  frames.forEach(frame => applyAppearanceToIframe(frame));
+  refreshExportButtons();
+}
+
+function applyAppearanceToIframe(iframe) {
+  const doc = iframe?.contentDocument;
+  if (!doc?.documentElement) return;
+
+  doc.documentElement.style.setProperty('--accent-color', state.accentColor);
+  doc.documentElement.style.setProperty('--spacing-factor', state.spacingMode === 'compact' ? '0.8' : '1.0');
+
+  let spacingStyle = doc.getElementById('jpda-spacing-style');
+  if (!spacingStyle) {
+    spacingStyle = doc.createElement('style');
+    spacingStyle.id = 'jpda-spacing-style';
+    doc.head.appendChild(spacingStyle);
+  }
+  spacingStyle.textContent = getSpacingCss(state.spacingMode);
+}
+
+async function persistAppearanceSettingsToSavedDraft() {
+  if (!state.drafts.resume && !state.drafts['cover-letter']) return;
+
+  try {
+    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    if (!savedDraft) return;
+
+    await chrome.storage.local.set({
+      savedDraft: {
+        ...savedDraft,
+        templateId: state.templateId,
+        accentColor: state.accentColor,
+        spacingMode: state.spacingMode,
+      }
+    });
+  } catch (err) {
+    console.warn('Could not persist appearance settings:', err?.message || err);
   }
 }
 
@@ -871,6 +1148,7 @@ function updatePreviews() {
     };
     const html = renderDocument(state.templateId, 'resume', resumeData, options);
     injectToIframe(dom.previewResumeFrame, html);
+    restoreEditedHtml('resume');
     refreshExportButtons();
   }
 
@@ -885,6 +1163,7 @@ function updatePreviews() {
     };
     const html = renderDocument(state.templateId, 'cover-letter', clData, options);
     injectToIframe(dom.previewCLFrame, html);
+    restoreEditedHtml('cover-letter');
   }
 
   if (state.drafts.resume && state.drafts['cover-letter']) {
@@ -903,6 +1182,7 @@ function updatePreviews() {
   }
 
   refreshExportButtons();
+  updateManualEditNotice();
 }
 
 function injectToIframe(iframe, html) {
@@ -930,7 +1210,14 @@ function toggleEditMode(tab) {
     doc.head.appendChild(style);
     page.contentEditable = 'true';
     page.focus();
-    page.addEventListener('input', () => { state.hasEdits[tab] = true; }, { once: true });
+    if (!page.dataset.jpdaEditListenerAttached) {
+      page.dataset.jpdaEditListenerAttached = 'true';
+      page.addEventListener('input', () => {
+        state.hasEdits[tab] = true;
+        updateManualEditNotice();
+        scheduleEditedHtmlAutosave(tab);
+      });
+    }
     btn.textContent = 'Done';
     btn.classList.add('editing');
     btn.title = 'Click to exit edit mode';
@@ -941,11 +1228,12 @@ function toggleEditMode(tab) {
     btn.textContent = '✏ Edit';
     btn.classList.remove('editing');
     btn.title = 'Edit the document directly in the preview';
+    if (state.hasEdits[tab]) persistEditedHtml(tab);
   }
 }
 
 function getIframeHtml(iframe) {
-  return '<!DOCTYPE html>\n' + iframe.contentDocument.documentElement.outerHTML;
+  return getSanitizedIframeHtml(iframe);
 }
 
 function clearEditState(tab) {
@@ -1053,6 +1341,10 @@ function restoreSavedDraft(saved) {
   state.spacingMode = saved.spacingMode || 'standard';
   state.tone        = saved.tone        ?? 30;
   state.clLength    = saved.clLength    || 'standard';
+  state.editedHtml = {
+    resume: normalizeEditedHtmlEntry(saved.editedHtml?.resume),
+    'cover-letter': normalizeEditedHtmlEntry(saved.editedHtml?.['cover-letter']),
+  };
 
   // Restore form fields
   dom.fieldTitle.value   = state.jobData.jobTitle  || '';
@@ -1090,6 +1382,7 @@ async function clearDraft(tab) {
   emptyEl.classList.remove('hidden');
   contentEl.classList.add('hidden');
   clearEditState(tab);
+  await clearEditedHtml(tab);
 
   // If neither draft remains, also hide the merged tab
   if (!state.drafts.resume && !state.drafts['cover-letter']) {
@@ -1117,6 +1410,11 @@ async function clearSession() {
   state.drafts      = { resume: null, 'cover-letter': null };
   state.jobData     = { jobTitle: '', company: '', sourceUrl: '', description: '' };
   state.lastRunMode = null;
+  state.editedHtml  = { resume: null, 'cover-letter': null };
+  clearTimeout(editedHtmlSaveTimers.resume);
+  clearTimeout(editedHtmlSaveTimers['cover-letter']);
+  editedHtmlSaveTimers.resume = null;
+  editedHtmlSaveTimers['cover-letter'] = null;
 
   dom.fieldTitle.value = '';
   dom.fieldCompany.value = '';
@@ -1135,6 +1433,7 @@ async function clearSession() {
   dom.btnPrintMerged.classList.add('hidden');
   clearEditState('resume');
   clearEditState('cover-letter');
+  updateManualEditNotice();
 
   refreshExportButtons();
   switchTab('resume');
@@ -1598,14 +1897,19 @@ const TOUR_STEPS = [
     body: 'Paste the full job posting here. The more detail the AI has, the more precisely it tailors your documents to this specific role.',
   },
   {
-    target: '#card-template',
-    title: 'Step 3 - Style',
-    body: 'Choose the document layout, accent colour, spacing, cover letter length, and writing tone. These settings shape both the preview and the next draft you generate.',
+    target: '#draft-settings',
+    title: 'Step 3 - Draft Settings',
+    body: 'Choose cover letter length and writing tone before generating. These settings affect the next AI draft, not an existing preview.',
   },
   {
     target: '#card-generate',
     title: 'Step 4 - Generate',
     body: 'Generate a tailored resume, cover letter, or both with one click. A Stop button replaces this while the AI is working, in case you need to cancel.',
+  },
+  {
+    target: '#appearance-controls',
+    title: 'Appearance',
+    body: 'Change template, accent colour, and spacing from the Preview area. These controls update the rendered document without regenerating the text.',
   },
   {
     target: '#card-drafts',
