@@ -10,7 +10,7 @@ const STATUSES = [
 ];
 
 let suppressNextSavedJobsRefresh = false;
-let currentSort = 'updated_desc';
+let currentSort = 'created_desc';
 const analyzingJobs = new Set();
 const fitErrors = new Map();
 
@@ -151,7 +151,7 @@ function sortSavedJobs(jobs) {
         sortText(a.title).localeCompare(sortText(b.title)) ||
         timeValue(b.updatedAt || b.createdAt) - timeValue(a.updatedAt || a.createdAt);
     }
-    return timeValue(b.updatedAt || b.createdAt) - timeValue(a.updatedAt || a.createdAt);
+    return timeValue(b.createdAt) - timeValue(a.createdAt);
   });
   return sorted;
 }
