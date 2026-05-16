@@ -1419,6 +1419,47 @@ details[open] .pdf-preview-summary::before { content: '▼ '; }
   max-width: 220px;
 }
 
+.profile-mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.profile-mode-btn {
+  font-size: 11px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  padding: 3px 9px;
+  background: var(--color-surface);
+  color: var(--color-ink-3);
+  border: none;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+  white-space: nowrap;
+}
+
+.profile-mode-btn + .profile-mode-btn {
+  border-left: 1px solid var(--color-border);
+}
+
+.profile-mode-btn--active {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.profile-mode-btn:not(.profile-mode-btn--active):hover {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.section-desc--fit-mode {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
 .profile-rename-input {
   font-size: 13px;
   font-weight: 600;

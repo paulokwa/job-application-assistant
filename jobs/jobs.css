@@ -317,18 +317,31 @@ body {
 }
 
 .fit-score {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-ink);
   font-family: var(--font-display);
-  font-size: 15px;
   font-weight: 700;
+  line-height: 1;
+}
+
+.fit-score-number {
+  font-size: 15px;
+}
+
+.fit-score-denom {
+  font-size: 9px;
+  font-weight: 400;
+  opacity: 0.6;
+  letter-spacing: 0;
 }
 
 .fit-score--good {

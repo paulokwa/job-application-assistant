@@ -91,7 +91,7 @@ export function hasFitAnalysisInputs(profile, sourceResumeText) {
 export function normalizeFitAnalysis(raw) {
   const parsed = parseJsonObject(raw);
   const score = clampScore(parsed.score);
-  const label = LABELS.has(parsed.label) ? parsed.label : labelForScore(score);
+  const label = labelForScore(score);
 
   return {
     score,
@@ -144,7 +144,7 @@ function mockAnalyzeFit(savedJob, profile, sourceResumeText) {
   });
 }
 
-export async function analyzeFit(savedJob, profile, settings, sourceResumeText = '', signal) {
+export async function analyzeFit(savedJob, profile, settings, sourceResumeText = '', signal, inferenceMode = 'transferable') {
   const description = String(savedJob?.cleanDescription || savedJob?.rawContent || '').trim();
   if (!description) {
     throw new Error('fit_no_job_description');
@@ -171,16 +171,21 @@ export async function analyzeFit(savedJob, profile, settings, sourceResumeText =
   truthBlocks.push(profileText);
   truthBlocks.push('=== END USER PROFILE ===');
 
+  const inferenceInstruction = inferenceMode === 'exact'
+    ? 'Only count qualifications, skills, and experience that are explicitly stated in the profile or source resume. If something is not written there, treat it as a gap — do not connect implied or related experience to unstated requirements.'
+    : 'Do not fabricate qualifications that are absent from the profile/resume. However, do recognize genuine transferable experience — for example, project management includes coordinating and overseeing work, which is directly relevant to supervisory roles; customer service experience is relevant to client-facing requirements.';
+
   const systemPrompt = [
-    'You are a careful job fit analyst for a job seeker.',
-    'Compare the target job posting against only the provided user profile and source resume.',
-    'Do not invent, infer, or assume qualifications, credentials, years of experience, tools, achievements, licenses, education, or job history.',
-    'If evidence is not present in the profile or source resume, treat it as a possible gap.',
+    'You are a job fit analyst helping a job seeker understand how well their background matches a posting.',
+    'Compare the job requirements against only the provided user profile and source resume.',
+    inferenceInstruction,
+    'Missing items are gaps, but weigh them against the strength and depth of what IS present. Exceeding the minimum requirements on experience or education should increase the score.',
+    'Score 0–100 using these anchors: 85–100 = strong match (well-qualified, minor gaps at most); 70–84 = good match (clearly applicable, gaps are addressable); 50–69 = maybe (real potential but notable gaps worth addressing); 30–49 = weak match (significant missing requirements); 0–29 = not recommended (major gaps make success unlikely). A score of 2–5 means the candidate has almost nothing relevant — reserve those for true mismatches.',
     'Return valid JSON only. No markdown, no preamble, no trailing text.',
   ].join('\n\n');
 
   const schema = {
-    score: 0,
+    score: '0-100 integer (use the full range — see scoring anchors above)',
     label: 'strong_match | good_match | maybe | weak_match | not_recommended',
     strongMatches: ['Specific verified match from the profile/source resume'],
     possibleGaps: ['Requirement from the job posting not clearly supported by the profile/source resume'],

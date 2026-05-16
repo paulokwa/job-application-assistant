@@ -26,6 +26,11 @@ Rules:
 - [DONE] Clear session cleanup merged.
 - [DONE] Storage quota guards merged.
 - [DONE] `ROADMAP.md` and `RELEASE_V2_CHECKLIST.md` updated.
+- [DONE] AI job info suggestions (job title/employer extraction via AI suggest fields) — `feature/ai-job-info-extraction`.
+- [DONE] Fit score `/100` reference added to saved job cards (`jobs/jobs.js`, `jobs/jobs.css`).
+- [DONE] Fit score label bug fixed — label now always derived from numeric score, not trusted from AI response (`modules/fitAnalysis.js`).
+- [DONE] Fit Analysis scoring prompt overhauled — added 0–100 rubric with anchor points, replaced over-strict "do not infer" rule with transferable skills recognition.
+- [DONE] Per-profile Fit Analysis inference mode toggle (Transferable / Exact) — stored in profile metadata, visible and switchable in Manage Profiles, explanation text added (`settings/settings.html`, `settings/settings.js`, `settings/settings.css`, `dashboard/dashboard.js`, `modules/fitAnalysis.js`).
 
 ## Current Main Branch State
 
