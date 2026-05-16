@@ -1,6 +1,7 @@
 // jobs/jobs.js - Saved jobs and application queue controller
 
 import { openSafeHttpUrl } from '../modules/url.js';
+import { compactSavedJobs, isStorageQuotaError, storageQuotaMessage } from '../modules/storageLimits.js';
 
 const SAVED_JOBS_KEY = 'savedJobs';
 const STATUSES = [
@@ -165,7 +166,17 @@ async function loadSavedJobs() {
 
 async function saveSavedJobs(jobs, options = {}) {
   if (options.silent) suppressNextSavedJobsRefresh = true;
-  await chrome.storage.local.set({ [SAVED_JOBS_KEY]: jobs });
+  try {
+    await chrome.storage.local.set({ [SAVED_JOBS_KEY]: compactSavedJobs(jobs) });
+    return true;
+  } catch (err) {
+    suppressNextSavedJobsRefresh = false;
+    console.warn('Could not save saved jobs:', err?.message || err);
+    if (isStorageQuotaError(err)) {
+      window.alert(storageQuotaMessage('savedJobs'));
+    }
+    return false;
+  }
 }
 
 async function refreshJobs() {

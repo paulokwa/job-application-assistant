@@ -3,6 +3,13 @@
 import { extractProfileFromResume, extractTextFromDocx, extractTextFromPdf, scorePdfExtraction, fileToArrayBuffer } from '../modules/extraction.js';
 import { loadProfile, saveProfile, loadProfiles, createProfile, renameProfile, deleteProfile, clearProfileData, switchProfile, updateProfileMeta } from '../modules/profile.js';
 import { loadProviderSettings, saveProviderSettings } from '../modules/providerSettings.js';
+import {
+  STORAGE_LIMITS,
+  isStorageQuotaError,
+  storageQuotaMessage,
+  truncateText,
+  wasTruncated,
+} from '../modules/storageLimits.js';
 import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
 
@@ -776,8 +783,19 @@ function updateFilenamePreview() {
 
 async function saveDocuments() {
   docSettings.defaultType = $('sel-default-type').value;
-  docSettings.filenamePattern = $('inp-filename-pattern').value.trim();
-  await chrome.storage.sync.set({ docSettings });
+  docSettings.filenamePattern = truncateText(
+    $('inp-filename-pattern').value.trim(),
+    STORAGE_LIMITS.docSettingsFilenamePatternChars
+  );
+  try {
+    await chrome.storage.sync.set({ docSettings });
+  } catch (err) {
+    console.warn('Could not save document settings:', err?.message || err);
+    showToast(isStorageQuotaError(err)
+      ? 'Could not save document settings because Chrome sync storage is full.'
+      : 'Could not save document settings.');
+    return;
+  }
 
   const btn = $('btn-save-documents');
   const original = btn.textContent;
@@ -929,8 +947,11 @@ async function handleSourceResumeUpload(event) {
       showPdfQualityWarning(quality.level, quality.charCount);
     }
 
+    const savedResumeText = truncateText(plainText, STORAGE_LIMITS.sourceResumeTextChars);
+    const sourceResumeWasTruncated = wasTruncated(plainText, savedResumeText);
+
     await chrome.storage.local.set({
-      sourceResumeText: plainText,
+      sourceResumeText: savedResumeText,
       sourceResumeName: file.name
     });
 
@@ -941,7 +962,9 @@ async function handleSourceResumeUpload(event) {
     $('source-resume-active-label').textContent = `📄 Active Source: ${file.name}`;
     $('source-resume-active-bar').classList.remove('hidden');
 
-    if (isPdf && qualityLevel !== 'good') {
+    if (sourceResumeWasTruncated) {
+      showToast('Resume text was very large, so only the first portion was saved for AI context.');
+    } else if (isPdf && qualityLevel !== 'good') {
       showToast('📄 PDF imported — please review the profile fields before generating.');
     } else {
       showToast('✅ Resume uploaded. Starting AI auto-fill...');
@@ -949,8 +972,9 @@ async function handleSourceResumeUpload(event) {
 
     await attemptAutofill(statusEl);
   } catch (e) {
-    statusEl.textContent = `❌ Error: ${e.message}`;
-    showToast('❌ Upload failed');
+    const message = isStorageQuotaError(e) ? storageQuotaMessage('sourceResume') : e.message;
+    statusEl.textContent = `❌ Error: ${message}`;
+    showToast(isStorageQuotaError(e) ? message : '❌ Upload failed');
     // Reset input so the user can retry the same file (change event won't fire otherwise)
     event.target.value = '';
   }

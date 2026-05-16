@@ -5,6 +5,15 @@ import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } 
 import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
 import { analyzeFit } from '../modules/fitAnalysis.js';
 import { loadProviderSettings, saveProviderSettings } from '../modules/providerSettings.js';
+import {
+  compactJobHistoryEntry,
+  compactSavedDraft,
+  compactSavedJob,
+  compactSavedJobs,
+  isStorageQuotaError,
+  storageQuotaMessage,
+  wasTruncated,
+} from '../modules/storageLimits.js';
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { mapError } from '../modules/errorMapper.js';
 
@@ -733,22 +742,9 @@ async function runGeneration(mode) {
     renderGenerationReceipt();
     showToast('✨ Drafts ready!');
 
-    // Persist so draft survives the panel being closed and reopened
-    await chrome.storage.local.set({
-      savedDraft: {
-        drafts:         state.drafts,
-        originalDrafts: state.originalDrafts,
-        jobData:        state.jobData,
-        lastRunMode:    state.lastRunMode,
-        templateId:     state.templateId,
-        accentColor:    state.accentColor,
-        spacingMode:    state.spacingMode,
-        tone:           state.tone,
-        clLength:       state.clLength,
-        generationReceipt: state.generationReceipt,
-        editedHtml:     getPersistableEditedHtml(),
-      }
-    });
+    // Persist so draft survives the panel being closed and reopened. If quota
+    // fails, the in-memory draft remains usable for export in the current view.
+    await persistSavedDraftSnapshot(createSavedDraftSnapshot());
   } catch (e) {
     if (e.name === 'AbortError') {
       showToast('Generation stopped.');
@@ -764,6 +760,36 @@ async function runGeneration(mode) {
 function stopGeneration() {
   if (currentAbortController) {
     currentAbortController.abort();
+  }
+}
+
+function createSavedDraftSnapshot(overrides = {}) {
+  return compactSavedDraft({
+    drafts:         state.drafts,
+    originalDrafts: state.originalDrafts,
+    jobData:        state.jobData,
+    lastRunMode:    state.lastRunMode,
+    templateId:     state.templateId,
+    accentColor:    state.accentColor,
+    spacingMode:    state.spacingMode,
+    tone:           state.tone,
+    clLength:       state.clLength,
+    generationReceipt: state.generationReceipt,
+    editedHtml:     getPersistableEditedHtml(),
+    ...overrides,
+  });
+}
+
+async function persistSavedDraftSnapshot(savedDraft, { toastOnQuota = true } = {}) {
+  try {
+    await chrome.storage.local.set({ savedDraft: compactSavedDraft(savedDraft) });
+    return true;
+  } catch (err) {
+    console.warn('Could not persist saved draft:', err?.message || err);
+    if (toastOnQuota && isStorageQuotaError(err)) {
+      showToast(storageQuotaMessage('savedDraft'));
+    }
+    return false;
   }
 }
 
@@ -857,9 +883,21 @@ async function saveCurrentJob() {
     createdAt: now,
     updatedAt: now,
   };
+  const compactedJob = compactSavedJob(savedJob);
+  const jobWasTruncated = wasTruncated(savedJob.rawContent, compactedJob.rawContent) ||
+    wasTruncated(savedJob.cleanDescription, compactedJob.cleanDescription);
 
-  await chrome.storage.local.set({ [SAVED_JOBS_KEY]: [savedJob, ...savedJobs] });
-  showToast('Saved to Jobs.');
+  try {
+    await chrome.storage.local.set({ [SAVED_JOBS_KEY]: compactSavedJobs([compactedJob, ...savedJobs]) });
+    showToast(jobWasTruncated
+      ? 'This job description was very large, so Jobs saved a shortened copy.'
+      : 'Saved to Jobs.');
+  } catch (err) {
+    console.warn('Could not save job:', err?.message || err);
+    showToast(isStorageQuotaError(err)
+      ? storageQuotaMessage('savedJobs')
+      : 'Could not save this job. Please try again.');
+  }
 }
 
 // ── Job History ───────────────────────────────────────────────────────────
@@ -914,11 +952,13 @@ async function handleFitAnalysisRequest(id) {
       updatedAt: new Date().toISOString(),
     };
 
-    await chrome.storage.local.set({ [SAVED_JOBS_KEY]: updatedJobs });
+    await chrome.storage.local.set({ [SAVED_JOBS_KEY]: compactSavedJobs(updatedJobs) });
     postFitAnalysisResult({ type: 'JPDA_ANALYZE_FIT_DONE', id, fitAnalysis });
   } catch (error) {
     if (error?.name === 'AbortError') {
       postFitAnalysisResult({ type: 'JPDA_ANALYZE_FIT_ERROR', id, message: 'Fit analysis was stopped.' });
+    } else if (isStorageQuotaError(error)) {
+      postFitAnalysisResult({ type: 'JPDA_ANALYZE_FIT_ERROR', id, message: storageQuotaMessage('savedJobs') });
     } else {
       postFitAnalysisResult({ type: 'JPDA_ANALYZE_FIT_ERROR', id, message: fitAnalysisErrorMessage(error) });
     }
@@ -933,7 +973,7 @@ async function appendJobHistory(targets) {
     : targets.includes('cover-letter') ? 'Cover Letter'
     : 'Resume';
 
-  const entry = {
+  const entry = compactJobHistoryEntry({
     id:        Date.now(),
     jobTitle:  state.jobData.jobTitle  || '(untitled)',
     company:   state.jobData.company   || '',
@@ -941,12 +981,16 @@ async function appendJobHistory(targets) {
     docType,
     date:      new Date().toISOString(),
     jobData:   { ...state.jobData },
-  };
+  });
 
   const { jobHistory = [] } = await chrome.storage.local.get('jobHistory');
-  jobHistory.unshift(entry);
-  if (jobHistory.length > 100) jobHistory.splice(100);
-  await chrome.storage.local.set({ jobHistory });
+  const compactedHistory = [entry, ...jobHistory.map(compactJobHistoryEntry)];
+  if (compactedHistory.length > 100) compactedHistory.splice(100);
+  try {
+    await chrome.storage.local.set({ jobHistory: compactedHistory });
+  } catch (err) {
+    console.warn('Could not save job history:', err?.message || err);
+  }
   await syncJobHistorySummary(entry);
 }
 
@@ -1223,17 +1267,21 @@ async function persistEditedHtml(tab) {
     const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
     if (!savedDraft) return;
 
-    await chrome.storage.local.set({
-      savedDraft: {
-        ...savedDraft,
-        editedHtml: {
-          ...(savedDraft.editedHtml || {}),
-          [tab]: entry,
-        },
-      }
-    });
+    const saved = await persistSavedDraftSnapshot({
+      ...savedDraft,
+      editedHtml: {
+        ...(savedDraft.editedHtml || {}),
+        [tab]: entry,
+      },
+    }, { toastOnQuota: false });
+    if (!saved) {
+      showToast(storageQuotaMessage('editedHtml'));
+    }
   } catch (err) {
     console.warn('Could not persist edited preview HTML:', err?.message || err);
+    if (isStorageQuotaError(err)) {
+      showToast(storageQuotaMessage('editedHtml'));
+    }
   }
 }
 
@@ -1252,12 +1300,10 @@ async function clearEditedHtml(tab) {
 
     const editedHtml = { ...savedDraft.editedHtml };
     delete editedHtml[tab];
-    await chrome.storage.local.set({
-      savedDraft: {
-        ...savedDraft,
-        editedHtml,
-      }
-    });
+    await persistSavedDraftSnapshot({
+      ...savedDraft,
+      editedHtml,
+    }, { toastOnQuota: false });
   } catch (err) {
     console.warn('Could not clear edited preview HTML:', err?.message || err);
   } finally {
@@ -1311,14 +1357,12 @@ async function persistAppearanceSettingsToSavedDraft() {
     const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
     if (!savedDraft) return;
 
-    await chrome.storage.local.set({
-      savedDraft: {
-        ...savedDraft,
-        templateId: state.templateId,
-        accentColor: state.accentColor,
-        spacingMode: state.spacingMode,
-      }
-    });
+    await persistSavedDraftSnapshot({
+      ...savedDraft,
+      templateId: state.templateId,
+      accentColor: state.accentColor,
+      spacingMode: state.spacingMode,
+    }, { toastOnQuota: false });
   } catch (err) {
     console.warn('Could not persist appearance settings:', err?.message || err);
   }
@@ -1598,7 +1642,7 @@ async function clearDraft(tab) {
       savedDraft.drafts[tab] = null;
       if (savedDraft.originalDrafts) savedDraft.originalDrafts[tab] = null;
       savedDraft.generationReceipt = null;
-      await chrome.storage.local.set({ savedDraft });
+      await persistSavedDraftSnapshot(savedDraft, { toastOnQuota: false });
     }
   }
 
@@ -1767,12 +1811,10 @@ async function clearSavedGenerationReceipt() {
   try {
     const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
     if (!savedDraft?.generationReceipt) return;
-    await chrome.storage.local.set({
-      savedDraft: {
-        ...savedDraft,
-        generationReceipt: null,
-      }
-    });
+    await persistSavedDraftSnapshot({
+      ...savedDraft,
+      generationReceipt: null,
+    }, { toastOnQuota: false });
   } catch (err) {
     console.warn('Could not clear previous generation receipt:', err?.message || err);
   }
