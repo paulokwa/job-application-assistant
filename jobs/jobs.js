@@ -11,6 +11,8 @@ const STATUSES = [
 
 let suppressNextSavedJobsRefresh = false;
 let currentSort = 'updated_desc';
+const analyzingJobs = new Set();
+const fitErrors = new Map();
 
 function applyTheme(theme) {
   if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
@@ -57,6 +59,74 @@ function timeValue(iso) {
 
 function statusLabel(value) {
   return STATUSES.find(([status]) => status === value)?.[1] || 'Saved';
+}
+
+function fitLabelText(value) {
+  const labels = {
+    strong_match: 'Strong match',
+    good_match: 'Good match',
+    maybe: 'Maybe',
+    weak_match: 'Weak match',
+    not_recommended: 'Not recommended',
+  };
+  return labels[value] || 'Fit analysis';
+}
+
+function fitScoreClass(score) {
+  const number = Number(score) || 0;
+  if (number >= 70) return 'fit-score fit-score--good';
+  if (number >= 50) return 'fit-score fit-score--maybe';
+  return 'fit-score fit-score--weak';
+}
+
+function listItems(items) {
+  const values = Array.isArray(items) ? items.filter(Boolean) : [];
+  if (!values.length) return '<li>No items returned.</li>';
+  return values.map(item => `<li>${escHtml(item)}</li>`).join('');
+}
+
+function fitAnalysisHtml(job) {
+  const error = fitErrors.get(job.id);
+  const analysis = job.fitAnalysis;
+  const errorHtml = error
+    ? `<div class="fit-message fit-message--error" role="alert">${escHtml(error)}</div>`
+    : '';
+
+  if (!analysis) return errorHtml;
+
+  const score = Number.isFinite(Number(analysis.score)) ? Math.round(Number(analysis.score)) : 0;
+  const analyzedAt = formatDateTime(analysis.analyzedAt);
+
+  return `
+    ${errorHtml}
+    <div class="fit-summary">
+      <div class="${fitScoreClass(score)}" aria-label="Fit score ${score} out of 100">${score}</div>
+      <div class="fit-summary-main">
+        <div class="fit-summary-heading">
+          <span class="fit-label">${escHtml(fitLabelText(analysis.label))}</span>
+          ${analyzedAt ? `<span class="fit-time">Analyzed ${escHtml(analyzedAt)}</span>` : ''}
+        </div>
+        <p class="fit-recommendation">${escHtml(analysis.recommendation || 'No recommendation returned.')}</p>
+      </div>
+    </div>
+    <details class="fit-details">
+      <summary>Fit details</summary>
+      <div class="fit-detail-grid">
+        <section>
+          <h3>Strong matches</h3>
+          <ul>${listItems(analysis.strongMatches)}</ul>
+        </section>
+        <section>
+          <h3>Possible gaps</h3>
+          <ul>${listItems(analysis.possibleGaps)}</ul>
+        </section>
+        <section class="fit-angle">
+          <h3>Suggested angle</h3>
+          <p>${escHtml(analysis.suggestedAngle || 'No suggested angle returned.')}</p>
+        </section>
+      </div>
+    </details>
+  `;
 }
 
 function sortText(value) {
@@ -123,6 +193,7 @@ function render(jobs) {
     const savedAt = formatDateTime(job.createdAt);
     const updatedAt = formatDateTime(job.updatedAt);
     const showUpdatedAt = updatedAt && updatedAt !== savedAt;
+    const isAnalyzing = analyzingJobs.has(job.id);
     const openButton = job.sourceUrl
       ? `<button class="action-btn" data-action="open" data-url="${escAttr(job.sourceUrl)}" type="button">Open URL</button>`
       : '';
@@ -147,6 +218,8 @@ function render(jobs) {
         ${showUpdatedAt ? `<span>Updated ${escHtml(updatedAt)}</span>` : ''}
       </div>
 
+      ${fitAnalysisHtml(job)}
+
       <div class="job-controls">
         <label>
           <span>Status</span>
@@ -161,6 +234,9 @@ function render(jobs) {
       </div>
 
       <div class="job-actions">
+        <button class="action-btn" data-action="analyze" type="button" ${isAnalyzing ? 'disabled' : ''}>
+          ${isAnalyzing ? 'Analyzing...' : job.fitAnalysis ? 'Re-analyze' : 'Analyze Fit'}
+        </button>
         <button class="action-btn action-btn--primary" data-action="load" type="button">Load into generator</button>
         ${openButton}
         <button class="action-btn action-btn--danger" data-action="delete" type="button">Delete</button>
@@ -244,6 +320,13 @@ async function loadIntoGenerator(id) {
   window.parent?.postMessage({ type: 'JPDA_SAVED_JOB_LOADED', id: job.id }, window.location.origin);
 }
 
+async function requestFitAnalysis(id) {
+  analyzingJobs.add(id);
+  fitErrors.delete(id);
+  await refreshJobs();
+  window.parent?.postMessage({ type: 'JPDA_ANALYZE_FIT_REQUESTED', id }, window.location.origin);
+}
+
 async function init() {
   const { theme } = await chrome.storage.local.get(['theme']);
   applyTheme(theme || 'system');
@@ -270,6 +353,10 @@ async function init() {
       window.open(btn.dataset.url, '_blank', 'noopener');
     }
 
+    if (btn.dataset.action === 'analyze') {
+      await requestFitAnalysis(id);
+    }
+
     if (btn.dataset.action === 'load') {
       await loadIntoGenerator(id);
     }
@@ -281,6 +368,8 @@ async function init() {
         'Delete'
       );
       if (ok) {
+        analyzingJobs.delete(id);
+        fitErrors.delete(id);
         await deleteSavedJob(id);
         await refreshJobs();
       }
@@ -315,6 +404,28 @@ async function init() {
         return;
       }
       refreshJobs();
+    }
+  });
+
+  window.addEventListener('message', async e => {
+    if (e.origin !== window.location.origin) return;
+    const { type, id, message } = e.data || {};
+    if (!id) return;
+
+    if (type === 'JPDA_ANALYZE_FIT_STARTED') {
+      analyzingJobs.add(id);
+      fitErrors.delete(id);
+      await refreshJobs();
+    }
+    if (type === 'JPDA_ANALYZE_FIT_DONE') {
+      analyzingJobs.delete(id);
+      fitErrors.delete(id);
+      await refreshJobs();
+    }
+    if (type === 'JPDA_ANALYZE_FIT_ERROR') {
+      analyzingJobs.delete(id);
+      fitErrors.set(id, message || 'Fit analysis failed. Please try again.');
+      await refreshJobs();
     }
   });
 }

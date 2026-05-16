@@ -3,6 +3,7 @@
 import { extractJobFields } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
 import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
+import { analyzeFit } from '../modules/fitAnalysis.js';
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { mapError } from '../modules/errorMapper.js';
 
@@ -60,6 +61,7 @@ const state = {
 };
 
 let currentAbortController = null;
+let currentFitAnalysisController = null;
 let generationStatusTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
@@ -407,10 +409,15 @@ function bindEvents() {
   dom.btnCloseJobs.addEventListener('click', () => dom.jobsView.classList.remove('visible'));
   window.addEventListener('message', e => {
     if (e.origin !== window.location.origin) return;
-    if (e.data?.type !== 'JPDA_SAVED_JOB_LOADED') return;
-    dom.jobsView.classList.remove('visible');
-    loadSession();
-    showToast('Loaded saved job. Generate when ready.');
+    if (e.data?.type === 'JPDA_SAVED_JOB_LOADED') {
+      dom.jobsView.classList.remove('visible');
+      loadSession();
+      showToast('Loaded saved job. Generate when ready.');
+      return;
+    }
+    if (e.data?.type === 'JPDA_ANALYZE_FIT_REQUESTED') {
+      handleFitAnalysisRequest(e.data.id);
+    }
   });
 
   // Support
@@ -881,6 +888,69 @@ async function saveCurrentJob() {
 }
 
 // ── Job History ───────────────────────────────────────────────────────────
+
+function postFitAnalysisResult(payload) {
+  const frame = document.getElementById('jobs-frame');
+  frame?.contentWindow?.postMessage(payload, window.location.origin);
+}
+
+function fitAnalysisErrorMessage(error) {
+  const message = error?.message || String(error || '');
+  if (message === 'fit_no_job_description') {
+    return 'Add a job description before analyzing fit.';
+  }
+  if (message === 'fit_missing_profile') {
+    return 'Add profile details or upload a source resume before analyzing fit.';
+  }
+  return mapError(error).message;
+}
+
+async function handleFitAnalysisRequest(id) {
+  if (!id) return;
+
+  postFitAnalysisResult({ type: 'JPDA_ANALYZE_FIT_STARTED', id });
+  currentFitAnalysisController?.abort();
+  const controller = new AbortController();
+  currentFitAnalysisController = controller;
+
+  try {
+    const data = await chrome.storage.local.get([SAVED_JOBS_KEY, 'sourceResumeText']);
+    const savedJobs = Array.isArray(data[SAVED_JOBS_KEY]) ? data[SAVED_JOBS_KEY] : [];
+    const index = savedJobs.findIndex(job => job.id === id);
+    if (index === -1) throw new Error('Saved job not found.');
+
+    const [profile, settings] = await Promise.all([
+      loadProfile(),
+      loadSettings(),
+    ]);
+    const sourceResumeText = data.sourceResumeText || '';
+    const fitAnalysis = await analyzeFit(
+      savedJobs[index],
+      profile,
+      settings,
+      sourceResumeText,
+      controller.signal
+    );
+
+    const updatedJobs = [...savedJobs];
+    updatedJobs[index] = {
+      ...updatedJobs[index],
+      fitAnalysis,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await chrome.storage.local.set({ [SAVED_JOBS_KEY]: updatedJobs });
+    postFitAnalysisResult({ type: 'JPDA_ANALYZE_FIT_DONE', id, fitAnalysis });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      postFitAnalysisResult({ type: 'JPDA_ANALYZE_FIT_ERROR', id, message: 'Fit analysis was stopped.' });
+    } else {
+      postFitAnalysisResult({ type: 'JPDA_ANALYZE_FIT_ERROR', id, message: fitAnalysisErrorMessage(error) });
+    }
+  } finally {
+    if (currentFitAnalysisController === controller) currentFitAnalysisController = null;
+  }
+}
 
 async function appendJobHistory(targets) {
   const docType = targets.includes('merged') || (targets.includes('resume') && targets.includes('cover-letter'))
