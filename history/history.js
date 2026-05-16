@@ -1,5 +1,7 @@
 // history/history.js — Job History page controller
 // Entries are written by dashboard.js when the user saves a document as PDF.
+import { openSafeHttpUrl } from '../modules/url.js';
+
 const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
@@ -271,7 +273,7 @@ async function init() {
     if (!btn) return;
 
     if (btn.dataset.action === 'open') {
-      window.open(btn.dataset.url, '_blank', 'noopener');
+      openSafeHttpUrl(btn.dataset.url);
     }
 
     if (btn.dataset.action === 'regenerate') {

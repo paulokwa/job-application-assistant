@@ -111,6 +111,6 @@ lib/
 **API keys are never stored in the extension source code.**
 
 - Keys are entered by the user in **Settings → AI Provider**
-- They are stored locally in **`chrome.storage.sync`** — encrypted by Chrome, tied to your profile, never sent anywhere except directly to the AI provider API you chose
+- They are stored locally in **`chrome.storage.local`** and are never sent anywhere except directly to the AI provider API you chose
 - The source code contains **no hardcoded credentials** — you can safely publish or share this repo without leaking any keys
 - If you fork this project and add a real key somewhere by mistake, the `.gitignore` strips common secret files (`.env`, `secrets.json`, etc.), but always double-check before committing

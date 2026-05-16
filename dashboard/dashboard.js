@@ -4,6 +4,7 @@ import { extractJobFields } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
 import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
 import { analyzeFit } from '../modules/fitAnalysis.js';
+import { loadProviderSettings, saveProviderSettings } from '../modules/providerSettings.js';
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { mapError } from '../modules/errorMapper.js';
 
@@ -652,29 +653,6 @@ function openSettingsSection(section = 'provider') {
   setTimeout(activateSection, 100);
 }
 
-function migrateProviderSettings(raw) {
-  if (!raw) return { activeProvider: '', configs: {}, simulateFailure: 'none' };
-  if (raw.configs !== undefined) {
-    return {
-      ...raw,
-      configs: raw.configs || {},
-      simulateFailure: raw.simulateFailure || 'none',
-    };
-  }
-
-  const provider = raw.provider || '';
-  const configs = {};
-  if (provider) {
-    configs[provider] = {
-      apiKey: raw.apiKey || '',
-      modelName: raw.modelName || '',
-      endpoint: raw.endpoint || '',
-    };
-  }
-
-  return { activeProvider: provider, configs, simulateFailure: raw.simulateFailure || 'none' };
-}
-
 function hasExistingAiProviderSetup(settings) {
   if (!settings?.provider || settings.provider === 'mock') return false;
   if (settings.provider === 'ollama') return true;
@@ -682,19 +660,16 @@ function hasExistingAiProviderSetup(settings) {
 }
 
 async function activateDemoMode() {
-  const data = await chrome.storage.sync.get(['providerSettings']);
-  const settings = migrateProviderSettings(data.providerSettings);
+  const settings = await loadProviderSettings();
   const configs = {
     ...(settings.configs || {}),
     mock: { apiKey: '', modelName: '', endpoint: '' },
   };
 
-  await chrome.storage.sync.set({
-    providerSettings: {
-      ...settings,
-      activeProvider: 'mock',
-      configs,
-    },
+  await saveProviderSettings({
+    ...settings,
+    activeProvider: 'mock',
+    configs,
   });
 
   state.settings = await loadSettings();
@@ -1632,7 +1607,17 @@ async function clearDraft(tab) {
 }
 
 async function clearSession() {
-  await chrome.storage.local.remove(['savedDraft']);
+  await Promise.all([
+    chrome.storage.local.remove(['savedDraft']),
+    chrome.storage.session.remove([
+      'extractedData',
+      'sourceUrl',
+      'sourceTitle',
+      'pendingMode',
+      'regenerateRequested',
+      'loadedSavedJob',
+    ]),
+  ]);
 
   state.drafts      = { resume: null, 'cover-letter': null };
   state.jobData     = { jobTitle: '', company: '', sourceUrl: '', description: '' };
@@ -2028,20 +2013,16 @@ function showToast(msg) {
 }
 
 async function loadSettings() {
-  const data = await chrome.storage.sync.get(['providerSettings']);
-  const raw = data.providerSettings || null;
-  if (!raw) return null;
-  // Old flat format — return as-is
-  if (!raw.configs) return raw;
-  // New per-provider format — flatten active provider config for callAI
-  const provider = raw.activeProvider || '';
-  const config = (raw.configs || {})[provider] || {};
+  const stored = await loadProviderSettings();
+  const provider = stored.activeProvider || '';
+  if (!provider) return null;
+  const config = (stored.configs || {})[provider] || {};
   return {
     provider,
     apiKey:          config.apiKey    || '',
     modelName:       config.modelName || '',
     endpoint:        config.endpoint  || '',
-    simulateFailure: raw.simulateFailure || 'none',
+    simulateFailure: stored.simulateFailure || 'none',
   };
 }
 
