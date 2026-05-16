@@ -812,9 +812,7 @@ function getCurrentSavedJobDraft() {
   const sourceUrl = dom.fieldUrl.value.trim();
   const cleanDescription = dom.fieldDesc.value.trim();
   const sourceType = state.currentJobMeta?.sourceType || 'manual_entry';
-  const rawContent = sourceType === 'extension_scan'
-    ? String(state.currentJobMeta?.rawContent || cleanDescription)
-    : String(state.currentJobMeta?.rawContent || '');
+  const rawContent = String(state.currentJobMeta?.rawContent || cleanDescription);
 
   return {
     title,
