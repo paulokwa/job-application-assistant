@@ -1,12 +1,34 @@
 # Agent Instructions — Job Application Assistant
 
+## Session Startup Protocol
+
+Every AI agent/Codex/Claude session must read these files before planning or coding:
+
+1. `SESSION_HANDOVER.md` if present
+2. `RELEASE_V2_CHECKLIST.md`
+3. `ROADMAP.md`
+4. `README.md` as needed
+
+Before starting work, report:
+
+- Current branch
+- Latest `main` commit
+- Current release status
+- Next gated action
+- What is already completed and must not be repeated
+
+Release gate: do not start packaging or submitting v2.0 until the v1.0 Chrome Web Store review result is known and the user confirms they are ready to proceed.
+
 If you are an AI agent picking up work on this project, read these files before doing anything:
 
 ## Required reading
 
 | File | Purpose |
 |---|---|
-| `SESSION_HANDOVER.md` | Full log of everything built or changed in the most recent session — prevents duplicating work |
+| `SESSION_HANDOVER.md` | Current release gate, completed v2 candidate work, and do-not-repeat list |
+| `RELEASE_V2_CHECKLIST.md` | Required checklist for future v2.0 packaging after the v1.0 review gate clears |
+| `ROADMAP.md` | Future roadmap ideas and suggested branch order after v2.0 prep |
+| `README.md` | Repo overview, setup, and basic usage |
 | `TROUBLESHOOTING.md` | Resolved technical issues that could recur — check here before debugging familiar-sounding problems |
 | `PRODUCT.md` | Strategic context: who the users are, what the product does, design principles, anti-references |
 | `DESIGN.md` | Full design system: tokens, typography, colour strategy, component rules, north star |
