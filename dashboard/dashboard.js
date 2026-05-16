@@ -1939,7 +1939,27 @@ const TOUR_STEPS = [
   {
     target: '#profile-strip',
     title: 'Profile Select',
-    body: 'Choose which saved profile the AI should use for this application. Use My Profile to edit details or Manage Profiles to add and rename saved profiles.',
+    body: 'Choose which saved profile the AI should use for this application. Profiles let you maintain separate sets of personal details for different roles or CVs.',
+  },
+  {
+    target: '#btn-open-profiles',
+    title: 'Manage Profiles',
+    body: 'Add, rename, or delete saved profiles. Each profile stores your personal details so you can switch identities across different applications.',
+  },
+  {
+    target: '#btn-open-profile',
+    title: 'My Profile',
+    body: 'Edit the personal details the AI uses to write your resume and cover letter — name, contact info, work history, skills, and more.',
+  },
+  {
+    target: '#btn-open-full-page',
+    title: 'Full Page',
+    body: 'Open the workspace in a full browser tab for more screen space. The current job context carries over automatically so you can pick up right where you left off.',
+  },
+  {
+    target: '#btn-history',
+    title: 'History',
+    body: 'Browse previously generated jobs. Select any entry to reload the job details and regenerate tailored documents for that role.',
   },
 ];
 
