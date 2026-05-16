@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saved Jobs - Job Application Assistant</title>
+  <link rel="stylesheet" href="jobs.css" />
+</head>
+<body>
+
+  <div class="jobs-header">
+    <div>
+      <h1 class="page-title">Saved Jobs</h1>
+      <p class="page-subtitle">Saved jobs stay separate from generated history</p>
+    </div>
+    <div class="jobs-header-actions">
+      <label class="sort-control" for="sort-jobs">
+        <span>Sort</span>
+        <select id="sort-jobs" aria-label="Sort saved jobs">
+          <option value="updated_desc">Recently updated</option>
+          <option value="created_desc">Recently saved</option>
+          <option value="created_asc">Oldest saved</option>
+          <option value="status">Status</option>
+          <option value="company">Company</option>
+        </select>
+      </label>
+      <span class="limit-note">Limit 50</span>
+    </div>
+  </div>
+
+  <main class="jobs-main">
+    <div id="empty-state" class="empty-state hidden">
+      <div class="empty-icon" aria-hidden="true">+</div>
+      <p class="empty-title">No saved jobs yet</p>
+      <p class="empty-body">Scan or enter a job, then choose Save to Jobs.</p>
+    </div>
+
+    <div id="jobs-list" class="jobs-list hidden" aria-label="Saved jobs"></div>
+  </main>
+
+  <div id="confirm-overlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="confirm-modal">
+      <p class="confirm-modal-title" id="confirm-title"></p>
+      <p class="confirm-modal-body" id="confirm-body"></p>
+      <div class="confirm-modal-actions">
+        <button id="confirm-btn-cancel" class="btn-secondary" type="button">Cancel</button>
+        <button id="confirm-btn-ok" class="btn-danger" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="jobs.js"></script>
+</body>
+</html>
