@@ -2,6 +2,7 @@
 
 import { extractProfileFromResume, extractTextFromDocx, extractTextFromPdf, scorePdfExtraction, fileToArrayBuffer } from '../modules/extraction.js';
 import { loadProfile, saveProfile, loadProfiles, createProfile, renameProfile, deleteProfile, clearProfileData, switchProfile, updateProfileMeta } from '../modules/profile.js';
+import { loadProviderSettings, saveProviderSettings } from '../modules/providerSettings.js';
 import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
 
@@ -171,8 +172,11 @@ async function init() {
   });
 
   // Load saved data
-  const stored = await chrome.storage.sync.get(['providerSettings', 'docSettings']);
-  settings = migrateSettings(stored.providerSettings);
+  const [providerSettings, stored] = await Promise.all([
+    loadProviderSettings(),
+    chrome.storage.sync.get(['docSettings']),
+  ]);
+  settings = providerSettings;
   docSettings = stored.docSettings || { templateMode: 'smart' };
   profile = await loadProfile();
   if (hasExistingAiProviderSetup(settings)) {
@@ -284,22 +288,6 @@ function activateSettingsSection(section, { autoTour = true } = {}) {
   sectionEl.classList.add('active');
 
   if (autoTour) scheduleSettingsTourIfFirstVisit(section);
-}
-
-// Migrate old flat format { provider, apiKey, ... } to per-provider configs format
-function migrateSettings(raw) {
-  if (!raw) return { activeProvider: '', configs: {}, simulateFailure: 'none' };
-  if (raw.configs !== undefined) return raw; // already new format
-  const provider = raw.provider || '';
-  const configs = {};
-  if (provider) {
-    configs[provider] = {
-      apiKey:    raw.apiKey    || '',
-      modelName: raw.modelName || '',
-      endpoint:  raw.endpoint  || '',
-    };
-  }
-  return { activeProvider: provider, configs, simulateFailure: raw.simulateFailure || 'none' };
 }
 
 function hasExistingAiProviderSetup(s) {
@@ -459,7 +447,7 @@ async function saveProvider() {
   };
 
   settings = { ...settings, activeProvider: provider, configs, simulateFailure: $('sel-simulate-failure').value };
-  await chrome.storage.sync.set({ providerSettings: settings });
+  await saveProviderSettings(settings);
   await markAiProviderSetupAcknowledged();
 
   const btn = $('btn-save-provider');

@@ -28,5 +28,5 @@ A Chrome extension (Manifest V3, side panel) that helps job seekers generate tai
 - The design system is "The Quiet Advisor" — warm parchment light mode, cool-tinted dark mode, slate-teal accent (`oklch(46% 0.10 195)`)
 - Both `dashboard/` and `settings/` share the same token names but have separate CSS files
 - JS modules live in `modules/` — provider abstraction, drafting, profile, extraction, renderer
-- `chrome.storage.sync` → provider settings and doc settings; `chrome.storage.local` → profile, source resume text, saved draft; `chrome.storage.session` → captured job page data
+- `chrome.storage.local` → provider settings, profiles, source resume text, saved jobs, job history, saved draft; `chrome.storage.sync` → low-sensitivity document settings and compact history summaries; `chrome.storage.session` → captured job page data
 - Check `TROUBLESHOOTING.md` before debugging any API, CSS variable, or settings-page JS issue

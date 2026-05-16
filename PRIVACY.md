@@ -20,9 +20,11 @@ The extension does not require you to provide all of this information. The infor
 
 ## How information is stored
 
-The extension stores settings, profiles, drafts, job history, manual preview edits, and API keys locally using Chrome extension storage on your device.
+The extension stores API keys, profile content, source resume text, saved jobs, drafts, job history, and manual preview edits locally using Chrome extension storage on your device.
 
 API keys are stored locally in Chrome and are used only to connect to the AI provider that you select in the extension settings.
+
+Some low-sensitivity preferences and compact history summaries may use Chrome sync storage. These synced summaries are limited metadata, such as job title, company, source URL, document type, and date. They do not include full resumes, source resume text, full job descriptions, generated drafts, saved jobs, profile content, or API keys.
 
 Job Application Assistant does not operate its own external server for storing your profile, resume, cover letter, API key, job history, or draft content.
 

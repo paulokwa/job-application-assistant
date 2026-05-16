@@ -1,5 +1,7 @@
 // jobs/jobs.js - Saved jobs and application queue controller
 
+import { openSafeHttpUrl } from '../modules/url.js';
+
 const SAVED_JOBS_KEY = 'savedJobs';
 const STATUSES = [
   ['needs_review', 'Needs review'],
@@ -350,7 +352,7 @@ async function init() {
     if (!id) return;
 
     if (btn.dataset.action === 'open') {
-      window.open(btn.dataset.url, '_blank', 'noopener');
+      openSafeHttpUrl(btn.dataset.url);
     }
 
     if (btn.dataset.action === 'analyze') {

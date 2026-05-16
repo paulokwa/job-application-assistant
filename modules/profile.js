@@ -1,6 +1,6 @@
 // modules/profile.js
-// Multi-profile storage. Each profile lives under its own sync key (profile_{id})
-// so it gets an individual 8 KB budget. An index (profileIndex) tracks names and order.
+// Multi-profile storage. Private profile content is stored local-first.
+// Older sync keys are copied into local storage on read, but future writes stay local.
 
 import { normalizeResumeContent } from './schema.js';
 
@@ -14,22 +14,52 @@ function makeId()       { return 'p' + Date.now(); }
 // ── Migration ─────────────────────────────────────────────────────────────
 
 async function migrateIfNeeded() {
-  const data = await chrome.storage.sync.get([INDEX_KEY, LEGACY_KEY]);
-  if (data[INDEX_KEY]) return; // already migrated
+  const localData = await chrome.storage.local.get([INDEX_KEY, ACTIVE_KEY, LEGACY_KEY]);
+  if (localData[INDEX_KEY]) return; // already migrated to local
+
+  const syncData = await chrome.storage.sync.get([INDEX_KEY, ACTIVE_KEY, LEGACY_KEY]);
+  const syncProfiles = Array.isArray(syncData[INDEX_KEY]) ? syncData[INDEX_KEY] : null;
+  if (syncProfiles?.length) {
+    const profileKeys = syncProfiles.map(p => profileKey(p.id));
+    const profileData = await chrome.storage.sync.get(profileKeys);
+    const payload = {
+      [INDEX_KEY]: syncProfiles,
+      [ACTIVE_KEY]: syncData[ACTIVE_KEY] || syncProfiles[0]?.id || null,
+    };
+    for (const key of profileKeys) {
+      if (profileData[key] !== undefined) payload[key] = profileData[key];
+    }
+    await chrome.storage.local.set(payload);
+    return;
+  }
 
   const id = makeId();
-  await chrome.storage.sync.set({
+  await chrome.storage.local.set({
     [INDEX_KEY]:  [{ id, name: 'General' }],
     [ACTIVE_KEY]: id,
-    [profileKey(id)]: data[LEGACY_KEY] || {},
+    [profileKey(id)]: localData[LEGACY_KEY] || syncData[LEGACY_KEY] || {},
   });
+}
+
+async function loadStoredProfile(id) {
+  const key = profileKey(id);
+  const localData = await chrome.storage.local.get(key);
+  if (localData[key] !== undefined) return localData[key];
+
+  const syncData = await chrome.storage.sync.get(key);
+  if (syncData[key] !== undefined) {
+    await chrome.storage.local.set({ [key]: syncData[key] });
+    return syncData[key];
+  }
+
+  return {};
 }
 
 // ── Core reads ────────────────────────────────────────────────────────────
 
 export async function loadProfiles() {
   await migrateIfNeeded();
-  const data = await chrome.storage.sync.get([INDEX_KEY, ACTIVE_KEY]);
+  const data = await chrome.storage.local.get([INDEX_KEY, ACTIVE_KEY]);
   const profiles = data[INDEX_KEY] || [];
   const activeId = data[ACTIVE_KEY] || profiles[0]?.id || null;
   return { profiles, activeId };
@@ -39,8 +69,7 @@ export async function loadProfile() {
   const { profiles, activeId } = await loadProfiles();
   const id = activeId || profiles[0]?.id;
   if (!id) return normalizeResumeContent({});
-  const data = await chrome.storage.sync.get(profileKey(id));
-  return normalizeResumeContent(data[profileKey(id)] || {});
+  return normalizeResumeContent(await loadStoredProfile(id));
 }
 
 // ── Core writes ───────────────────────────────────────────────────────────
@@ -48,13 +77,12 @@ export async function loadProfile() {
 export async function saveProfile(profile) {
   const { activeId } = await loadProfiles();
   if (!activeId) return;
-  await chrome.storage.sync.set({ [profileKey(activeId)]: profile });
+  await chrome.storage.local.set({ [profileKey(activeId)]: profile });
 }
 
 export async function switchProfile(id) {
-  await chrome.storage.sync.set({ [ACTIVE_KEY]: id });
-  const data = await chrome.storage.sync.get(profileKey(id));
-  return normalizeResumeContent(data[profileKey(id)] || {});
+  await chrome.storage.local.set({ [ACTIVE_KEY]: id });
+  return normalizeResumeContent(await loadStoredProfile(id));
 }
 
 // ── Profile management ────────────────────────────────────────────────────
@@ -62,7 +90,7 @@ export async function switchProfile(id) {
 export async function createProfile(name) {
   const { profiles, activeId } = await loadProfiles();
   const id = makeId();
-  await chrome.storage.sync.set({
+  await chrome.storage.local.set({
     [INDEX_KEY]:      [...profiles, { id, name: name || 'New Profile' }],
     [profileKey(id)]: {},
   });
@@ -72,13 +100,13 @@ export async function createProfile(name) {
 export async function renameProfile(id, name) {
   const { profiles, activeId } = await loadProfiles();
   const updated = profiles.map(p => p.id === id ? { ...p, name } : p);
-  await chrome.storage.sync.set({ [INDEX_KEY]: updated });
+  await chrome.storage.local.set({ [INDEX_KEY]: updated });
 }
 
 export async function updateProfileMeta(id, meta) {
   const { profiles, activeId } = await loadProfiles();
   const updated = profiles.map(p => p.id === id ? { ...p, ...meta } : p);
-  await chrome.storage.sync.set({ [INDEX_KEY]: updated });
+  await chrome.storage.local.set({ [INDEX_KEY]: updated });
 }
 
 export async function deleteProfile(id) {
@@ -86,8 +114,8 @@ export async function deleteProfile(id) {
   if (profiles.length <= 1) return activeId;
   const remaining  = profiles.filter(p => p.id !== id);
   const newActive  = activeId === id ? remaining[0].id : activeId;
-  await chrome.storage.sync.remove(profileKey(id));
-  await chrome.storage.sync.set({ [INDEX_KEY]: remaining, [ACTIVE_KEY]: newActive });
+  await chrome.storage.local.remove(profileKey(id));
+  await chrome.storage.local.set({ [INDEX_KEY]: remaining, [ACTIVE_KEY]: newActive });
   return newActive;
 }
 
@@ -102,7 +130,7 @@ export async function clearProfileData(id) {
     return { ...rest, isCleared: true };
   });
 
-  await chrome.storage.sync.set({
+  await chrome.storage.local.set({
     [INDEX_KEY]: updated,
     [profileKey(targetId)]: normalizeResumeContent({}),
   });
