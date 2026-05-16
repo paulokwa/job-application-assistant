@@ -1062,17 +1062,21 @@ async function handleFitAnalysisRequest(id) {
     const index = savedJobs.findIndex(job => job.id === id);
     if (index === -1) throw new Error('Saved job not found.');
 
-    const [profile, settings] = await Promise.all([
+    const [profile, settings, { profiles, activeId }] = await Promise.all([
       loadProfile(),
       loadSettings(),
+      loadProfiles(),
     ]);
+    const activeProfileMeta = profiles.find(p => p.id === activeId) || {};
+    const inferenceMode = activeProfileMeta.fitInferenceMode || 'transferable';
     const sourceResumeText = data.sourceResumeText || '';
     const fitAnalysis = await analyzeFit(
       savedJobs[index],
       profile,
       settings,
       sourceResumeText,
-      controller.signal
+      controller.signal,
+      inferenceMode
     );
 
     const updatedJobs = [...savedJobs];

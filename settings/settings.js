@@ -1608,6 +1608,7 @@ function renderProfilesList(profiles, activeId) {
     row.className = 'profile-row' + (isActive ? ' profile-row--active' : '');
     row.dataset.id = p.id;
 
+    const mode = p.fitInferenceMode || 'transferable';
     row.innerHTML = `
       <div class="profile-row-left">
         <div class="profile-row-name-wrap">
@@ -1617,6 +1618,9 @@ function renderProfilesList(profiles, activeId) {
         ${isActive ? '<span class="profile-row-badge">Active</span>' : ''}
       </div>
       <div class="profile-row-actions">
+        <span class="profile-mode-toggle" title="Fit Analysis mode: controls how the AI scores job matches for this profile">
+          <button class="profile-mode-btn${mode === 'transferable' ? ' profile-mode-btn--active' : ''}" data-action="fit-inference-mode" data-id="${p.id}" data-mode="transferable" type="button" aria-pressed="${mode === 'transferable'}">Transferable</button><button class="profile-mode-btn${mode === 'exact' ? ' profile-mode-btn--active' : ''}" data-action="fit-inference-mode" data-id="${p.id}" data-mode="exact" type="button" aria-pressed="${mode === 'exact'}">Exact</button>
+        </span>
         ${!isActive ? `<button class="profile-row-btn" data-action="switch" data-id="${p.id}" type="button">Switch</button>` : ''}
         <button class="profile-row-btn" data-action="rename" data-id="${p.id}" type="button">Rename</button>
         <button class="profile-row-btn profile-row-btn--danger" data-action="delete" data-id="${p.id}" type="button">Delete</button>
@@ -1669,6 +1673,13 @@ async function handleProfileRowAction(e) {
       if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
       if (e.key === 'Escape') { input.value = current; input.blur(); }
     });
+  }
+
+  if (action === 'fit-inference-mode') {
+    const newMode = btn.dataset.mode;
+    await updateProfileMeta(id, { fitInferenceMode: newMode });
+    await populateProfilesSection();
+    return;
   }
 
   if (action === 'delete') {

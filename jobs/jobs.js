@@ -103,7 +103,9 @@ function fitAnalysisHtml(job) {
   return `
     ${errorHtml}
     <div class="fit-summary">
-      <div class="${fitScoreClass(score)}" aria-label="Fit score ${score} out of 100">${score}</div>
+      <div class="${fitScoreClass(score)}" aria-label="Fit score ${score} out of 100">
+        <span class="fit-score-number">${score}</span><span class="fit-score-denom">/100</span>
+      </div>
       <div class="fit-summary-main">
         <div class="fit-summary-heading">
           <span class="fit-label">${escHtml(fitLabelText(analysis.label))}</span>
