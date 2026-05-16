@@ -99,7 +99,7 @@ export async function clearProfileData(id) {
   const updated = profiles.map(p => {
     if (p.id !== targetId) return p;
     const { sourceResumeName, ...rest } = p;
-    return rest;
+    return { ...rest, isCleared: true };
   });
 
   await chrome.storage.sync.set({
