@@ -16,6 +16,8 @@ export function extractJobFields(rawText, url) {
 
   let jobTitle = '';
   let company = '';
+  let jobTitleSource = '';
+  let companySource = '';
 
   const titlePatterns = [
     /^job\s*title[:\-–]?\s*(.+)$/i,
@@ -33,13 +35,13 @@ export function extractJobFields(rawText, url) {
     if (!jobTitle) {
       for (const pat of titlePatterns) {
         const m = line.match(pat);
-        if (m) { jobTitle = m[1].trim(); break; }
+        if (m) { jobTitle = m[1].trim(); jobTitleSource = 'pattern'; break; }
       }
     }
     if (!company) {
       for (const pat of companyPatterns) {
         const m = line.match(pat);
-        if (m) { company = m[1].trim(); break; }
+        if (m) { company = m[1].trim(); companySource = 'pattern'; break; }
       }
     }
     if (jobTitle && company) break;
@@ -48,7 +50,10 @@ export function extractJobFields(rawText, url) {
   // Fallback: first meaningful line as job title
   if (!jobTitle) {
     const firstMeaningfulLine = lines.find(l => l.length > 8 && l.length < 120 && !/^(home|menu|skip|search|login|sign)/i.test(l));
-    if (firstMeaningfulLine) jobTitle = firstMeaningfulLine;
+    if (firstMeaningfulLine) {
+      jobTitle = firstMeaningfulLine;
+      jobTitleSource = 'fallback';
+    }
   }
 
   return {
@@ -56,6 +61,9 @@ export function extractJobFields(rawText, url) {
     company:  company  || '',
     sourceUrl: url || '',
     description: rawText,
+    jobTitleSource,
+    companySource,
+    needsReview: !jobTitle || !company || jobTitleSource === 'fallback' || !companySource,
   };
 }
 

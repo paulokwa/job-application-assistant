@@ -2,6 +2,7 @@
 
 import { extractJobFields } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
+import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
 import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
 import { analyzeFit } from '../modules/fitAnalysis.js';
 import { loadProviderSettings, saveProviderSettings } from '../modules/providerSettings.js';
@@ -67,11 +68,13 @@ const state = {
   currentJobMeta: {
     sourceType: 'manual_entry',
     rawContent: '',
+    aiJobInfoAttemptedFor: '',
   },
 };
 
 let currentAbortController = null;
 let currentFitAnalysisController = null;
+let currentJobInfoController = null;
 let generationStatusTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
@@ -85,6 +88,7 @@ const dom = {
   fieldCompany:       $('field-company'),
   fieldUrl:           $('field-url'),
   fieldDesc:          $('field-job-desc'),
+  jobInfoReview:      $('job-info-review'),
   
   btnGenResume:       $('btn-gen-resume'),
   btnGenCL:           $('btn-gen-cover-letter'),
@@ -164,6 +168,7 @@ const dom = {
   btnSaveJob:         $('btn-save-job'),
   btnTour:            $('btn-tour'),
   btnScan:            $('btn-scan-page'),
+  btnAiJobInfo:       $('btn-ai-job-info'),
   settingsFrame:      $('settings-frame'),
   btnEditResume:      $('btn-edit-resume'),
   btnEditCL:          $('btn-edit-cl'),
@@ -216,6 +221,120 @@ function loadSession() {
   chrome.storage.session.get(null).then(applySession);
 }
 
+function showJobInfoReviewNotice(message, tone = 'warning') {
+  if (!dom.jobInfoReview) return;
+  dom.jobInfoReview.textContent = message;
+  dom.jobInfoReview.dataset.tone = tone;
+  dom.jobInfoReview.classList.remove('hidden');
+}
+
+function hideJobInfoReviewNotice() {
+  if (!dom.jobInfoReview) return;
+  dom.jobInfoReview.classList.add('hidden');
+}
+
+function refreshJobInfoReviewNotice() {
+  if (dom.fieldTitle.value.trim() && dom.fieldCompany.value.trim()) {
+    hideJobInfoReviewNotice();
+  }
+}
+
+function maybeShowScannedJobInfoReview(fields, jobTitle, company) {
+  if (!fields?.needsReview && jobTitle && company) {
+    hideJobInfoReviewNotice();
+    return;
+  }
+  showJobInfoReviewNotice('Review Job Title and Employer before saving or analyzing. Page scans can miss these fields. Use AI suggest fields for a second pass.');
+}
+
+function jobInfoSuggestionBody(info) {
+  const title = info.jobTitle || '(no title found)';
+  const company = info.company || '(no employer found)';
+  return [
+    `Job Title: ${title}`,
+    `Employer: ${company}`,
+    '',
+    'Apply these suggestions to the Job Info fields? Review them before saving or analyzing.',
+  ].join('\n');
+}
+
+async function runAiJobInfoExtraction() {
+  const text = dom.fieldDesc.value.trim();
+  if (text.length < 50) {
+    showToast('Add a job description before using AI suggest fields.');
+    return;
+  }
+
+  if (state.currentJobMeta?.aiJobInfoAttemptedFor === text) {
+    const runAgain = await showConfirmDialog(
+      'Run AI fill again?',
+      'AI has already checked this job description. Run it again and review new suggestions?',
+      'Run again'
+    );
+    if (!runAgain) return;
+  }
+
+  currentJobInfoController?.abort();
+  const controller = new AbortController();
+  currentJobInfoController = controller;
+
+  const btn = dom.btnAiJobInfo;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  showJobInfoReviewNotice('AI is checking Job Title and Employer from the description...', 'info');
+
+  try {
+    const settings = await loadSettings();
+    if (!settings?.provider) {
+      showToast('Set up an AI provider or Demo Mode before using AI suggest fields.');
+      maybeShowScannedJobInfoReview({ needsReview: true }, dom.fieldTitle.value.trim(), dom.fieldCompany.value.trim());
+      return;
+    }
+
+    const info = await extractJobInfoWithAI(text, dom.fieldUrl.value.trim(), settings, controller.signal);
+    state.currentJobMeta = {
+      ...(state.currentJobMeta || {}),
+      aiJobInfoAttemptedFor: text,
+    };
+
+    if (!info.jobTitle && !info.company) {
+      showJobInfoReviewNotice('AI could not confidently find Job Title or Employer. Please review the fields manually.');
+      return;
+    }
+
+    const applySuggestions = await showConfirmDialog(
+      'Apply AI field suggestions?',
+      jobInfoSuggestionBody(info),
+      'Apply'
+    );
+    if (!applySuggestions) {
+      showJobInfoReviewNotice('AI suggestions were not applied. Review Job Title and Employer before saving or analyzing.');
+      return;
+    }
+
+    if (info.jobTitle) {
+      dom.fieldTitle.value = info.jobTitle;
+      state.jobData.jobTitle = info.jobTitle;
+    }
+    if (info.company) {
+      dom.fieldCompany.value = info.company;
+      state.jobData.company = info.company;
+    }
+
+    showJobInfoReviewNotice('AI filled Job Title and Employer. Review them before saving or analyzing.', 'info');
+  } catch (err) {
+    if (err?.name !== 'AbortError') {
+      console.warn('[JPDA] job info extraction failed:', err?.message || err);
+      maybeShowScannedJobInfoReview({ needsReview: true }, dom.fieldTitle.value.trim(), dom.fieldCompany.value.trim());
+    }
+  } finally {
+    if (currentJobInfoController === controller) currentJobInfoController = null;
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
 function applyExtractedData(raw, url, usedSelection) {
   if (raw.error) {
     showToast(`⚠️ ${raw.error}`);
@@ -256,7 +375,14 @@ function applyExtractedData(raw, url, usedSelection) {
   state.currentJobMeta = {
     sourceType,
     rawContent: raw.pageText || raw.selectedText || text,
+    aiJobInfoAttemptedFor: '',
   };
+
+  if (!raw.loadedFromSavedJob && sourceType !== 'manual_entry') {
+    maybeShowScannedJobInfoReview(fields, jobTitle, company);
+  } else {
+    refreshJobInfoReviewNotice();
+  }
 }
 
 async function applySession(session) {
@@ -465,6 +591,7 @@ function bindEvents() {
     if (dom.btnGenBoth.classList.contains('btn-stop')) { stopGeneration(); return; }
     if (await confirmOverwrite('both')) runGeneration('both');
   });
+  dom.btnAiJobInfo.addEventListener('click', runAiJobInfoExtraction);
 
   // Revision — button stays disabled until the user has typed something
   dom.fieldRevision.addEventListener('input', refreshRevisionButton);
@@ -509,10 +636,12 @@ function bindEvents() {
   dom.fieldTitle.addEventListener('input', () => {
     state.jobData.jobTitle = dom.fieldTitle.value;
     markManualEntryIfEmpty();
+    refreshJobInfoReviewNotice();
   });
   dom.fieldCompany.addEventListener('input', () => {
     state.jobData.company = dom.fieldCompany.value;
     markManualEntryIfEmpty();
+    refreshJobInfoReviewNotice();
   });
   dom.fieldUrl.addEventListener('input', () => {
     state.jobData.sourceUrl = dom.fieldUrl.value;
@@ -521,6 +650,7 @@ function bindEvents() {
   dom.fieldDesc.addEventListener('input', () => {
     state.jobData.description = dom.fieldDesc.value;
     markManualEntryIfEmpty();
+    state.currentJobMeta.aiJobInfoAttemptedFor = '';
   });
 }
 
@@ -1665,7 +1795,7 @@ async function clearSession() {
 
   state.drafts      = { resume: null, 'cover-letter': null };
   state.jobData     = { jobTitle: '', company: '', sourceUrl: '', description: '' };
-  state.currentJobMeta = { sourceType: 'manual_entry', rawContent: '' };
+  state.currentJobMeta = { sourceType: 'manual_entry', rawContent: '', aiJobInfoAttemptedFor: '' };
   state.lastRunMode = null;
   state.generationReceipt = null;
   state.editedHtml  = { resume: null, 'cover-letter': null };

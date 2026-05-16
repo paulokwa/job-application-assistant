@@ -100,6 +100,7 @@
           <div class="card-header-right">
             <span class="card-hint" id="source-indicator"></span>
             <button id="btn-scan-page" class="btn-scan" type="button" title="Scan the current browser tab for job details" aria-label="Scan current page for job details">Scan page</button>
+            <button id="btn-ai-job-info" class="btn-scan" type="button" title="Use AI to suggest Job Title and Employer from the description" aria-label="Use AI to suggest Job Title and Employer">AI suggest fields</button>
             <button id="btn-save-job" class="btn-scan" type="button" title="Save this job to your application queue" aria-label="Save this job">Save to Jobs</button>
             <button id="btn-new-draft" class="btn-scan btn-scan--clear" type="button" title="Clear all fields and start a new draft" aria-label="Clear and start new draft">Clear</button>
           </div>
@@ -113,6 +114,9 @@
 
           <label for="field-url">Posting URL</label>
           <input type="text" id="field-url" placeholder="Job posting URL" aria-label="Job posting URL" />
+        </div>
+        <div id="job-info-review" class="job-info-review hidden" role="status">
+          Review Job Title and Employer before saving or analyzing.
         </div>
       </section>
 
