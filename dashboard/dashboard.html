@@ -30,6 +30,7 @@
       </div>
       <button id="btn-open-profiles" class="header-link-btn" type="button">Manage Profiles</button>
       <button id="btn-open-profile" class="header-link-btn" type="button">My Profile</button>
+      <button id="btn-open-full-page" class="header-link-btn" type="button" title="Open this workspace in a full browser tab">Full page</button>
       <button id="btn-history" class="icon-btn" title="Job history" aria-label="View job history">History</button>
       <button id="btn-tour" class="icon-btn header-tour-btn" title="Feature tour" aria-label="Start feature tour">?</button>
       <button id="btn-theme" class="icon-btn" title="Switch to light mode" aria-label="Switch to light mode">🖥️</button>
@@ -113,50 +114,16 @@
         <textarea id="field-job-desc" rows="8" placeholder="Paste or edit the job description here…" aria-label="Job description"></textarea>
       </section>
 
-      <!-- Template Selection Card -->
-      <section class="card" id="card-template">
+      <!-- Generate Controls Card -->
+      <section class="card" id="card-generate">
         <div class="card-header">
-          <span class="card-title"><span class="step-badge" aria-hidden="true">3</span> Style</span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">3</span> Generate</span>
         </div>
-        <div class="template-grid" role="group" aria-label="Choose a resume template">
-          <button class="template-option active" data-template="classic" type="button" aria-label="Classic template">
-            <div class="template-thumb classic" aria-hidden="true"></div>
-            <span>Classic</span>
-          </button>
-          <button class="template-option" data-template="modern" type="button" aria-label="Modern template">
-            <div class="template-thumb modern" aria-hidden="true"></div>
-            <span>Modern</span>
-          </button>
-          <button class="template-option" data-template="sidebar" type="button" aria-label="Sidebar template">
-            <div class="template-thumb sidebar" aria-hidden="true"></div>
-            <span>Sidebar</span>
-          </button>
-          <button class="template-option" data-template="compact" type="button" aria-label="Compact template">
-            <div class="template-thumb compact" aria-hidden="true"></div>
-            <span>Compact</span>
-          </button>
-        </div>
-
-        <div class="customization-controls">
-          <div class="ctrl-section-label">Layout</div>
-          <div class="control-group">
-            <label for="color-preset-group">Accent</label>
-            <div class="color-presets" id="color-preset-group" role="group" aria-label="Choose document accent colour">
-              <button class="color-dot active" style="background: #2563eb" data-color="#2563eb" type="button" aria-label="Blue accent"></button>
-              <button class="color-dot" style="background: #059669" data-color="#059669" type="button" aria-label="Green accent"></button>
-              <button class="color-dot" style="background: #dc2626" data-color="#dc2626" type="button" aria-label="Red accent"></button>
-              <button class="color-dot" style="background: #7c3aed" data-color="#7c3aed" type="button" aria-label="Purple accent"></button>
-              <button class="color-dot" style="background: #0f172a" data-color="#0f172a" type="button" aria-label="Dark accent"></button>
-            </div>
+        <div class="draft-settings" id="draft-settings" aria-label="Draft settings">
+          <div class="draft-settings-header">
+            <span class="ctrl-section-label">Draft Settings</span>
+            <span class="settings-note">Affects the next generation</span>
           </div>
-          <div class="control-group layout-spacing-group">
-            <label for="select-spacing">Spacing</label>
-            <select id="select-spacing" aria-label="Document spacing">
-              <option value="standard">Standard</option>
-              <option value="compact">Compact</option>
-            </select>
-          </div>
-          <div class="ctrl-section-label">Writing</div>
           <div class="control-group">
             <label>Length</label>
             <div class="length-pills" role="group" aria-label="Cover letter length">
@@ -176,13 +143,6 @@
               <span id="tone-descriptor" class="tone-descriptor">Professional</span>
             </div>
           </div>
-        </div>
-      </section>
-
-      <!-- Generate Controls Card -->
-      <section class="card" id="card-generate">
-        <div class="card-header">
-          <span class="card-title"><span class="step-badge" aria-hidden="true">4</span> Generate</span>
         </div>
         <div class="generate-buttons">
           <button id="btn-gen-both" class="btn-primary btn-lg">Generate Resume + Cover Letter</button>
@@ -212,16 +172,66 @@
 
       <!-- Draft Preview Card -->
       <section class="card" id="card-drafts">
-        <div class="card-header">
+        <div class="card-header preview-card-header">
           <span class="card-title">Preview</span>
           <div class="tab-bar" role="tablist" aria-label="Document preview">
             <button class="tab-btn active" data-tab="resume" role="tab" aria-selected="true" aria-controls="tab-resume">Resume</button>
             <button class="tab-btn" data-tab="cover-letter" role="tab" aria-selected="false" aria-controls="tab-cover-letter">Cover Letter</button>
             <button class="tab-btn hidden" id="tab-btn-merged" data-tab="merged" role="tab" aria-selected="false" aria-controls="tab-merged">Merged</button>
           </div>
+          <details class="appearance-menu" id="appearance-controls">
+            <summary class="appearance-summary">Appearance</summary>
+            <div class="appearance-popover" aria-label="Document appearance controls">
+              <div class="appearance-heading">
+                <span class="appearance-title">Appearance</span>
+                <span class="settings-note">Can change after generation</span>
+              </div>
+              <div class="appearance-control appearance-template-control">
+                <span class="appearance-control-label">Template</span>
+                <div class="template-grid" role="group" aria-label="Choose a resume template">
+                  <button class="template-option active" data-template="classic" type="button" aria-label="Classic template">
+                    <div class="template-thumb classic" aria-hidden="true"></div>
+                    <span>Classic</span>
+                  </button>
+                  <button class="template-option" data-template="modern" type="button" aria-label="Modern template">
+                    <div class="template-thumb modern" aria-hidden="true"></div>
+                    <span>Modern</span>
+                  </button>
+                  <button class="template-option" data-template="sidebar" type="button" aria-label="Sidebar template">
+                    <div class="template-thumb sidebar" aria-hidden="true"></div>
+                    <span>Sidebar</span>
+                  </button>
+                  <button class="template-option" data-template="compact" type="button" aria-label="Compact template">
+                    <div class="template-thumb compact" aria-hidden="true"></div>
+                    <span>Compact</span>
+                  </button>
+                </div>
+              </div>
+              <div class="appearance-control">
+                <span class="appearance-control-label">Accent</span>
+                <div class="color-presets" id="color-preset-group" role="group" aria-label="Choose document accent colour">
+                  <button class="color-dot active" style="background: #2563eb" data-color="#2563eb" type="button" aria-label="Blue accent"></button>
+                  <button class="color-dot" style="background: #059669" data-color="#059669" type="button" aria-label="Green accent"></button>
+                  <button class="color-dot" style="background: #dc2626" data-color="#dc2626" type="button" aria-label="Red accent"></button>
+                  <button class="color-dot" style="background: #7c3aed" data-color="#7c3aed" type="button" aria-label="Purple accent"></button>
+                  <button class="color-dot" style="background: #0f172a" data-color="#0f172a" type="button" aria-label="Dark accent"></button>
+                </div>
+              </div>
+              <div class="appearance-control">
+                <label class="appearance-control-label" for="select-spacing">Spacing</label>
+                <select id="select-spacing" aria-label="Document spacing">
+                  <option value="standard">Standard</option>
+                  <option value="compact">Compact</option>
+                </select>
+              </div>
+            </div>
+          </details>
         </div>
         <div class="preview-review-nudge" role="note">
           AI draft — review facts, dates, titles, and claims before submitting.
+        </div>
+        <div id="manual-edit-notice" class="manual-edit-notice hidden" role="note">
+          Preview has manual edits. These are preserved for export, but AI refine and ATS scan still use the structured draft.
         </div>
 
         <div id="tab-resume" class="tab-panel" role="tabpanel" aria-label="Resume preview">

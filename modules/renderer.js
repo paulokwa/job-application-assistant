@@ -14,6 +14,15 @@ const templates = {
   compact
 };
 
+export function getSpacingCss(spacingMode = 'standard') {
+  return spacingMode === 'compact' ? `
+          .resume-container { font-size: 0.9em; }
+          .section { margin-bottom: 8pt; }
+          .item { margin-bottom: 6pt; }
+          .bullets li { margin-bottom: 1pt; }
+        ` : '';
+}
+
 function safeHexColor(value, fallback = '#2563eb') {
   const color = String(value || '').trim();
   return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color) ? color : fallback;
@@ -80,13 +89,6 @@ export function renderDocument(templateId, type, data, options = {}) {
 
         ${template.styles}
 
-        ${spacingMode === 'compact' ? `
-          .resume-container { font-size: 0.9em; }
-          .section { margin-bottom: 8pt; }
-          .item { margin-bottom: 6pt; }
-          .bullets li { margin-bottom: 1pt; }
-        ` : ''}
-
         .keep-together {
           page-break-inside: avoid;
           break-inside: avoid;
@@ -118,6 +120,7 @@ export function renderDocument(templateId, type, data, options = {}) {
           }
         }
       </style>
+      <style id="jpda-spacing-style">${getSpacingCss(spacingMode)}</style>
     </head>
     <body>
       <div class="page-preview">
@@ -192,13 +195,6 @@ export function renderMergedDocument(templateId, resumeData, clData, options = {
 
         ${template.styles}
 
-        ${spacingMode === 'compact' ? `
-          .resume-container { font-size: 0.9em; }
-          .section { margin-bottom: 8pt; }
-          .item { margin-bottom: 6pt; }
-          .bullets li { margin-bottom: 1pt; }
-        ` : ''}
-
         .keep-together {
           page-break-inside: avoid;
           break-inside: avoid;
@@ -236,6 +232,7 @@ export function renderMergedDocument(templateId, resumeData, clData, options = {
           }
         }
       </style>
+      <style id="jpda-spacing-style">${getSpacingCss(spacingMode)}</style>
     </head>
     <body>
       <div class="page-preview">
