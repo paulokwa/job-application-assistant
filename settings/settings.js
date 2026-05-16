@@ -1,7 +1,7 @@
 // settings/settings.js — Settings page controller (Redesigned for HTML-First System)
 
 import { extractProfileFromResume, extractTextFromDocx, extractTextFromPdf, scorePdfExtraction, fileToArrayBuffer } from '../modules/extraction.js';
-import { loadProfile, saveProfile, loadProfiles, createProfile, renameProfile, deleteProfile, switchProfile, updateProfileMeta } from '../modules/profile.js';
+import { loadProfile, saveProfile, loadProfiles, createProfile, renameProfile, deleteProfile, clearProfileData, switchProfile, updateProfileMeta } from '../modules/profile.js';
 import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
 
@@ -947,7 +947,7 @@ async function handleSourceResumeUpload(event) {
     });
 
     const { activeId } = await loadProfiles();
-    if (activeId) await updateProfileMeta(activeId, { sourceResumeName: file.name });
+    if (activeId) await updateProfileMeta(activeId, { sourceResumeName: file.name, isCleared: false });
 
     $('source-upload-text').textContent = `${file.name} uploaded ✓`;
     $('source-resume-active-label').textContent = `📄 Active Source: ${file.name}`;
@@ -1117,6 +1117,10 @@ function collectProfileFromForm() {
 async function saveProfileData() {
   profile = collectProfileFromForm();
   await saveProfile(profile);
+  const { activeId } = await loadProfiles();
+  if (activeId && hasProfileContent(profile)) {
+    await updateProfileMeta(activeId, { isCleared: false });
+  }
   setProfileDirty(false);
 
   const btn = $('btn-save-profile');
@@ -1561,7 +1565,25 @@ function settingsTourKeyHandler(e) {
 
 async function populateProfilesSection() {
   const { profiles, activeId } = await loadProfiles();
-  renderProfilesList(profiles, activeId);
+  const hideOnlyProfile = await shouldHideOnlyProfileShell(profiles);
+  const visibleProfiles = hideOnlyProfile ? [] : profiles;
+  renderProfilesList(visibleProfiles, activeId);
+  $('profiles-edit-active-note')?.classList.toggle('hidden', hideOnlyProfile);
+}
+
+async function shouldHideOnlyProfileShell(profiles) {
+  if (profiles.length !== 1 || !profiles[0]?.isCleared) return false;
+  const currentProfile = await loadProfile();
+  const localData = await chrome.storage.local.get(['sourceResumeText', 'sourceResumeName']);
+  return !hasProfileContent(currentProfile) && !localData.sourceResumeText && !localData.sourceResumeName;
+}
+
+function hasProfileContent(value) {
+  if (value == null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.some(hasProfileContent);
+  if (typeof value === 'object') return Object.values(value).some(hasProfileContent);
+  return Boolean(value);
 }
 
 function renderProfilesList(profiles, activeId) {
@@ -1585,7 +1607,7 @@ function renderProfilesList(profiles, activeId) {
       <div class="profile-row-actions">
         ${!isActive ? `<button class="profile-row-btn" data-action="switch" data-id="${p.id}" type="button">Switch</button>` : ''}
         <button class="profile-row-btn" data-action="rename" data-id="${p.id}" type="button">Rename</button>
-        ${profiles.length > 1 ? `<button class="profile-row-btn profile-row-btn--danger" data-action="delete" data-id="${p.id}" type="button">Delete</button>` : ''}
+        <button class="profile-row-btn profile-row-btn--danger" data-action="delete" data-id="${p.id}" type="button">Delete</button>
       </div>
     `;
     list.appendChild(row);
@@ -1640,6 +1662,23 @@ async function handleProfileRowAction(e) {
   if (action === 'delete') {
     const { profiles } = await loadProfiles();
     const p = profiles.find(p => p.id === id);
+    if (profiles.length <= 1) {
+      const ok = await showConfirmDialog(
+        'Clear profile?',
+        'This will remove the profile details and uploaded source resume. You can add a new profile anytime.',
+        'Clear Profile'
+      );
+      if (!ok) return;
+      await clearProfileData(id);
+      await chrome.storage.local.remove(['sourceResumeText', 'sourceResumeName']);
+      clearSourceResumeUI();
+      profile = await loadProfile();
+      populateProfile(profile);
+      await populateProfilesSection();
+      showToast('Profile cleared.');
+      return;
+    }
+
     const ok = await showConfirmDialog(
       'Delete profile?',
       `"${p?.name || 'This profile'}" and all its data will be permanently deleted.`,
@@ -1656,6 +1695,21 @@ async function handleProfileRowAction(e) {
 
 async function handleAddProfile() {
   const { profiles } = await loadProfiles();
+  if (await shouldHideOnlyProfileShell(profiles)) {
+    const id = profiles[0].id;
+    await renameProfile(id, 'Profile 1');
+    await updateProfileMeta(id, { isCleared: false });
+    await switchProfile(id);
+    profile = await loadProfile();
+    populateProfile(profile);
+    clearSourceResumeUI();
+    await populateProfilesSection();
+    const newBtn = $('profiles-list').querySelector(`[data-action="rename"][data-id="${id}"]`);
+    if (newBtn) newBtn.click();
+    document.querySelector('.nav-btn[data-section="profile"]').click();
+    return;
+  }
+
   const name = `Profile ${profiles.length + 1}`;
   const id   = await createProfile(name);
   await saveProfile(collectProfileFromForm());

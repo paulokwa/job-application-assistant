@@ -91,6 +91,25 @@ export async function deleteProfile(id) {
   return newActive;
 }
 
+export async function clearProfileData(id) {
+  const { profiles, activeId } = await loadProfiles();
+  const targetId = id || activeId || profiles[0]?.id;
+  if (!targetId) return null;
+
+  const updated = profiles.map(p => {
+    if (p.id !== targetId) return p;
+    const { sourceResumeName, ...rest } = p;
+    return { ...rest, isCleared: true };
+  });
+
+  await chrome.storage.sync.set({
+    [INDEX_KEY]: updated,
+    [profileKey(targetId)]: normalizeResumeContent({}),
+  });
+
+  return targetId;
+}
+
 // ── AI prompt helper ──────────────────────────────────────────────────────
 
 export function profileToPromptText(profile) {
