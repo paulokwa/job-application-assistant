@@ -1,7 +1,7 @@
 // settings/settings.js — Settings page controller (Redesigned for HTML-First System)
 
 import { extractProfileFromResume, extractTextFromDocx, extractTextFromPdf, scorePdfExtraction, fileToArrayBuffer } from '../modules/extraction.js';
-import { loadProfile, saveProfile, loadProfiles, createProfile, renameProfile, deleteProfile, switchProfile, updateProfileMeta } from '../modules/profile.js';
+import { loadProfile, saveProfile, loadProfiles, createProfile, renameProfile, deleteProfile, clearProfileData, switchProfile, updateProfileMeta } from '../modules/profile.js';
 import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
 
@@ -1585,7 +1585,7 @@ function renderProfilesList(profiles, activeId) {
       <div class="profile-row-actions">
         ${!isActive ? `<button class="profile-row-btn" data-action="switch" data-id="${p.id}" type="button">Switch</button>` : ''}
         <button class="profile-row-btn" data-action="rename" data-id="${p.id}" type="button">Rename</button>
-        ${profiles.length > 1 ? `<button class="profile-row-btn profile-row-btn--danger" data-action="delete" data-id="${p.id}" type="button">Delete</button>` : ''}
+        <button class="profile-row-btn profile-row-btn--danger" data-action="delete" data-id="${p.id}" type="button">Delete</button>
       </div>
     `;
     list.appendChild(row);
@@ -1640,6 +1640,23 @@ async function handleProfileRowAction(e) {
   if (action === 'delete') {
     const { profiles } = await loadProfiles();
     const p = profiles.find(p => p.id === id);
+    if (profiles.length <= 1) {
+      const ok = await showConfirmDialog(
+        'Clear last profile?',
+        `"${p?.name || 'This profile'}" is the only profile. This will clear its profile details and remove the uploaded source resume, but keep an empty profile so the app can still run.`,
+        'Clear Profile'
+      );
+      if (!ok) return;
+      await clearProfileData(id);
+      await chrome.storage.local.remove(['sourceResumeText', 'sourceResumeName']);
+      clearSourceResumeUI();
+      profile = await loadProfile();
+      populateProfile(profile);
+      await populateProfilesSection();
+      showToast('Profile cleared.');
+      return;
+    }
+
     const ok = await showConfirmDialog(
       'Delete profile?',
       `"${p?.name || 'This profile'}" and all its data will be permanently deleted.`,
