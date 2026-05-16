@@ -47,6 +47,7 @@ const state = {
   profile: null,
   sourceResumeText: '',
   lastRunMode: null,
+  generationReceipt: null,
   editMode: { resume: false, 'cover-letter': false },
   hasEdits: { resume: false, 'cover-letter': false },
   editedHtml: { resume: null, 'cover-letter': null },
@@ -658,10 +659,12 @@ async function runGeneration(mode) {
 
   currentAbortController = new AbortController();
   const { signal } = currentAbortController;
+  const generationStartedAt = Date.now();
 
   state.lastRunMode = mode;
   setGenerating(true);
   hideError();
+  await clearSavedGenerationReceipt();
 
   const toGenerate = mode === 'both' ? ['resume', 'cover-letter'] : [mode];
 
@@ -698,6 +701,8 @@ async function runGeneration(mode) {
     }
 
     switchTab(toGenerate[0]);
+    state.generationReceipt = createGenerationReceipt(mode, generationStartedAt, Date.now());
+    renderGenerationReceipt();
     showToast('✨ Drafts ready!');
 
     // Persist so draft survives the panel being closed and reopened
@@ -712,6 +717,7 @@ async function runGeneration(mode) {
         spacingMode:    state.spacingMode,
         tone:           state.tone,
         clLength:       state.clLength,
+        generationReceipt: state.generationReceipt,
         editedHtml:     getPersistableEditedHtml(),
       }
     });
@@ -1341,6 +1347,7 @@ function restoreSavedDraft(saved) {
   state.spacingMode = saved.spacingMode || 'standard';
   state.tone        = saved.tone        ?? 30;
   state.clLength    = saved.clLength    || 'standard';
+  state.generationReceipt = saved.generationReceipt || null;
   state.editedHtml = {
     resume: normalizeEditedHtmlEntry(saved.editedHtml?.resume),
     'cover-letter': normalizeEditedHtmlEntry(saved.editedHtml?.['cover-letter']),
@@ -1368,6 +1375,7 @@ function restoreSavedDraft(saved) {
 
   if (state.drafts.resume || state.drafts['cover-letter']) {
     updatePreviews();
+    renderGenerationReceipt();
   }
 
   switchTab(state.drafts.resume ? 'resume' : 'cover-letter');
@@ -1383,6 +1391,9 @@ async function clearDraft(tab) {
   contentEl.classList.add('hidden');
   clearEditState(tab);
   await clearEditedHtml(tab);
+  state.generationReceipt = null;
+  dom.genStatus.classList.add('hidden');
+  dom.genStatus.classList.remove('gen-status--complete');
 
   // If neither draft remains, also hide the merged tab
   if (!state.drafts.resume && !state.drafts['cover-letter']) {
@@ -1396,6 +1407,7 @@ async function clearDraft(tab) {
     if (savedDraft) {
       savedDraft.drafts[tab] = null;
       if (savedDraft.originalDrafts) savedDraft.originalDrafts[tab] = null;
+      savedDraft.generationReceipt = null;
       await chrome.storage.local.set({ savedDraft });
     }
   }
@@ -1410,6 +1422,7 @@ async function clearSession() {
   state.drafts      = { resume: null, 'cover-letter': null };
   state.jobData     = { jobTitle: '', company: '', sourceUrl: '', description: '' };
   state.lastRunMode = null;
+  state.generationReceipt = null;
   state.editedHtml  = { resume: null, 'cover-letter': null };
   clearTimeout(editedHtmlSaveTimers.resume);
   clearTimeout(editedHtmlSaveTimers['cover-letter']);
@@ -1422,6 +1435,8 @@ async function clearSession() {
   dom.fieldDesc.value = '';
   dom.selectionNotice.classList.add('hidden');
   dom.sourceIndicator.textContent = '';
+  dom.genStatus.classList.add('hidden');
+  dom.genStatus.classList.remove('gen-status--complete');
 
   dom.draftResumeEmpty.classList.remove('hidden');
   dom.draftResumeContent.classList.add('hidden');
@@ -1470,8 +1485,17 @@ async function validateForGeneration(mode) {
 }
 
 function setGenerating(on) {
-  dom.genStatus.classList.toggle('hidden', !on);
-  if (!on) clearGenerationStatusMessages();
+  if (on) {
+    state.generationReceipt = null;
+    dom.genStatus.classList.remove('hidden', 'gen-status--complete');
+    dom.genStatus.removeAttribute('aria-label');
+    const spinner = dom.genStatus.querySelector('.spinner');
+    if (spinner) spinner.classList.remove('hidden');
+  } else {
+    clearGenerationStatusMessages();
+    if (state.generationReceipt) renderGenerationReceipt();
+    else dom.genStatus.classList.add('hidden');
+  }
 
   const allGenBtns = [dom.btnGenBoth, dom.btnGenResume, dom.btnGenCL];
   const modeMap = { both: dom.btnGenBoth, resume: dom.btnGenResume, 'cover-letter': dom.btnGenCL };
@@ -1502,6 +1526,10 @@ function setGenerating(on) {
 
 function startGenerationStatusMessages(type) {
   clearGenerationStatusMessages();
+  dom.genStatus.classList.remove('hidden', 'gen-status--complete');
+  dom.genStatus.removeAttribute('aria-label');
+  const spinner = dom.genStatus.querySelector('.spinner');
+  if (spinner) spinner.classList.remove('hidden');
 
   const isResume = type === 'resume';
   dom.genStatusText.textContent = isResume
@@ -1512,14 +1540,14 @@ function startGenerationStatusMessages(type) {
 
   const messages = isResume
     ? [
-        { delay: 15000, text: 'Local AI is working. Ollama can take a minute or two depending on your computer.' },
+        { delay: 15000, text: 'Local AI is tailoring the resume. Ollama can take a minute or two depending on your computer.' },
         { delay: 45000, text: 'Still tailoring the resume. Larger job descriptions and local models can take longer.' },
-        { delay: 90000, text: 'Still working. You can stop this run if you want to try a smaller Ollama model.' },
+        { delay: 90000, text: 'Still tailoring the resume. You can stop this run if you want to try a smaller Ollama model.' },
       ]
     : [
-        { delay: 15000, text: 'Local AI is drafting the letter. Ollama can take a minute or two depending on your computer.' },
+        { delay: 15000, text: 'Local AI is drafting the cover letter. Ollama can take a minute or two depending on your computer.' },
         { delay: 45000, text: 'Still writing the cover letter. Smaller models are faster but may need a retry.' },
-        { delay: 90000, text: 'Still working. You can stop this run if you want to try a smaller Ollama model.' },
+        { delay: 90000, text: 'Still writing the cover letter. You can stop this run if you want to try a smaller Ollama model.' },
       ];
 
   generationStatusTimers = messages.map(({ delay, text }) => setTimeout(() => {
@@ -1532,6 +1560,105 @@ function startGenerationStatusMessages(type) {
 function clearGenerationStatusMessages() {
   generationStatusTimers.forEach(timerId => clearTimeout(timerId));
   generationStatusTimers = [];
+}
+
+async function clearSavedGenerationReceipt() {
+  try {
+    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    if (!savedDraft?.generationReceipt) return;
+    await chrome.storage.local.set({
+      savedDraft: {
+        ...savedDraft,
+        generationReceipt: null,
+      }
+    });
+  } catch (err) {
+    console.warn('Could not clear previous generation receipt:', err?.message || err);
+  }
+}
+
+function createGenerationReceipt(mode, startedAt, completedAt) {
+  const provider = state.settings?.provider || 'unknown';
+  const modelName = state.settings?.modelName || defaultModelForProvider(provider);
+  return {
+    mode,
+    provider,
+    providerLabel: providerLabel(provider),
+    modelName,
+    modelLabel: modelLabel(provider, modelName),
+    documentLabel: generatedDocumentLabel(mode),
+    completedAt: new Date(completedAt).toISOString(),
+    elapsedMs: Math.max(0, completedAt - startedAt),
+  };
+}
+
+function renderGenerationReceipt(receipt = state.generationReceipt) {
+  if (!receipt) {
+    dom.genStatus.classList.add('hidden');
+    return;
+  }
+
+  const spinner = dom.genStatus.querySelector('.spinner');
+  if (spinner) spinner.classList.add('hidden');
+
+  const provider = receipt.providerLabel || providerLabel(receipt.provider);
+  const model = receipt.modelLabel || modelLabel(receipt.provider, receipt.modelName);
+  const completedAt = formatCompletedAt(receipt.completedAt);
+  const elapsed = formatElapsedTime(receipt.elapsedMs);
+
+  dom.genStatus.classList.remove('hidden');
+  dom.genStatus.classList.add('gen-status--complete');
+  dom.genStatus.setAttribute('aria-label', 'Generation complete');
+  dom.genStatusText.textContent = `${receipt.documentLabel || 'Draft'} completed by ${provider} with ${model} at ${completedAt}. Took ${elapsed}.`;
+}
+
+function generatedDocumentLabel(mode) {
+  if (mode === 'both') return 'Drafts';
+  if (mode === 'resume') return 'Resume draft';
+  if (mode === 'cover-letter') return 'Cover letter draft';
+  return 'Draft';
+}
+
+function providerLabel(provider) {
+  const labels = {
+    mock: 'Demo Mode',
+    openai: 'OpenAI',
+    gemini: 'Gemini',
+    openrouter: 'OpenRouter',
+    ollama: 'Ollama',
+  };
+  return labels[provider] || provider || 'AI provider';
+}
+
+function defaultModelForProvider(provider) {
+  const defaults = {
+    mock: 'sample generator',
+    openai: 'gpt-4o-mini',
+    gemini: 'gemini-2.5-flash',
+    openrouter: 'anthropic/claude-3.5-haiku',
+    ollama: 'llama3',
+  };
+  return defaults[provider] || 'selected model';
+}
+
+function modelLabel(provider, modelName) {
+  if (provider === 'mock') return 'sample generator';
+  return modelName || 'selected model';
+}
+
+function formatCompletedAt(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'just now';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatElapsedTime(elapsedMs = 0) {
+  const totalSeconds = Math.max(1, Math.round(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (!minutes) return `${seconds}s`;
+  if (!seconds) return `${minutes}m`;
+  return `${minutes}m ${seconds}s`;
 }
 
 function showError(err) {

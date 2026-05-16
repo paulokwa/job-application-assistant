@@ -1,6 +1,47 @@
 # Session Handover — Job Application Assistant
 
-**Last updated:** 2026-05-14 (Session 7 — Profile importer custom sections)
+**Last updated:** 2026-05-16 (Session 8 - Generation completion receipt)
+
+---
+
+# Session 8 additions (2026-05-16)
+
+**Branch:** `main`
+
+---
+
+### 49. Generation completion receipt
+
+Added a persistent completion receipt in the dashboard generation status area. After a successful run, the running status turns into a compact sticky receipt that tells the user:
+
+- Which document set completed: resume, cover letter, or both
+- Which provider ran the job
+- Which model was used
+- What time the generation completed
+- How long the generation took
+
+Example copy: `Drafts completed by OpenAI with gpt-4o-mini at 10:42 PM. Took 1m 18s.`
+
+The receipt is cleared when a new generation starts, updated after the next successful run, persisted with the saved draft, and cleared when drafts are cleared.
+
+**Files changed:** `dashboard/dashboard.js`, `dashboard/dashboard.css`
+
+---
+
+### 50. Explicit waiting copy for resume vs cover letter
+
+Updated the timed Ollama waiting messages so every stage clearly names the artifact being generated. The longer-running messages now say `resume` or `cover letter` instead of generic text like `the letter` or `still working`.
+
+Examples:
+
+- `Local AI is tailoring the resume. Ollama can take a minute or two depending on your computer.`
+- `Still tailoring the resume. You can stop this run if you want to try a smaller Ollama model.`
+- `Local AI is drafting the cover letter. Ollama can take a minute or two depending on your computer.`
+- `Still writing the cover letter. You can stop this run if you want to try a smaller Ollama model.`
+
+**Verification:** `node --check dashboard/dashboard.js`, `git diff --check`
+
+**Files changed:** `dashboard/dashboard.js`
 
 ---
 
