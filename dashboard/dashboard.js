@@ -11,8 +11,10 @@ import { mapError } from '../modules/errorMapper.js';
 const SUPPORT_URL = 'https://ko-fi.com/mwakelabs';
 const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
 const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
+const SAVED_JOBS_KEY = 'savedJobs';
 const EDITED_HTML_SAVE_DELAY_MS = 500;
 const MAX_EDITED_HTML_CHARS = 500000;
+const MAX_SAVED_JOBS = 50;
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
 const MAX_SYNC_FIELD_LENGTHS = {
@@ -51,6 +53,10 @@ const state = {
   editMode: { resume: false, 'cover-letter': false },
   hasEdits: { resume: false, 'cover-letter': false },
   editedHtml: { resume: null, 'cover-letter': null },
+  currentJobMeta: {
+    sourceType: 'manual_entry',
+    rawContent: '',
+  },
 };
 
 let currentAbortController = null;
@@ -125,6 +131,7 @@ const dom = {
   
   toast:              $('toast'),
   btnTheme:           $('btn-theme'),
+  btnJobs:            $('btn-jobs'),
   btnHistory:         $('btn-history'),
   profileSwitcher:    $('profile-switcher'),
   profileMenuList:    $('profile-menu-list'),
@@ -134,6 +141,8 @@ const dom = {
   btnOpenFullPage:    $('btn-open-full-page'),
   historyView:        $('history-view'),
   btnCloseHistory:    $('btn-close-history'),
+  jobsView:           $('jobs-view'),
+  btnCloseJobs:       $('btn-close-jobs'),
   btnSupport:         $('btn-support'),
   btnSettings:        $('btn-settings'),
   mockBanner:         $('mock-mode-banner'),
@@ -141,6 +150,7 @@ const dom = {
   settingsOverlayTitle: $('settings-overlay-title'),
   btnCloseSettings:   $('btn-close-settings'),
   btnNewDraft:        $('btn-new-draft'),
+  btnSaveJob:         $('btn-save-job'),
   btnTour:            $('btn-tour'),
   btnScan:            $('btn-scan-page'),
   settingsFrame:      $('settings-frame'),
@@ -202,8 +212,17 @@ function applyExtractedData(raw, url, usedSelection) {
   }
 
   const text = raw.selectedText || raw.pageText || '';
+  const sourceType = raw.sourceType === 'manual_entry' ? 'manual_entry' : 'extension_scan';
 
-  if (usedSelection) {
+  if (raw.loadedFromSavedJob) {
+    dom.selectionNotice.classList.add('hidden');
+    dom.sourceIndicator.textContent = 'Loaded from Jobs';
+    dom.sourceIndicator.className = 'card-hint source-page';
+  } else if (sourceType === 'manual_entry') {
+    dom.selectionNotice.classList.add('hidden');
+    dom.sourceIndicator.textContent = 'Manual entry';
+    dom.sourceIndicator.className = 'card-hint source-page';
+  } else if (usedSelection) {
     dom.selectionNotice.classList.remove('hidden');
     dom.sourceIndicator.textContent = '✦ From your selection';
     dom.sourceIndicator.className = 'card-hint source-selection';
@@ -223,6 +242,10 @@ function applyExtractedData(raw, url, usedSelection) {
   dom.fieldDesc.value    = text;
 
   state.jobData = { jobTitle, company, sourceUrl: url, description: text };
+  state.currentJobMeta = {
+    sourceType,
+    rawContent: raw.pageText || raw.selectedText || text,
+  };
 }
 
 async function applySession(session) {
@@ -327,6 +350,7 @@ function bindEvents() {
 
   // Scan page
   dom.btnScan.addEventListener('click', scanCurrentPage);
+  dom.btnSaveJob.addEventListener('click', saveCurrentJob);
 
   // New draft
   dom.btnNewDraft.addEventListener('click', clearSession);
@@ -379,6 +403,17 @@ function bindEvents() {
   // History
   dom.btnHistory.addEventListener('click', () => dom.historyView.classList.add('visible'));
   dom.btnCloseHistory.addEventListener('click', () => dom.historyView.classList.remove('visible'));
+
+  // Saved jobs
+  dom.btnJobs.addEventListener('click', () => dom.jobsView.classList.add('visible'));
+  dom.btnCloseJobs.addEventListener('click', () => dom.jobsView.classList.remove('visible'));
+  window.addEventListener('message', e => {
+    if (e.origin !== window.location.origin) return;
+    if (e.data?.type !== 'JPDA_SAVED_JOB_LOADED') return;
+    dom.jobsView.classList.remove('visible');
+    loadSession();
+    showToast('Loaded saved job. Generate when ready.');
+  });
 
   // Support
   dom.btnSupport.addEventListener('click', () => window.open(SUPPORT_URL, '_blank', 'noopener'));
@@ -456,9 +491,18 @@ function bindEvents() {
   });
 
   // Sync inputs
-  dom.fieldTitle.addEventListener('input', () => state.jobData.jobTitle = dom.fieldTitle.value);
-  dom.fieldCompany.addEventListener('input', () => state.jobData.company = dom.fieldCompany.value);
-  dom.fieldDesc.addEventListener('input', () => state.jobData.description = dom.fieldDesc.value);
+  dom.fieldTitle.addEventListener('input', () => {
+    state.jobData.jobTitle = dom.fieldTitle.value;
+    markManualEntryIfEmpty();
+  });
+  dom.fieldCompany.addEventListener('input', () => {
+    state.jobData.company = dom.fieldCompany.value;
+    markManualEntryIfEmpty();
+  });
+  dom.fieldDesc.addEventListener('input', () => {
+    state.jobData.description = dom.fieldDesc.value;
+    markManualEntryIfEmpty();
+  });
 }
 
 // ── Core Logic ────────────────────────────────────────────────────────────
@@ -737,6 +781,103 @@ function stopGeneration() {
   if (currentAbortController) {
     currentAbortController.abort();
   }
+}
+
+// Saved Jobs
+
+function markManualEntryIfEmpty() {
+  if (state.currentJobMeta?.rawContent) return;
+  state.currentJobMeta = {
+    sourceType: 'manual_entry',
+    rawContent: '',
+  };
+}
+
+function normalizeSavedJobUrl(url) {
+  return String(url || '').trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function normalizeSavedJobText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function createSavedJobId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getCurrentSavedJobDraft() {
+  const title = dom.fieldTitle.value.trim();
+  const company = dom.fieldCompany.value.trim();
+  const sourceUrl = dom.fieldUrl.value.trim();
+  const cleanDescription = dom.fieldDesc.value.trim();
+  const sourceType = state.currentJobMeta?.sourceType || 'manual_entry';
+  const rawContent = sourceType === 'extension_scan'
+    ? String(state.currentJobMeta?.rawContent || cleanDescription)
+    : String(state.currentJobMeta?.rawContent || '');
+
+  return {
+    title,
+    company,
+    location: '',
+    salaryText: '',
+    sourceUrl,
+    sourceType,
+    rawContent,
+    cleanDescription,
+    status: 'saved',
+    notes: '',
+  };
+}
+
+function findSavedJobDuplicate(savedJobs, draft) {
+  const draftUrl = normalizeSavedJobUrl(draft.sourceUrl);
+  if (draftUrl) {
+    return savedJobs.find(job => normalizeSavedJobUrl(job.sourceUrl) === draftUrl);
+  }
+
+  const draftTitle = normalizeSavedJobText(draft.title);
+  const draftCompany = normalizeSavedJobText(draft.company);
+  if (!draftTitle || !draftCompany) return null;
+
+  return savedJobs.find(job =>
+    normalizeSavedJobText(job.title) === draftTitle &&
+    normalizeSavedJobText(job.company) === draftCompany
+  );
+}
+
+async function saveCurrentJob() {
+  const draft = getCurrentSavedJobDraft();
+
+  if (!draft.title && !draft.company && !draft.cleanDescription && !draft.sourceUrl) {
+    showToast('Add or scan a job before saving.');
+    return;
+  }
+
+  const data = await chrome.storage.local.get(SAVED_JOBS_KEY);
+  const savedJobs = Array.isArray(data[SAVED_JOBS_KEY]) ? data[SAVED_JOBS_KEY] : [];
+
+  const duplicate = findSavedJobDuplicate(savedJobs, draft);
+  if (duplicate) {
+    showToast('This job is already saved.');
+    return;
+  }
+
+  if (savedJobs.length >= MAX_SAVED_JOBS) {
+    showToast(`Saved Jobs is full (${MAX_SAVED_JOBS}). Delete a job before saving another.`);
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const savedJob = {
+    id: createSavedJobId(),
+    ...draft,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await chrome.storage.local.set({ [SAVED_JOBS_KEY]: [savedJob, ...savedJobs] });
+  showToast('Saved to Jobs.');
 }
 
 // ── Job History ───────────────────────────────────────────────────────────
@@ -1341,6 +1482,10 @@ function restoreSavedDraft(saved) {
   state.drafts         = saved.drafts         || { resume: null, 'cover-letter': null };
   state.originalDrafts = saved.originalDrafts || { resume: null, 'cover-letter': null };
   state.jobData        = saved.jobData        || state.jobData;
+  state.currentJobMeta = {
+    sourceType: state.jobData.sourceUrl ? 'extension_scan' : 'manual_entry',
+    rawContent: state.jobData.description || '',
+  };
   state.lastRunMode = saved.lastRunMode || null;
   state.templateId  = saved.templateId  || 'classic';
   state.accentColor = saved.accentColor || '#2563eb';
@@ -1421,6 +1566,7 @@ async function clearSession() {
 
   state.drafts      = { resume: null, 'cover-letter': null };
   state.jobData     = { jobTitle: '', company: '', sourceUrl: '', description: '' };
+  state.currentJobMeta = { sourceType: 'manual_entry', rawContent: '' };
   state.lastRunMode = null;
   state.generationReceipt = null;
   state.editedHtml  = { resume: null, 'cover-letter': null };

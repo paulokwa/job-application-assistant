@@ -1590,6 +1590,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .overlay-content { flex: 1; min-height: 0; }
 #settings-frame,
+#jobs-frame,
 #history-frame  { width: 100%; height: 100%; border: none; }
 
 /* ══════════════════════════════════════════════
