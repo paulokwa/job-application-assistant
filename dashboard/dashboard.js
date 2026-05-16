@@ -499,6 +499,10 @@ function bindEvents() {
     state.jobData.company = dom.fieldCompany.value;
     markManualEntryIfEmpty();
   });
+  dom.fieldUrl.addEventListener('input', () => {
+    state.jobData.sourceUrl = dom.fieldUrl.value;
+    markManualEntryIfEmpty();
+  });
   dom.fieldDesc.addEventListener('input', () => {
     state.jobData.description = dom.fieldDesc.value;
     markManualEntryIfEmpty();
