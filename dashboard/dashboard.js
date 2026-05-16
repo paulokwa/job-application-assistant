@@ -137,7 +137,6 @@ const dom = {
   profileMenuList:    $('profile-menu-list'),
   profileStrip:       $('profile-strip'),
   btnOpenProfile:     $('btn-open-profile'),
-  btnOpenProfiles:    $('btn-open-profiles'),
   btnOpenFullPage:    $('btn-open-full-page'),
   historyView:        $('history-view'),
   btnCloseHistory:    $('btn-close-history'),
@@ -394,7 +393,6 @@ function bindEvents() {
     if (!dom.profileStrip.contains(e.target)) closeProfileMenu();
   });
   dom.btnOpenProfile.addEventListener('click', () => openSettingsSection('profile'));
-  dom.btnOpenProfiles.addEventListener('click', () => openSettingsSection('profiles'));
   dom.btnOpenFullPage.addEventListener('click', openFullPage);
 
   // Theme toggle
@@ -2215,11 +2213,6 @@ const TOUR_STEPS = [
     target: '#profile-strip',
     title: 'Profile Select',
     body: 'Choose which saved profile the AI should use for this application. Profiles let you maintain separate sets of personal details for different roles or CVs.',
-  },
-  {
-    target: '#btn-open-profiles',
-    title: 'Manage Profiles',
-    body: 'Add, rename, or delete saved profiles. Each profile stores your personal details so you can switch identities across different applications.',
   },
   {
     target: '#btn-open-profile',

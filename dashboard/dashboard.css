@@ -495,18 +495,25 @@ body {
 
 #card-job-info .card-header-right {
   flex: 1 1 100%;
+  flex-wrap: wrap;
   justify-content: flex-start;
   gap: 6px;
-  margin-left: 82px;
+  margin-left: 0;
+  max-width: 100%;
   min-width: 0;
 }
 
 #source-indicator {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  text-align: right;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+#source-indicator:not(:empty) {
+  flex-basis: 100%;
 }
 
 .btn-scan {
