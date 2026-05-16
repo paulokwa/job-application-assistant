@@ -10,6 +10,7 @@ const STATUSES = [
 ];
 
 let suppressNextSavedJobsRefresh = false;
+let currentSort = 'updated_desc';
 
 function applyTheme(theme) {
   if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
@@ -36,8 +37,53 @@ function formatDate(iso) {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function formatDateTime(iso) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function timeValue(iso) {
+  const time = new Date(iso || '').getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
 function statusLabel(value) {
   return STATUSES.find(([status]) => status === value)?.[1] || 'Saved';
+}
+
+function sortText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function sortSavedJobs(jobs) {
+  const sorted = [...jobs];
+  sorted.sort((a, b) => {
+    if (currentSort === 'created_asc') {
+      return timeValue(a.createdAt) - timeValue(b.createdAt);
+    }
+    if (currentSort === 'created_desc') {
+      return timeValue(b.createdAt) - timeValue(a.createdAt);
+    }
+    if (currentSort === 'status') {
+      return statusLabel(a.status).localeCompare(statusLabel(b.status)) ||
+        timeValue(b.updatedAt || b.createdAt) - timeValue(a.updatedAt || a.createdAt);
+    }
+    if (currentSort === 'company') {
+      return sortText(a.company).localeCompare(sortText(b.company)) ||
+        sortText(a.title).localeCompare(sortText(b.title)) ||
+        timeValue(b.updatedAt || b.createdAt) - timeValue(a.updatedAt || a.createdAt);
+    }
+    return timeValue(b.updatedAt || b.createdAt) - timeValue(a.updatedAt || a.createdAt);
+  });
+  return sorted;
 }
 
 async function loadSavedJobs() {
@@ -51,7 +97,7 @@ async function saveSavedJobs(jobs, options = {}) {
 }
 
 async function refreshJobs() {
-  render(await loadSavedJobs());
+  render(sortSavedJobs(await loadSavedJobs()));
 }
 
 function render(jobs) {
@@ -74,6 +120,9 @@ function render(jobs) {
     card.className = 'job-card';
     card.dataset.id = job.id;
     const date = formatDate(job.updatedAt || job.createdAt);
+    const savedAt = formatDateTime(job.createdAt);
+    const updatedAt = formatDateTime(job.updatedAt);
+    const showUpdatedAt = updatedAt && updatedAt !== savedAt;
     const openButton = job.sourceUrl
       ? `<button class="action-btn" data-action="open" data-url="${escAttr(job.sourceUrl)}" type="button">Open URL</button>`
       : '';
@@ -91,6 +140,11 @@ function render(jobs) {
           <span>${escHtml(statusLabel(job.status))}</span>
           ${date ? `<span>${escHtml(date)}</span>` : ''}
         </div>
+      </div>
+
+      <div class="job-timestamps">
+        ${savedAt ? `<span>Saved ${escHtml(savedAt)}</span>` : ''}
+        ${showUpdatedAt ? `<span>Updated ${escHtml(updatedAt)}</span>` : ''}
       </div>
 
       <div class="job-controls">
@@ -196,6 +250,13 @@ async function init() {
   await refreshJobs();
 
   const list = document.getElementById('jobs-list');
+  const sortSelect = document.getElementById('sort-jobs');
+  sortSelect.value = currentSort;
+
+  sortSelect.addEventListener('change', async () => {
+    currentSort = sortSelect.value;
+    await refreshJobs();
+  });
 
   list.addEventListener('click', async e => {
     const btn = e.target.closest('[data-action]');
@@ -232,8 +293,7 @@ async function init() {
 
     const card = select.closest('.job-card');
     await updateSavedJob(card.dataset.id, { status: select.value });
-    const statusMeta = card.querySelector('.job-meta span');
-    if (statusMeta) statusMeta.textContent = statusLabel(select.value);
+    await refreshJobs();
   });
 
   list.addEventListener('blur', async e => {
@@ -242,6 +302,7 @@ async function init() {
 
     const card = notes.closest('.job-card');
     await updateSavedJob(card.dataset.id, { notes: notes.value.trim() });
+    await refreshJobs();
   }, true);
 
   chrome.storage.onChanged.addListener((changes, area) => {

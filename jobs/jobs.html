@@ -13,7 +13,19 @@
       <h1 class="page-title">Saved Jobs</h1>
       <p class="page-subtitle">Saved jobs stay separate from generated history</p>
     </div>
-    <span class="limit-note">Limit 50</span>
+    <div class="jobs-header-actions">
+      <label class="sort-control" for="sort-jobs">
+        <span>Sort</span>
+        <select id="sort-jobs" aria-label="Sort saved jobs">
+          <option value="updated_desc">Recently updated</option>
+          <option value="created_desc">Recently saved</option>
+          <option value="created_asc">Oldest saved</option>
+          <option value="status">Status</option>
+          <option value="company">Company</option>
+        </select>
+      </label>
+      <span class="limit-note">Limit 50</span>
+    </div>
   </div>
 
   <main class="jobs-main">
