@@ -74,6 +74,7 @@
 }
 
 body {
+  overflow-x: hidden;
   min-height: 100vh;
   background: var(--color-canvas);
   color: var(--color-ink);
@@ -86,6 +87,8 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -93,6 +96,10 @@ body {
   padding: 18px 20px 14px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
+}
+
+.jobs-header > div:first-child {
+  min-width: 0;
 }
 
 .page-title {
@@ -110,6 +117,10 @@ body {
 
 .page-subtitle { margin-top: 2px; }
 
+.page-subtitle {
+  overflow-wrap: anywhere;
+}
+
 .limit-note {
   padding: 2px 7px;
   border: 1px solid var(--color-border);
@@ -123,18 +134,24 @@ body {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .sort-control {
   display: flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+  min-width: 0;
   color: var(--color-ink-2);
   font-size: 11.5px;
   font-weight: 500;
 }
 
 .sort-control select {
+  max-width: 100%;
+  min-width: 0;
   min-height: 30px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -145,6 +162,9 @@ body {
 }
 
 .jobs-main {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   padding: 16px 20px 32px;
 }
 
@@ -188,11 +208,15 @@ body {
 .jobs-list {
   display: grid;
   gap: 10px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .job-card {
   display: grid;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
   padding: 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -205,6 +229,7 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .job-card-heading {
@@ -236,7 +261,8 @@ body {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 5px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .job-meta span {
@@ -253,20 +279,28 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 12px;
+  min-width: 0;
   color: var(--color-ink-3);
   font-size: 11.5px;
 }
 
+.job-timestamps span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .job-controls {
   display: grid;
-  grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
   gap: 10px;
   align-items: start;
+  min-width: 0;
 }
 
 .job-controls label {
   display: grid;
   gap: 4px;
+  min-width: 0;
   color: var(--color-ink-2);
   font-size: 11.5px;
   font-weight: 500;
@@ -275,6 +309,7 @@ body {
 .status-select,
 .job-notes {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-raised);
@@ -309,6 +344,7 @@ body {
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .action-btn,
@@ -316,10 +352,13 @@ body {
 .btn-danger {
   border-radius: var(--radius-sm);
   cursor: pointer;
+  min-width: 0;
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
   padding: 5px 10px;
+  overflow-wrap: anywhere;
+  text-align: center;
   transition: background-color var(--dur-fast) var(--ease-std),
               color var(--dur-fast) var(--ease-std),
               border-color var(--dur-fast) var(--ease-std),
@@ -416,7 +455,17 @@ body {
   }
 
   .jobs-header-actions {
+    width: 100%;
     justify-content: flex-start;
+  }
+
+  .sort-control {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .sort-control select {
+    flex: 1 1 auto;
   }
 
   .job-meta {
