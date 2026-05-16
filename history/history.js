@@ -1,6 +1,7 @@
 // history/history.js — Job History page controller
 // Entries are written by dashboard.js when the user saves a document as PDF.
 import { openSafeHttpUrl } from '../modules/url.js';
+import { compactJobHistoryEntry, isStorageQuotaError, storageQuotaMessage } from '../modules/storageLimits.js';
 
 const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
@@ -80,7 +81,14 @@ async function loadSyncedSummaries() {
 }
 
 async function saveLocalHistory(entries) {
-  await chrome.storage.local.set({ jobHistory: entries });
+  try {
+    await chrome.storage.local.set({ jobHistory: entries.map(compactJobHistoryEntry) });
+    return true;
+  } catch (err) {
+    console.warn('Could not save job history:', err?.message || err);
+    if (isStorageQuotaError(err)) window.alert(storageQuotaMessage('jobHistory'));
+    return false;
+  }
 }
 
 async function saveSyncedSummaries(entries) {
