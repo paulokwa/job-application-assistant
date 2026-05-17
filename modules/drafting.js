@@ -166,15 +166,19 @@ export async function generateCoverLetter(jobData, profile, settings, sourceResu
 
 // ── Draft Revision ─────────────────────────────────────────────────────────
 
-export async function reviseDraft(currentDraft, revisionRequest, docType, jobData, profile, settings) {
+export async function reviseDraft(currentDraft, revisionRequest, docType, jobData, profile, settings, isAtsRevision = false) {
   if (isMock(settings)) return mockReviseDraft(currentDraft, revisionRequest, docType);
   const profileText = profileToPromptText(profile);
-  
+
   const draftStr = typeof currentDraft === 'object' ? JSON.stringify(currentDraft, null, 2) : currentDraft;
+
+  const honestyRule = isAtsRevision
+    ? 'KEYWORD MODE: The user is explicitly directing you to incorporate the listed keywords and phrases. Add skill names, tools, and descriptive terms exactly as provided, placed naturally into existing bullet points or the skills list. Do not fabricate specific metrics, dates, or credentials not in the profile.'
+    : HALLUCINATION_GUARD;
 
   const systemPrompt = [
     `You are revising a ${docType === 'resume' ? 'resume' : 'cover letter'} structured JSON based on user feedback.`,
-    HALLUCINATION_GUARD,
+    honestyRule,
     'Return the COMPLETE revised JSON object following the established schema.',
     'IMPORTANT: Use any new information provided in the revision request even if not in the profile.',
   ].join('\n\n');

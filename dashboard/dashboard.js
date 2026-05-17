@@ -62,6 +62,7 @@ const state = {
   sourceResumeText: '',
   lastRunMode: null,
   generationReceipt: null,
+  atsRevision: false,
   editMode: { resume: false, 'cover-letter': false },
   hasEdits: { resume: false, 'cover-letter': false },
   editedHtml: { resume: null, 'cover-letter': null },
@@ -1290,7 +1291,9 @@ async function applyRevision() {
   dom.btnRegenerate.disabled = true;
 
   try {
-    const raw = await reviseDraft(state.drafts[docType], request, docType, state.jobData, state.profile, state.settings);
+    const isAts = state.atsRevision;
+    state.atsRevision = false;
+    const raw = await reviseDraft(state.drafts[docType], request, docType, state.jobData, state.profile, state.settings, isAts);
     const parsed = normalizeDraftContent(docType, tryParseJson(raw));
     if (parsed) {
       state.drafts[docType] = parsed;
@@ -1302,6 +1305,7 @@ async function applyRevision() {
       showToast('⚠️ Could not apply changes — try rephrasing your request.');
     }
   } catch (e) {
+    state.atsRevision = false;
     showToast(`⚠️ ${mapError(e).message}`);
   } finally {
     dom.btnApplyChanges.classList.remove('btn--loading');
@@ -2095,8 +2099,14 @@ async function runAtsCheck() {
     }
 
     const resumeText = JSON.stringify(state.drafts.resume).toLowerCase();
-    const matched = keywords.filter(k => resumeText.includes(k.toLowerCase()));
-    const missing  = keywords.filter(k => !resumeText.includes(k.toLowerCase()));
+    const keywordMatches = kw => {
+      const lower = kw.toLowerCase();
+      if (resumeText.includes(lower)) return true;
+      const words = lower.split(/\s+/).filter(w => w.length > 2);
+      return words.length > 1 && words.every(w => resumeText.includes(w));
+    };
+    const matched = keywords.filter(keywordMatches);
+    const missing  = keywords.filter(k => !keywordMatches(k));
     renderAtsResults(matched, missing, keywords.length);
   } catch {
     showToast('⚠️ ATS scan failed.');
@@ -2160,6 +2170,8 @@ function applyAtsKeywords() {
 
   if (!selected.length) return;
 
+  switchTab('resume');
+  state.atsRevision = true;
   dom.fieldRevision.value = `Naturally incorporate the following keywords into the resume where they genuinely apply to my experience: ${selected.join(', ')}`;
   refreshRevisionButton();
   document.getElementById('card-revision').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
