@@ -406,7 +406,6 @@ async function init() {
 
     const card = notes.closest('.job-card');
     await updateSavedJob(card.dataset.id, { notes: notes.value.trim() });
-    await refreshJobs();
   }, true);
 
   chrome.storage.onChanged.addListener((changes, area) => {
