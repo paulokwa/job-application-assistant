@@ -207,7 +207,7 @@ These are known constraints of the current MVP. None block local testing; they a
 
 - Cross-origin iframes cannot be scanned or filled due to browser security restrictions. Many ATS platforms embed their forms in same-origin iframes, but some use cross-origin frames.
 - Shadow DOM and custom web component inputs (used by some ATS widgets) may not be detected by `querySelectorAll`.
-- Workday, Greenhouse, Lever, SmartRecruiters, and other major ATS platforms may need platform-specific adapters for reliable field detection and filling.
+- Workday, Greenhouse, Lever, SmartRecruiters, Taleo, iCIMS, and other major ATS platforms may need platform-specific adapters for reliable field detection and filling.
 
 ### Safety boundaries (permanent — not limitations)
 
