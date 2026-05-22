@@ -1051,13 +1051,17 @@ function addEducationEntry(data = {}) {
   div.style.marginBottom = '12px';
   const degree = data.credential || data.degree || '';
   const school = data.institution || data.school || '';
+  const dates  = data.dates || data.year || '';
 
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between">
       <input type="text" class="edu-degree" value="${escHtml(degree)}" placeholder="Degree" style="font-weight:bold" />
       <button onclick="this.closest('.edu-entry').remove()" class="btn-remove">✕</button>
     </div>
-    <input type="text" class="edu-school" value="${escHtml(school)}" placeholder="School" />
+    <div class="form-grid-2">
+      <input type="text" class="edu-school" value="${escHtml(school)}" placeholder="School" />
+      <input type="text" class="edu-dates" value="${escHtml(dates)}" placeholder="Dates (e.g. 2020 - 2022)" />
+    </div>
   `;
   $('education-list').appendChild(div);
 }
@@ -1112,7 +1116,8 @@ function collectProfileFromForm() {
     })),
     education: readList('.edu-entry', el => ({
       credential:  el.querySelector('.edu-degree').value,
-      institution: el.querySelector('.edu-school').value
+      institution: el.querySelector('.edu-school').value,
+      dates:       el.querySelector('.edu-dates').value,
     })),
     certifications: readList('.cert-entry', el => ({
       name:   el.querySelector('.cert-name').value,

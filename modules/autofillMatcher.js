@@ -249,11 +249,18 @@ const MATCHERS = [
   },
   {
     profileKey: 'education[0].dates',
+    // normalizeResumeContent already maps edu.year → edu.dates, so no year fallback needed here.
     get: p => p.education?.[0]?.dates || '',
     confidence: 'medium',
     reason: 'label matches graduation or education dates',
+    // Exclude select fields — a freeform dates string like "2020 - 2022" won't match dropdown options.
     test: f =>
-      hasSignal(f, 'graduation year', 'graduation date', 'grad year', 'graduated', 'education date'),
+      f.tagName !== 'select' &&
+      hasSignal(f,
+        'graduation year', 'graduation date', 'grad year', 'graduated',
+        'education date', 'education dates', 'school dates',
+        'attended dates', 'dates attended',
+      ),
   },
 ];
 

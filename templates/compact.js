@@ -107,7 +107,7 @@ export function render(data) {
             ${education.map(edu => `
               <div class="item keep-together">
                 <div style="font-weight:700;">${edu.institution}</div>
-                <div>${edu.credential} | ${edu.dates}</div>
+                <div>${edu.credential}${edu.dates ? ` | ${edu.dates}` : ''}</div>
               </div>
             `).join('')}
           </section>

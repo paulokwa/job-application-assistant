@@ -195,7 +195,7 @@ Schema:
     }
   ],
   "education": [
-    { "degree": "Degree/Diploma", "school": "School Name", "year": "Graduation Year", "notes": "Any honors or notes" }
+    { "degree": "Degree/Diploma", "school": "School Name", "dates": "Start Year - End Year or graduation year", "notes": "Any honors or notes" }
   ],
   "certifications": [
     { "name": "Cert Name", "issuer": "Issuing Org", "year": "Year", "doNotClaim": false }

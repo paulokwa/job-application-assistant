@@ -88,7 +88,7 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
         institution: "University Name",
         credential: "Degree/Diploma Name",
         location: "City, State",
-        dates: "Year - Year",
+        dates: "(copy verbatim from profile; use empty string if not provided — do not invent dates)",
         notes: ["Academic achievement or detail"]
       }
     ],
