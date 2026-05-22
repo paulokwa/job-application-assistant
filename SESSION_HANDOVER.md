@@ -9,13 +9,15 @@
 ## Next Action Gate
 
 Status:
-[WAITING] v1.0 Chrome Web Store review result.
+[DONE] v1.0 approved and live on the Chrome Web Store (confirmed 2026-05-22).
+[DONE] v2.0 release checklist completed (2026-05-22) — manifest bumped to 2.0.0, all smoke tests passed, privacy policy verified live.
+[WAITING] User to complete two manual steps before submitting v2.0:
+  1. Update Chrome Web Store screenshots to show Saved Jobs and Fit Analysis.
+  2. Paste updated overview copy into the Chrome Web Store developer dashboard.
 
 Rules:
 
-- If v1.0 is approved, ask the user whether to begin v2.0 packaging.
-- If v1.0 is rejected, ask the user for the rejection reason and fix relevant issues before v2.0 packaging.
-- Do not create `release/v2.0-package` until the user confirms.
+- Do not submit v2.0 until the user confirms the above two steps are done.
 
 ## Completed Since v1.0 Submission
 
