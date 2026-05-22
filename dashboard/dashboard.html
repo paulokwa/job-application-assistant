@@ -80,6 +80,27 @@
     </div>
   </div>
 
+  <!-- Autofill Review Overlay -->
+  <div id="autofill-review-view" class="settings-overlay" role="dialog" aria-label="Review Autofill" aria-modal="true">
+    <div class="overlay-header">
+      <button id="btn-close-autofill-review" class="back-btn" aria-label="Cancel autofill review">
+        <span aria-hidden="true">←</span> Cancel
+      </button>
+      <span class="overlay-title">Review Autofill</span>
+    </div>
+    <div class="overlay-content autofill-review-overlay-content">
+      <div class="autofill-review-intro-block">
+        <p class="autofill-review-intro">Check what will be filled before anything is inserted. Autofill will never submit the application.</p>
+        <p class="autofill-review-notice">Sensitive or uncertain fields are skipped — answer them manually.</p>
+      </div>
+      <div id="autofill-review-body" class="autofill-review-body"></div>
+      <div class="autofill-review-actions">
+        <button id="btn-fill-page" class="btn-primary" type="button">Fill page</button>
+        <button id="btn-cancel-autofill-review" class="btn-secondary" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Mock Mode Banner -->
   <div id="mock-mode-banner" class="mock-mode-banner hidden" role="status">
     <strong>Demo Mode active</strong> — drafts are simulated from your saved profile/source resume where available. Demo placeholders are not verified credentials.
@@ -132,10 +153,24 @@
         <textarea id="field-job-desc" rows="8" placeholder="Paste or edit the job description here…" aria-label="Job description"></textarea>
       </section>
 
+      <!-- Application Form Card -->
+      <section class="card" id="card-application-form">
+        <div class="card-header">
+          <span class="card-title"><span class="step-badge" aria-hidden="true">3</span> Application Form</span>
+        </div>
+        <p class="autofill-helper">Fill repetitive fields from your saved profile. Autofill will never submit the application.</p>
+        <p id="autofill-no-profile" class="autofill-no-profile hidden" role="status">Select a profile before using autofill.</p>
+        <p id="autofill-status-text" class="autofill-status-text">No form fields scanned yet.</p>
+        <div class="autofill-actions">
+          <button id="btn-scan-form-fields" class="btn-scan" type="button" title="Scan the current page for application form fields" aria-label="Scan form fields on current page">Scan form fields</button>
+          <button id="btn-review-autofill" class="btn-primary btn-sm" type="button" disabled aria-label="Review and autofill detected form fields">Review &amp; Autofill</button>
+        </div>
+      </section>
+
       <!-- Generate Controls Card -->
       <section class="card" id="card-generate">
         <div class="card-header">
-          <span class="card-title"><span class="step-badge" aria-hidden="true">3</span> Generate</span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">4</span> Generate</span>
         </div>
         <div class="draft-settings" id="draft-settings" aria-label="Draft settings">
           <div class="draft-settings-header">

@@ -11,9 +11,9 @@
 Status:
 [DONE] v1.0 approved and live on the Chrome Web Store (confirmed 2026-05-22).
 [DONE] v2.0 release checklist completed (2026-05-22) — manifest bumped to 2.0.0, all smoke tests passed, privacy policy verified live.
-[WAITING] User to complete two manual steps before submitting v2.0:
-  1. Update Chrome Web Store screenshots to show Saved Jobs and Fit Analysis.
-  2. Paste updated overview copy into the Chrome Web Store developer dashboard.
+[DONE] User completed two manual steps before submitting v2.0 (confirmed 2026-05-22):
+  1. Updated Chrome Web Store screenshots to show Saved Jobs and Fit Analysis.
+  2. Pasted updated overview copy into the Chrome Web Store developer dashboard.
 
 Rules:
 

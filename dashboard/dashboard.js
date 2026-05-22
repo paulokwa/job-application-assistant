@@ -5,6 +5,7 @@ import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } 
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
 import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
 import { analyzeFit } from '../modules/fitAnalysis.js';
+import { buildAutofillMatches } from '../modules/autofillMatcher.js';
 import { loadProviderSettings, saveProviderSettings } from '../modules/providerSettings.js';
 import {
   compactJobHistoryEntry,
@@ -71,6 +72,8 @@ const state = {
     rawContent: '',
     aiJobInfoAttemptedFor: '',
   },
+  autofillFields:  [],
+  autofillMatches: [],
 };
 
 let currentAbortController = null;
@@ -170,6 +173,13 @@ const dom = {
   btnTour:            $('btn-tour'),
   btnScan:            $('btn-scan-page'),
   btnAiJobInfo:       $('btn-ai-job-info'),
+  btnScanFormFields:  $('btn-scan-form-fields'),
+  btnReviewAutofill:  $('btn-review-autofill'),
+  autofillNoProfile:    $('autofill-no-profile'),
+  autofillStatusText:   $('autofill-status-text'),
+  autofillReviewView:   $('autofill-review-view'),
+  autofillReviewBody:   $('autofill-review-body'),
+  btnFillPage:          $('btn-fill-page'),
   settingsFrame:      $('settings-frame'),
   btnEditResume:      $('btn-edit-resume'),
   btnEditCL:          $('btn-edit-cl'),
@@ -196,6 +206,7 @@ async function init() {
   }
 
   bindEvents();
+  refreshAutofillCard();
 
   // Restore any previously generated draft before loading session data
   if (localData.savedDraft) {
@@ -220,6 +231,236 @@ async function init() {
 
 function loadSession() {
   chrome.storage.session.get(null).then(applySession);
+}
+
+function refreshAutofillCard() {
+  const hasProfile = state.settings?.provider === 'mock' || !!state.profile?.personalInfo?.fullName;
+  const hasMatches = (state.autofillMatches || []).length > 0;
+  dom.btnReviewAutofill.disabled = !hasProfile || !hasMatches;
+  dom.autofillNoProfile.classList.toggle('hidden', hasProfile);
+}
+
+// summary is the MatchSummary from buildAutofillMatches; omit before first scan.
+function updateAutofillStatus(fields, summary) {
+  if (!fields || fields.length === 0) {
+    dom.autofillStatusText.textContent = 'No form fields detected on this page.';
+    return;
+  }
+
+  const parts = [`${fields.length} field${fields.length !== 1 ? 's' : ''} detected`];
+
+  if (summary) {
+    if (summary.matched > 0)   parts.push(`${summary.matched} matched`);
+    if (summary.unmatched > 0) parts.push(`${summary.unmatched} need manual input`);
+    if (summary.skipped > 0)   parts.push(`${summary.skipped} skipped (sensitive)`);
+  } else {
+    const skipped  = fields.filter(f => f.isSensitive || f.isDisabled || f.isReadOnly).length;
+    const fillable = fields.length - skipped;
+    if (fillable > 0) parts.push(`${fillable} ready to fill`);
+    if (skipped > 0)  parts.push(`${skipped} skipped (sensitive)`);
+  }
+
+  dom.autofillStatusText.textContent = parts.join('. ') + '.';
+}
+
+// ── Autofill review overlay ────────────────────────────────────────────────
+
+function escHtml(s) {
+  return (s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function fieldDisplayName(field) {
+  return field.labelText || field.ariaLabel || field.placeholder || field.name || field.id || `Field ${field.fieldIndex + 1}`;
+}
+
+function renderMatchRow(match, defaultChecked) {
+  const name       = escHtml(fieldDisplayName(match.field));
+  const value      = escHtml(match.profileValue);
+  const source     = escHtml(match.profileKey);
+  const badgeClass = match.confidence === 'high' ? 'high' : 'medium';
+  const badgeText  = match.confidence === 'high' ? 'High' : 'Medium';
+  const checked    = defaultChecked ? ' checked' : '';
+  return `
+    <label class="autofill-match-row">
+      <input type="checkbox" class="autofill-row-check" data-field-index="${match.field.fieldIndex}"${checked}>
+      <div class="autofill-row-body">
+        <div class="autofill-row-top">
+          <span class="autofill-row-field-name">${name}</span>
+          <span class="autofill-confidence-badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="autofill-row-value">${value}</div>
+        <div class="autofill-row-source">${source}</div>
+      </div>
+    </label>`;
+}
+
+function renderSkippedRow(field) {
+  const name   = escHtml(fieldDisplayName(field));
+  const reason = escHtml(field.skipReason || 'Skipped');
+  return `
+    <div class="autofill-skipped-row">
+      <span class="autofill-skip-icon" aria-hidden="true">⊘</span>
+      <div class="autofill-row-body">
+        <span class="autofill-row-field-name">${name}</span>
+        <span class="autofill-skip-reason">${reason}</span>
+      </div>
+    </div>`;
+}
+
+function renderAutofillReview() {
+  const matches = state.autofillMatches || [];
+  const fields  = state.autofillFields  || [];
+
+  const skipped       = fields.filter(f => f.isSensitive || f.isDisabled || f.isReadOnly);
+  const unmatchedCount = Math.max(0, fields.length - matches.length - skipped.length);
+  const highMatches   = matches.filter(m => m.confidence === 'high');
+  const mediumMatches = matches.filter(m => m.confidence === 'medium');
+
+  let html = '';
+
+  if (matches.length === 0) {
+    html += `<p class="autofill-review-empty">No fields could be matched to your profile. Make sure your profile has details filled in, then scan the form again.</p>`;
+  } else {
+    if (highMatches.length > 0) {
+      html += `<div class="autofill-review-section">
+        <h3 class="autofill-review-section-title">Ready to fill <span class="autofill-section-count">${highMatches.length}</span></h3>
+        <div class="autofill-match-list">${highMatches.map(m => renderMatchRow(m, true)).join('')}</div>
+      </div>`;
+    }
+    if (mediumMatches.length > 0) {
+      html += `<div class="autofill-review-section">
+        <h3 class="autofill-review-section-title">Review before filling <span class="autofill-section-count">${mediumMatches.length}</span></h3>
+        <div class="autofill-match-list">${mediumMatches.map(m => renderMatchRow(m, false)).join('')}</div>
+      </div>`;
+    }
+  }
+
+  if (skipped.length > 0) {
+    html += `<div class="autofill-review-section">
+      <h3 class="autofill-review-section-title">Skipped — answer manually <span class="autofill-section-count">${skipped.length}</span></h3>
+      <div class="autofill-skipped-list">${skipped.map(f => renderSkippedRow(f)).join('')}</div>
+    </div>`;
+  }
+
+  if (unmatchedCount > 0) {
+    html += `<p class="autofill-unmatched-note">${unmatchedCount} other field${unmatchedCount !== 1 ? 's' : ''} on this page were not matched and will not be touched.</p>`;
+  }
+
+  dom.autofillReviewBody.innerHTML = html;
+  updateFillPageButton();
+}
+
+function updateFillPageButton() {
+  const count = dom.autofillReviewBody.querySelectorAll('.autofill-row-check:checked').length;
+  dom.btnFillPage.textContent = count > 0 ? `Fill page (${count})` : 'Fill page';
+  dom.btnFillPage.disabled    = count === 0;
+}
+
+function openAutofillReview() {
+  if (!state.autofillMatches?.length && state.autofillFields?.length) {
+    const { matches, summary } = buildAutofillMatches(state.autofillFields, state.profile);
+    state.autofillMatches = matches;
+    updateAutofillStatus(state.autofillFields, summary);
+    refreshAutofillCard();
+  }
+  renderAutofillReview();
+  dom.autofillReviewView.classList.add('visible');
+}
+
+function closeAutofillReview() {
+  dom.autofillReviewView.classList.remove('visible');
+}
+
+async function handleFillPage() {
+  const checked = dom.autofillReviewBody.querySelectorAll('.autofill-row-check:checked');
+  if (checked.length === 0) {
+    showToast('No fields selected to fill.');
+    return;
+  }
+
+  // Build fill instructions for each checked match, keyed by fieldIndex.
+  const selectedIndices = new Set(
+    Array.from(checked).map(cb => parseInt(cb.dataset.fieldIndex, 10))
+  );
+  const fills = (state.autofillMatches || [])
+    .filter(m => selectedIndices.has(m.field.fieldIndex))
+    .map(m => ({
+      fieldIndex: m.field.fieldIndex,
+      fieldId:    m.field.fieldId,
+      tagName:    m.field.tagName,
+      type:       m.field.type,
+      id:         m.field.id,    // passed to content script for staleness check
+      name:       m.field.name,  // passed to content script for staleness check
+      value:      m.profileValue,
+    }));
+
+  if (fills.length === 0) {
+    showToast('No matching fields to fill.');
+    return;
+  }
+
+  // Do NOT close the overlay yet — only close after at least one field fills successfully.
+  // Keeping context visible lets the user rescan without losing state.
+
+  try {
+    const tab = await getScanTargetTab();
+
+    if (!tab?.id) {
+      showToast('⚠️ No active tab found. Reopen the application form and try again.');
+      return;
+    }
+
+    if (isRestrictedUrl(tab.url)) {
+      showToast('⚠️ Cannot fill fields on this page type.');
+      return;
+    }
+
+    // Re-inject in case the tab was navigated since the scan.
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    } catch (injectErr) {
+      console.warn('[JPDA] Could not inject content script for fill:', injectErr.message);
+      showToast('⚠️ Cannot access this page. Try reloading the form tab and rescanning.');
+      return;
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'FILL_FORM_FIELDS', fills });
+
+    if (!response) {
+      showToast('⚠️ No response from page. The form may have changed — scan again.');
+      return;
+    }
+
+    if (response.error) {
+      console.warn('[JPDA] Fill error:', response.error);
+      showToast(`⚠️ Fill failed: ${response.error}`);
+      return;
+    }
+
+    const { filled, failed } = response;
+
+    if (filled > 0) {
+      // Success — close overlay and update status in the Application Form card.
+      closeAutofillReview();
+      if (failed === 0) {
+        showToast(`✦ ${filled} field${filled !== 1 ? 's' : ''} filled.`);
+        dom.autofillStatusText.textContent = `${filled} field${filled !== 1 ? 's' : ''} filled.`;
+      } else {
+        showToast(`✦ ${filled} filled. ${failed} could not be filled — check those manually.`);
+        dom.autofillStatusText.textContent = `${filled} filled. ${failed} failed.`;
+      }
+    } else {
+      // All fills failed — keep the overlay open so the user can rescan without losing context.
+      showToast('⚠️ No fields were filled. The form may have changed — scan again.');
+    }
+  } catch (err) {
+    console.warn('[JPDA] handleFillPage error:', err?.message || 'Unknown error');
+    showToast('⚠️ Could not fill the form. Try rescanning the page.');
+  }
 }
 
 function showJobInfoReviewNotice(message, tone = 'warning') {
@@ -475,6 +716,61 @@ async function scanCurrentPage() {
   }
 }
 
+async function scanFormFieldsOnPage() {
+  const btn = dom.btnScanFormFields;
+  btn.disabled = true;
+  btn.textContent = 'Scanning…';
+
+  try {
+    const tab = await getScanTargetTab();
+
+    if (!tab?.id) {
+      showToast('⚠️ No active tab found.');
+      return;
+    }
+
+    if (isRestrictedUrl(tab.url)) {
+      showToast('⚠️ Cannot scan this page — open the job application form in a normal browser tab first.');
+      return;
+    }
+
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    } catch (injectErr) {
+      console.warn('[JPDA] Could not inject content script:', injectErr.message);
+      showToast('⚠️ Cannot scan this page — Chrome blocks scripts here.');
+      return;
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'SCAN_FORM_FIELDS' });
+
+    if (!response) {
+      showToast('⚠️ No response from page. Try reloading the application form tab first.');
+      return;
+    }
+
+    if (response.error) {
+      showToast(`⚠️ ${response.error}`);
+      return;
+    }
+
+    state.autofillFields = response.fields || [];
+    const { matches, summary } = buildAutofillMatches(state.autofillFields, state.profile);
+    state.autofillMatches = matches;
+    updateAutofillStatus(state.autofillFields, summary);
+    refreshAutofillCard();
+
+    const count = state.autofillFields.length;
+    showToast(count > 0 ? `✦ ${count} field${count !== 1 ? 's' : ''} scanned, ${matches.length} matched.` : 'No form fields found on this page.');
+  } catch (err) {
+    console.warn('[JPDA] scanFormFieldsOnPage error:', err?.message || 'Unknown error');
+    showToast('⚠️ Could not scan form fields.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan form fields';
+  }
+}
+
 // ── Events ────────────────────────────────────────────────────────────────
 function bindEvents() {
   // Feature tour
@@ -568,6 +864,12 @@ function bindEvents() {
     state.profile  = await loadProfile();
     dom.mockBanner.classList.toggle('hidden', state.settings?.provider !== 'mock');
     await populateProfileStrip();
+    if (state.autofillFields.length > 0) {
+      const { matches, summary } = buildAutofillMatches(state.autofillFields, state.profile);
+      state.autofillMatches = matches;
+      updateAutofillStatus(state.autofillFields, summary);
+    }
+    refreshAutofillCard();
   });
 
   // Tabs
@@ -593,6 +895,18 @@ function bindEvents() {
     if (await confirmOverwrite('both')) runGeneration('both');
   });
   dom.btnAiJobInfo.addEventListener('click', runAiJobInfoExtraction);
+
+  // Application Form
+  dom.btnScanFormFields.addEventListener('click', scanFormFieldsOnPage);
+  dom.btnReviewAutofill.addEventListener('click', openAutofillReview);
+
+  // Autofill review overlay
+  $('btn-close-autofill-review').addEventListener('click', closeAutofillReview);
+  $('btn-cancel-autofill-review').addEventListener('click', closeAutofillReview);
+  dom.btnFillPage.addEventListener('click', handleFillPage);
+  dom.autofillReviewBody.addEventListener('change', e => {
+    if (e.target.classList.contains('autofill-row-check')) updateFillPageButton();
+  });
 
   // Revision — button stays disabled until the user has typed something
   dom.fieldRevision.addEventListener('input', refreshRevisionButton);
@@ -2259,6 +2573,16 @@ async function switchToProfile(profileId) {
   state.profile = await switchProfile(profileId);
   await populateProfileStrip();
   closeProfileMenu();
+
+  // Re-run autofill matching so the review overlay reflects the new profile,
+  // consistent with the same logic in the settings-close handler.
+  if (state.autofillFields.length > 0) {
+    const { matches, summary } = buildAutofillMatches(state.autofillFields, state.profile);
+    state.autofillMatches = matches;
+    updateAutofillStatus(state.autofillFields, summary);
+  }
+  refreshAutofillCard();
+
   showToast('✦ Profile switched.');
 }
 

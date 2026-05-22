@@ -4,9 +4,11 @@ This document captures release prep notes and future roadmap ideas. It is planni
 
 ## Current Status
 
-Version 1.0 has already been submitted to the Chrome Web Store and is pending review.
+Version 1.0 is live on the Chrome Web Store.
 
-`main` currently contains the v2.0 candidate foundation:
+Version 2.0 release checklist is complete (manifest bumped, smoke tests passed, privacy policy verified). CWS screenshots and overview copy have been updated. v2.0 is ready to submit.
+
+`main` currently contains:
 
 - Saved Jobs workflow
 - Fit Analysis for Saved Jobs
@@ -14,6 +16,7 @@ Version 1.0 has already been submitted to the Chrome Web Store and is pending re
 - Safe URL opening
 - Clear session cleanup
 - Storage quota guards
+- Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
 
 ## v2.0 Release Prep
 
@@ -119,29 +122,25 @@ Preferred behavior:
 
 Treat it as a link collector first, not guaranteed full job-description extraction.
 
-### 6. Assisted Form Filling
+### 6. Application Form Autofill
 
-Suggested branch: `feature/assisted-form-fill`
+Status: **MVP complete on `main`** (Phases 1–5).
 
-Goal: help users fill common application form fields using their saved profile.
+What was built:
 
-Possible fields:
+- Scan form fields button — content script walks visible `input`, `select`, `textarea` on the active tab and returns field descriptors
+- Deterministic rule-based matcher — maps scanned fields to active profile values using signal patterns (label text, aria-label, placeholder, name, id, autocomplete attribute)
+- Review overlay — shows matched / skipped fields with confidence badges; high-confidence rows pre-checked, medium unchecked; user can uncheck any row before filling
+- Controlled page fill — fills only checked rows; dispatches native setter + `input` + `change` events for React/Vue/Angular compatibility; re-checks for sensitive fields before writing; staleness guard using id/name
+- Safety guardrails: sensitive/legal/demographic fields skipped, submit/button/password/file/payment/captcha fields excluded, no form submission, no auto-checking consent checkboxes
 
-- Name
-- Email
-- Phone
-- Address
-- LinkedIn
-- Portfolio
-- Work authorization
-- Resume upload
-- Cover letter upload
+Guardrails (permanent):
 
-Guardrails:
-
-- User reviews all fields.
+- User reviews all fields before anything is written.
 - User manually submits the application.
-- No automatic submission.
+- No automatic submission, ever.
+
+See `## Autofill Known Limitations / Future Improvements` for next steps.
 
 ### 7. Job Dashboard Stats
 
@@ -176,12 +175,45 @@ Why later: persistent storage risks were handled first. Session storage is tempo
 
 ## Suggested Order After v2.0 Prep
 
-1. `release/v2.0-prep`
-2. `feature/application-pack-actions`
-3. `feature/use-fit-analysis-in-generation`
-4. `feature/batch-job-intake`
-5. `feature/job-url-import`
-6. `feature/assisted-form-fill`
+1. ~~`release/v2.0-prep`~~ — complete
+2. ~~`feature/assisted-form-fill`~~ — MVP complete on `main` (see above)
+3. `feature/application-pack-actions`
+4. `feature/use-fit-analysis-in-generation`
+5. `feature/batch-job-intake`
+6. `feature/job-url-import`
+
+### Autofill improvements (suggested branch: `feature/autofill-improvements`)
+
+See `## Autofill Known Limitations / Future Improvements` for scope.
+
+## Autofill Known Limitations / Future Improvements
+
+These are known constraints of the current MVP. None block local testing; they are inputs for future iterations.
+
+### Matching
+
+- Field matching currently uses deterministic rules only. AI-assisted matching for custom question fields (e.g. "Why do you want to work here?") is a future consideration.
+- Multiple employment history sections are not fully mapped — only the most recent experience entry is used per field group.
+- Multiple education entries are not mapped — only the first education entry is used.
+- Employment and education date handling is basic because profile dates are stored as freeform strings (e.g. "Jan 2021"). Structured month/year fields on application forms may not match reliably.
+- Month/year dropdown support is limited to exact and case-insensitive text matching, plus a starts-with pass restricted to known month abbreviations only.
+
+### Field identity
+
+- Field identity uses scan-time index plus id/name attribute validation. More robust selectors (XPath, stable CSS paths) may be needed for heavily dynamic forms.
+- If the application form re-renders between scan and fill (e.g. React SPA navigation), the field index can become stale. The current guard catches obvious mismatches but is not foolproof.
+
+### Page compatibility
+
+- Cross-origin iframes cannot be scanned or filled due to browser security restrictions. Many ATS platforms embed their forms in same-origin iframes, but some use cross-origin frames.
+- Shadow DOM and custom web component inputs (used by some ATS widgets) may not be detected by `querySelectorAll`.
+- Workday, Greenhouse, Lever, SmartRecruiters, and other major ATS platforms may need platform-specific adapters for reliable field detection and filling.
+
+### Safety boundaries (permanent — not limitations)
+
+- Autofill does not and must never submit applications.
+- Sensitive, legal, demographic, and equal-opportunity fields are always skipped and must be answered manually.
+- The user reviews and confirms every fill before anything is written to the page.
 
 ## Product Principle
 
