@@ -2646,6 +2646,25 @@ function normalizeDraftContent(type, parsed) {
     : normalizeResumeDraft(parsed);
 }
 
+function normalizeEducationDraft(edu, index) {
+  const profileEdu = state.profile?.education?.[index] ?? {};
+  return {
+    institution: String(edu?.institution || profileEdu.institution || ''),
+    credential:  String(edu?.credential  || edu?.degree || profileEdu.credential || ''),
+    location:    String(edu?.location    || profileEdu.location    || ''),
+    dates: String(
+      edu?.dates          ||
+      edu?.date           ||
+      edu?.year           ||
+      edu?.graduationYear ||
+      profileEdu.dates    ||
+      profileEdu.year     ||
+      ''
+    ),
+    notes: toStringArray(edu?.notes),
+  };
+}
+
 function normalizeResumeDraft(parsed) {
   const experience = toArray(parsed.experience).map(exp => ({
     jobTitle: String(exp?.jobTitle || ''),
@@ -2660,13 +2679,7 @@ function normalizeResumeDraft(parsed) {
     summary: String(parsed.summary || parsed.professionalSummary || ''),
     skills: toStringArray(parsed.skills),
     experience,
-    education: toArray(parsed.education).map(edu => ({
-      institution: String(edu?.institution || ''),
-      credential: String(edu?.credential || edu?.degree || ''),
-      location: String(edu?.location || ''),
-      dates: String(edu?.dates || edu?.date || ''),
-      notes: toStringArray(edu?.notes),
-    })),
+    education: toArray(parsed.education).map((edu, i) => normalizeEducationDraft(edu, i)),
     certifications: toStringArray(parsed.certifications),
     projects: toArray(parsed.projects).map(project => ({
       name: String(project?.name || ''),

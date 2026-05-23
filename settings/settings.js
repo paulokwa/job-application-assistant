@@ -1075,10 +1075,12 @@ function syncLockToggles(lockedSections = {}) {
     const btn = document.getElementById('lock-btn-' + key);
     if (!btn) continue;
     const locked = !!lockedSections[key];
+    const label = SECTION_LABELS[key];
     btn.setAttribute('aria-pressed', String(locked));
+    btn.setAttribute('title', locked ? `Unlock ${label} for AI import` : `Lock ${label} from AI import`);
     btn.classList.toggle('is-locked', locked);
     btn.querySelector('.lock-icon').textContent = locked ? '🔒' : '🔓';
-    btn.querySelector('.lock-label').textContent = locked ? 'Locked' : 'Lock from AI import';
+    btn.querySelector('.lock-label').textContent = locked ? 'Locked from AI import' : 'Lock from AI import';
   }
 }
 

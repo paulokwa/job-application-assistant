@@ -34,24 +34,22 @@ Rules:
 - [DONE] Fit Analysis scoring prompt overhauled — added 0–100 rubric with anchor points, replaced over-strict "do not infer" rule with transferable skills recognition.
 - [DONE] Per-profile Fit Analysis inference mode toggle (Transferable / Exact) — stored in profile metadata, visible and switchable in Manage Profiles, explanation text added (`settings/settings.html`, `settings/settings.js`, `settings/settings.css`, `dashboard/dashboard.js`, `modules/fitAnalysis.js`).
 - [DONE] Section-level locking for My Profile AI import (V1, section-blocking only) — users can lock any of 7 profile sections (Personal Details, Summaries, Skills, Experience, Education, Certifications, Additional Background) to prevent AI analyser import from overwriting them. Lock toggles on each section card, pre-import warning modal, enforcement inside `attemptAutofill()` merge block, skipped-section names shown in success status. Lock state stored in `profile.metadata.lockedSections`. Manual edits unaffected. Side-effect fix: `saveProfileData()`, `clearProfile()`, and profile switch/add paths now preserve full `profile.metadata` (was being discarded on every manual save — pre-existing bug). (`modules/schema.js`, `settings/settings.html`, `settings/settings.css`, `settings/settings.js`)
+- [DONE] Lock button UX polish — locked state label updated from "Locked" to "Locked from AI import"; `syncLockToggles()` now updates the `title` attribute dynamically ("Unlock X for AI import" when locked, "Lock X from AI import" when unlocked). (`settings/settings.js`)
+- [DONE] Education dates fix — `normalizeResumeDraft()` in `dashboard/dashboard.js` was silently dropping education dates when the AI returned `year`/`graduationYear` keys or omitted the field entirely. Added `normalizeEducationDraft(edu, index)` helper with fallback chain: `edu.dates → edu.date → edu.year → edu.graduationYear → profile.education[index].dates → profile.education[index].year → ''`. Safe profile fallbacks also applied to institution/credential/location. (`dashboard/dashboard.js` only)
 
 ## Current Main Branch State
 
-Latest known `main` commit (2026-05-22):
+Latest known `main` commit (2026-05-23):
 
-`c97375e` - `fix: update ATS platforms list for field detection and filling`
+`adf45b1` - `feat: add section-level locking for My Profile AI import`
 
-Recent merged work on main (not in previous handover entries):
-- `c97375e` fix: update ATS platforms list for field detection and filling
-- `90d1bd6` feat: enhance education date handling in autofill and drafting modules
-- `351b356` feat: implement autofill review feature with UI and logic (form-field autofill review overlay in dashboard)
-- `b2f0415` release: bump to v2.0.0 and update handover gate
+Recent work this session (uncommitted):
+- Lock button UX polish (`settings/settings.js`)
+- Education dates normalization fix (`dashboard/dashboard.js`)
 
 ## Next Likely Branch
 
-`feature/profile-section-locking` (just implemented — see Completed list)
-
-Next after that: application pack, or V1.1 polish depending on user priority.
+Next: application pack, or V2.1 polish depending on user priority.
 
 ## Do Not Repeat
 
