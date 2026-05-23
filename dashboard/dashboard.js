@@ -17,6 +17,7 @@ import {
   wasTruncated,
 } from '../modules/storageLimits.js';
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
+import { buildFilename, downloadBlob } from '../modules/template.js';
 import { mapError } from '../modules/errorMapper.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -136,6 +137,10 @@ const dom = {
   btnPrintResume:     $('btn-print-resume'),
   btnPrintCL:         $('btn-print-cl'),
   btnPrintMerged:     $('btn-print-merged'),
+  btnDownloadBoth:    $('btn-download-both'),
+  btnDownloadResume:  $('btn-download-resume'),
+  btnDownloadCL:      $('btn-download-cl'),
+  btnDownloadMerged:  $('btn-download-merged'),
 
   btnAtsScan:         $('btn-ats-scan'),
   atsEmpty:           $('ats-empty'),
@@ -987,6 +992,10 @@ function bindEvents() {
   dom.btnPrintResume.addEventListener('click', () => printDraft('resume'));
   dom.btnPrintCL.addEventListener('click', () => printDraft('cover-letter'));
   dom.btnPrintMerged.addEventListener('click', () => printDraft('merged'));
+  dom.btnDownloadBoth.addEventListener('click', () => downloadPdfDraft('resume', 'cover-letter'));
+  dom.btnDownloadResume.addEventListener('click', () => downloadPdfDraft('resume'));
+  dom.btnDownloadCL.addEventListener('click', () => downloadPdfDraft('cover-letter'));
+  dom.btnDownloadMerged.addEventListener('click', () => downloadPdfDraft('merged'));
 
   // Error Retry
   dom.btnErrorRetry.addEventListener('click', () => {
@@ -1234,9 +1243,11 @@ async function runGeneration(mode) {
     if (mode === 'both') {
       dom.tabBtnMerged.classList.remove('hidden');
       dom.btnPrintMerged.classList.remove('hidden');
+      dom.btnDownloadMerged.classList.remove('hidden');
     } else {
       dom.tabBtnMerged.classList.add('hidden');
       dom.btnPrintMerged.classList.add('hidden');
+      dom.btnDownloadMerged.classList.add('hidden');
     }
 
     switchTab(toGenerate[0]);
@@ -2076,6 +2087,223 @@ function printDraft(...types) {
 
 // ── Draft Persistence ─────────────────────────────────────────────────────
 
+async function downloadPdfDraft(...types) {
+  const docSettings = await loadDocumentSettings();
+  const targetGroups = getRequestedDownloadTargets(types);
+
+  if (!targetGroups.length) {
+    showToast('No content to download yet.');
+    return;
+  }
+
+  if (!chrome.debugger?.attach || !chrome.tabs?.create) {
+    showToast('Direct PDF download is not available in this browser context.');
+    return;
+  }
+
+  setDownloadButtonsLoading(true);
+  showToast('Preparing PDF download...');
+
+  try {
+    const filenames = [];
+    for (const targets of targetGroups) {
+      filenames.push(await downloadPrintablePdf(targets, docSettings.filenamePattern));
+    }
+
+    appendJobHistory(types);
+    showToast(filenames.length === 1
+      ? `PDF ready: ${filenames[0]}`
+      : `PDFs ready: ${filenames.length} files`);
+  } catch (err) {
+    console.error('Experimental PDF download failed:', err);
+    showToast('Could not create the PDF download. Use Save as PDF instead.');
+  } finally {
+    setDownloadButtonsLoading(false);
+    refreshExportButtons();
+  }
+}
+
+async function loadDocumentSettings() {
+  const { docSettings = {} } = await chrome.storage.sync.get(['docSettings']);
+  return docSettings || {};
+}
+
+function getRequestedDownloadTargets(types) {
+  const hasResume = !!state.drafts.resume;
+  const hasCL = !!state.drafts['cover-letter'];
+  const targets = types.length ? types : [state.currentTab];
+
+  if (targets.includes('merged')) {
+    return hasResume && hasCL ? [['merged']] : [];
+  }
+
+  return targets
+    .filter(tab => (tab === 'resume' && hasResume) || (tab === 'cover-letter' && hasCL))
+    .map(tab => [tab]);
+}
+
+async function downloadPrintablePdf(targets, pattern) {
+  const filenameBase = getSuggestedFilenameBase(pattern, targets);
+  const filename = `${filenameBase}.pdf`;
+  const html = withDocumentTitle(getPrintableHtml(targets), filenameBase);
+  const htmlUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+  let pdfUrl = '';
+  let tabId = null;
+  let attached = false;
+
+  try {
+    const tab = await chrome.tabs.create({ url: htmlUrl, active: false });
+    tabId = tab.id;
+    if (!tabId) throw new Error('Could not open the temporary PDF tab.');
+
+    await waitForTabLoad(tabId);
+    await chrome.debugger.attach({ tabId }, '1.3');
+    attached = true;
+
+    const pdf = await chrome.debugger.sendCommand({ tabId }, 'Page.printToPDF', {
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+
+    const pdfBlob = base64ToBlob(pdf.data, 'application/pdf');
+    pdfUrl = URL.createObjectURL(pdfBlob);
+
+    if (chrome.downloads?.download) {
+      await chrome.downloads.download({
+        url: pdfUrl,
+        filename,
+        saveAs: true,
+        conflictAction: 'uniquify',
+      });
+    } else {
+      downloadBlob(pdfBlob, filename);
+    }
+
+    return filename;
+  } finally {
+    if (attached && tabId) {
+      try { await chrome.debugger.detach({ tabId }); } catch (err) { console.warn('Could not detach debugger:', err); }
+    }
+    if (tabId) {
+      try { await chrome.tabs.remove(tabId); } catch (err) { console.warn('Could not close temporary PDF tab:', err); }
+    }
+    URL.revokeObjectURL(htmlUrl);
+    if (pdfUrl) setTimeout(() => URL.revokeObjectURL(pdfUrl), 30000);
+  }
+}
+
+function setDownloadButtonsLoading(isLoading) {
+  [
+    dom.btnDownloadBoth,
+    dom.btnDownloadResume,
+    dom.btnDownloadCL,
+    dom.btnDownloadMerged,
+  ].forEach(btn => {
+    btn.classList.toggle('btn--loading', isLoading);
+    btn.disabled = isLoading || btn.disabled;
+  });
+}
+
+function getPrintableHtml(targets) {
+  const options = {
+    accentColor: state.accentColor,
+    spacingMode: state.spacingMode,
+  };
+
+  if (targets.includes('merged')) {
+    const resumeData = { ...state.drafts.resume, personalInfo: state.profile.personalInfo };
+    const clData = { personalInfo: state.profile.personalInfo, content: state.drafts['cover-letter'] };
+    return renderMergedDocument(state.templateId, resumeData, clData, options);
+  }
+
+  const tab = targets[0];
+  if (state.hasEdits[tab]) {
+    const iframe = tab === 'resume' ? dom.previewResumeFrame : dom.previewCLFrame;
+    return getIframeHtml(iframe);
+  }
+
+  const draft = state.drafts[tab];
+  const data = tab === 'resume'
+    ? { ...draft, personalInfo: state.profile.personalInfo }
+    : { personalInfo: state.profile.personalInfo, content: draft };
+
+  return renderDocument(state.templateId, tab, data, options);
+}
+
+function getSuggestedFilenameBase(pattern, targets) {
+  const docType = targets.includes('merged') || (targets.includes('resume') && targets.includes('cover-letter'))
+    ? 'Resume + Cover Letter'
+    : targets.includes('cover-letter') ? 'Cover Letter'
+    : 'Resume';
+
+  return buildFilename(pattern, {
+    jobTitle: state.jobData.jobTitle,
+    company: state.jobData.company,
+    docType,
+  });
+}
+
+function withDocumentTitle(html, title) {
+  const safeTitle = escapeTitleText(title);
+  if (/<title>[\s\S]*?<\/title>/i.test(html)) {
+    return html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle}</title>`);
+  }
+  return html.replace(/<head(\s[^>]*)?>/i, `$&\n      <title>${safeTitle}</title>`);
+}
+
+function escapeTitleText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function waitForTabLoad(tabId) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      chrome.tabs.onUpdated.removeListener(listener);
+      reject(new Error('Timed out while preparing the temporary PDF tab.'));
+    }, 10000);
+
+    function finish() {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
+    }
+
+    function listener(updatedTabId, info) {
+      if (updatedTabId !== tabId || info.status !== 'complete') return;
+      finish();
+    }
+
+    chrome.tabs.onUpdated.addListener(listener);
+    chrome.tabs.get(tabId).then(tab => {
+      if (tab.status === 'complete') finish();
+    }).catch(() => {});
+  });
+}
+
+function base64ToBlob(base64, mimeType) {
+  const binary = atob(base64);
+  const chunks = [];
+  for (let i = 0; i < binary.length; i += 8192) {
+    const slice = binary.slice(i, i + 8192);
+    const bytes = new Uint8Array(slice.length);
+    for (let j = 0; j < slice.length; j += 1) {
+      bytes[j] = slice.charCodeAt(j);
+    }
+    chunks.push(bytes);
+  }
+  return new Blob(chunks, { type: mimeType });
+}
+
 function restoreSavedDraft(saved) {
   state.drafts         = saved.drafts         || { resume: null, 'cover-letter': null };
   state.originalDrafts = saved.originalDrafts || { resume: null, 'cover-letter': null };
@@ -2114,6 +2342,7 @@ function restoreSavedDraft(saved) {
   if (state.lastRunMode === 'both') {
     dom.tabBtnMerged.classList.remove('hidden');
     dom.btnPrintMerged.classList.remove('hidden');
+    dom.btnDownloadMerged.classList.remove('hidden');
   }
 
   if (state.drafts.resume || state.drafts['cover-letter']) {
@@ -2144,6 +2373,7 @@ async function clearDraft(tab) {
     dom.draftMergedContent.classList.add('hidden');
     dom.tabBtnMerged.classList.add('hidden');
     dom.btnPrintMerged.classList.add('hidden');
+    dom.btnDownloadMerged.classList.add('hidden');
     await chrome.storage.local.remove(['savedDraft']);
   } else {
     const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
@@ -2200,6 +2430,7 @@ async function clearSession() {
   dom.draftMergedContent.classList.add('hidden');
   dom.tabBtnMerged.classList.add('hidden');
   dom.btnPrintMerged.classList.add('hidden');
+  dom.btnDownloadMerged.classList.add('hidden');
   clearEditState('resume');
   clearEditState('cover-letter');
   updateManualEditNotice();
@@ -2444,6 +2675,10 @@ function refreshExportButtons() {
   dom.btnPrintResume.disabled = !hasResume;
   dom.btnPrintCL.disabled = !hasCL;
   dom.btnPrintMerged.disabled = !(hasResume && hasCL);
+  dom.btnDownloadBoth.disabled = !(hasResume && hasCL);
+  dom.btnDownloadResume.disabled = !hasResume;
+  dom.btnDownloadCL.disabled = !hasCL;
+  dom.btnDownloadMerged.disabled = !(hasResume && hasCL);
   dom.btnAtsScan.disabled = !hasResume || !state.jobData.description;
 }
 

@@ -5,11 +5,14 @@ Before planning or coding, read these files in order:
 1. START_HERE.md
 2. SESSION_HANDOVER.md
 3. AGENT.md
-4. RELEASE_V2_CHECKLIST.md
+4. RELEASE_V3_CHECKLIST.md
 5. ROADMAP.md
 
 Current release gate:
-Do not package or submit v2.0 until the v1.0 Chrome Web Store review result is known and the user confirms.
+Do not package or submit v3.0 until the v2.0 Chrome Web Store review result is known and the user confirms.
+
+Important v3 release risk:
+Direct PDF download currently uses the Chrome `debugger` permission. Review `RELEASE_V3_CHECKLIST.md` before deciding whether it can ship.
 
 Before doing work, report:
 

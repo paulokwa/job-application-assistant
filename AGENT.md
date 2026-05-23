@@ -5,7 +5,7 @@
 Every AI agent/Codex/Claude session must read these files before planning or coding:
 
 1. `SESSION_HANDOVER.md` if present
-2. `RELEASE_V2_CHECKLIST.md`
+2. `RELEASE_V3_CHECKLIST.md`
 3. `ROADMAP.md`
 4. `README.md` as needed
 
@@ -17,7 +17,7 @@ Before starting work, report:
 - Next gated action
 - What is already completed and must not be repeated
 
-Release gate: do not start packaging or submitting v2.0 until the v1.0 Chrome Web Store review result is known and the user confirms they are ready to proceed.
+Release gate: do not start packaging or submitting v3.0 until the v2.0 Chrome Web Store review result is known and the user confirms they are ready to proceed.
 
 If you are an AI agent picking up work on this project, read these files before doing anything:
 
@@ -25,9 +25,10 @@ If you are an AI agent picking up work on this project, read these files before 
 
 | File | Purpose |
 |---|---|
-| `SESSION_HANDOVER.md` | Current release gate, completed v2 candidate work, and do-not-repeat list |
-| `RELEASE_V2_CHECKLIST.md` | Required checklist for future v2.0 packaging after the v1.0 review gate clears |
-| `ROADMAP.md` | Future roadmap ideas and suggested branch order after v2.0 prep |
+| `SESSION_HANDOVER.md` | Current release gate, completed v2 work, v3 candidate work, and do-not-repeat list |
+| `RELEASE_V3_CHECKLIST.md` | Required checklist for future v3.0 packaging after the v2.0 review gate clears |
+| `RELEASE_V2_CHECKLIST.md` | Historical checklist for the submitted v2.0 package |
+| `ROADMAP.md` | Future roadmap ideas and suggested branch order after v2.0 |
 | `README.md` | Repo overview, setup, and basic usage |
 | `TROUBLESHOOTING.md` | Resolved technical issues that could recur — check here before debugging familiar-sounding problems |
 | `PRODUCT.md` | Strategic context: who the users are, what the product does, design principles, anti-references |

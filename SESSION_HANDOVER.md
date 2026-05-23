@@ -3,7 +3,7 @@
 ## Current Release Status
 
 - v2.0 submitted to the Chrome Web Store (2026-05-22). Pending review.
-- `main` is the active development branch.
+- `main` is the active development branch for post-v2 / v3 candidate work.
 
 ## Next Action Gate
 
@@ -15,7 +15,14 @@ Status:
   2. Pasted updated overview copy into the Chrome Web Store developer dashboard.
 [WAITING] v2.0 Chrome Web Store review result.
 
-Next planned work: Application Pack, or V2.1 polish — user to confirm priority once v2.0 review clears.
+Next planned work: v3 candidate review, Application Pack, or v3 polish — user to confirm priority once v2.0 review clears.
+
+## v3 Candidate Work In Progress
+
+- Direct PDF download was added as a separate export path from the existing print-dialog Save as PDF flow.
+- The print-dialog Save as PDF function should remain available as the fallback/default export path.
+- Direct PDF download currently preserves formatting and respects filename settings, but depends on Chrome `debugger` plus `downloads` permissions.
+- Important release risk: `debugger` is powerful, cannot be optional, may slow Chrome Web Store review, and may be rejected as excessive. Review `RELEASE_V3_CHECKLIST.md` before any v3 packaging or submission.
 
 ## Completed Since v1.0 Submission
 
@@ -83,9 +90,10 @@ Uncommitted at time of handover: Phase 2 Workday autofill work listed above — 
 
 See `ROADMAP.md`. Do not duplicate the full roadmap here.
 
-## Release Checklist
+## Release Checklists
 
-See `RELEASE_V2_CHECKLIST.md`.
+See `RELEASE_V3_CHECKLIST.md` for active v3 planning.
+See `RELEASE_V2_CHECKLIST.md` only as the historical checklist for the already-submitted v2.0 package.
 
 ## Handover Maintenance Rule
 

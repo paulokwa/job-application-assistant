@@ -378,12 +378,13 @@
       <!-- Save Card -->
       <section class="card" id="card-save">
         <div class="card-header">
-          <span class="card-title">Save as PDF</span>
+          <span class="card-title">Export PDF</span>
         </div>
         <div class="ai-review-warning" role="note">
           AI-generated content — review all facts, dates, job titles, and claims carefully before submitting. You are responsible for the accuracy of your application.
         </div>
         <div class="save-buttons">
+          <div class="export-group-label">Print via dialog</div>
           <div class="btn-group-row save-button-row">
             <button id="btn-print-both" class="btn-confirm" style="width: 100%;" disabled>Resume + Cover Letter</button>
             <button id="btn-print-resume" class="btn-confirm" style="width: 100%;" disabled>Resume Only</button>
@@ -391,6 +392,15 @@
           </div>
           <button id="btn-print-merged" class="btn-confirm hidden" style="width: 100%; margin-bottom: 4px;" disabled>Merged Document</button>
           <p class="export-hint">Opens your browser's print dialog — choose <strong>Save as PDF</strong> as the destination.</p>
+
+          <div class="export-group-label export-group-label--download">Download PDF</div>
+          <div class="btn-group-row save-button-row">
+            <button id="btn-download-both" class="btn-secondary" style="width: 100%;" disabled>Resume + Cover Letter</button>
+            <button id="btn-download-resume" class="btn-secondary" style="width: 100%;" disabled>Resume Only</button>
+            <button id="btn-download-cl" class="btn-secondary" style="width: 100%;" disabled>Cover Letter Only</button>
+          </div>
+          <button id="btn-download-merged" class="btn-secondary hidden" style="width: 100%; margin-bottom: 4px;" disabled>Merged Document</button>
+          <p class="export-hint export-hint--download">Opens a Save As dialog with your filename settings.</p>
         </div>
       </section>
 
