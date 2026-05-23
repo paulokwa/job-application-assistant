@@ -99,6 +99,7 @@ export const DEFAULT_RESUME_CONTENT = {
     selectedTemplate: 'classic',
     accentColor: '#2563eb', // Default blue-600
     spacingMode: 'standard',
+    lockedSections: {},
   },
 };
 

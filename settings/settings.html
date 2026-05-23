@@ -215,7 +215,15 @@
 
       <!-- Personal Details -->
       <div class="card" id="card-personal-details">
-        <h3 class="card-sub-title">Personal Details</h3>
+        <div class="card-title-row">
+          <h3 class="card-sub-title">Personal Details</h3>
+          <button class="section-lock-btn" id="lock-btn-personalInfo" type="button"
+                  data-section="personalInfo" aria-pressed="false"
+                  title="Lock Personal Details from AI import">
+            <span class="lock-icon" aria-hidden="true">🔓</span>
+            <span class="lock-label">Lock from AI import</span>
+          </button>
+        </div>
         <div class="form-grid-2">
           <div class="field-group">
             <label for="p-name">Full Name <span aria-label="required">*</span></label>
@@ -245,44 +253,92 @@
       </div>
 
       <!-- Summaries -->
-      <div class="card">
-        <h3 class="card-sub-title">Professional Summaries</h3>
+      <div class="card" id="card-summaries">
+        <div class="card-title-row">
+          <h3 class="card-sub-title">Professional Summaries</h3>
+          <button class="section-lock-btn" id="lock-btn-summaries" type="button"
+                  data-section="summaries" aria-pressed="false"
+                  title="Lock Professional Summaries from AI import">
+            <span class="lock-icon" aria-hidden="true">🔓</span>
+            <span class="lock-label">Lock from AI import</span>
+          </button>
+        </div>
         <p class="field-hint">Store different summary styles. The AI will use the most relevant one for each application.</p>
         <div id="summaries-list"></div>
         <button class="btn-add" id="btn-add-summary" type="button">+ Add Style</button>
       </div>
 
       <!-- Skills -->
-      <div class="card">
-        <h3 class="card-sub-title">Skills</h3>
+      <div class="card" id="card-skills">
+        <div class="card-title-row">
+          <h3 class="card-sub-title">Skills</h3>
+          <button class="section-lock-btn" id="lock-btn-skills" type="button"
+                  data-section="skills" aria-pressed="false"
+                  title="Lock Skills from AI import">
+            <span class="lock-icon" aria-hidden="true">🔓</span>
+            <span class="lock-label">Lock from AI import</span>
+          </button>
+        </div>
         <p class="field-hint">One skill per line. Include both soft and technical skills.</p>
         <textarea id="p-skills" rows="6" placeholder="Client support&#10;Case documentation&#10;Stakeholder communication&#10;Jira&#10;Zendesk&#10;SEO" aria-label="Skills, one per line"></textarea>
       </div>
 
       <!-- Work Experience -->
-      <div class="card">
-        <h3 class="card-sub-title">Work Experience</h3>
+      <div class="card" id="card-experience">
+        <div class="card-title-row">
+          <h3 class="card-sub-title">Work Experience</h3>
+          <button class="section-lock-btn" id="lock-btn-experience" type="button"
+                  data-section="experience" aria-pressed="false"
+                  title="Lock Work Experience from AI import">
+            <span class="lock-icon" aria-hidden="true">🔓</span>
+            <span class="lock-label">Lock from AI import</span>
+          </button>
+        </div>
         <div id="experience-list"></div>
         <button class="btn-add" id="btn-add-exp" type="button">+ Add Role</button>
       </div>
 
       <!-- Education -->
-      <div class="card">
-        <h3 class="card-sub-title">Education</h3>
+      <div class="card" id="card-education">
+        <div class="card-title-row">
+          <h3 class="card-sub-title">Education</h3>
+          <button class="section-lock-btn" id="lock-btn-education" type="button"
+                  data-section="education" aria-pressed="false"
+                  title="Lock Education from AI import">
+            <span class="lock-icon" aria-hidden="true">🔓</span>
+            <span class="lock-label">Lock from AI import</span>
+          </button>
+        </div>
         <div id="education-list"></div>
         <button class="btn-add" id="btn-add-edu" type="button">+ Add Education</button>
       </div>
 
       <!-- Certifications -->
-      <div class="card">
-        <h3 class="card-sub-title">Certifications</h3>
+      <div class="card" id="card-certifications">
+        <div class="card-title-row">
+          <h3 class="card-sub-title">Certifications</h3>
+          <button class="section-lock-btn" id="lock-btn-certifications" type="button"
+                  data-section="certifications" aria-pressed="false"
+                  title="Lock Certifications from AI import">
+            <span class="lock-icon" aria-hidden="true">🔓</span>
+            <span class="lock-label">Lock from AI import</span>
+          </button>
+        </div>
         <div id="certifications-list"></div>
         <button class="btn-add" id="btn-add-cert" type="button">+ Add Certification</button>
       </div>
 
       <!-- Custom Sections -->
-      <div class="card">
-        <h3 class="card-sub-title">Additional Background</h3>
+      <div class="card" id="card-custom-sections">
+        <div class="card-title-row">
+          <h3 class="card-sub-title">Additional Background</h3>
+          <button class="section-lock-btn" id="lock-btn-customSections" type="button"
+                  data-section="customSections" aria-pressed="false"
+                  title="Lock Additional Background from AI import">
+            <span class="lock-icon" aria-hidden="true">🔓</span>
+            <span class="lock-label">Lock from AI import</span>
+          </button>
+        </div>
         <p class="field-hint">Use this for useful resume details that do not fit the standard fields, such as volunteer work, publications, awards, languages, or community leadership.</p>
         <div id="custom-sections-list"></div>
         <button class="btn-add" id="btn-add-custom-section" type="button">+ Add Section</button>
@@ -363,6 +419,20 @@
       <div class="confirm-modal-actions">
         <button id="confirm-btn-cancel" class="btn-secondary" type="button">Cancel</button>
         <button id="confirm-btn-ok" class="btn-danger-solid" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Lock Warning Modal ── -->
+  <div id="lock-warning-overlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="lock-warning-title">
+    <div class="confirm-modal lock-warning-modal">
+      <p class="confirm-modal-title" id="lock-warning-title">Some profile sections are locked</p>
+      <p class="confirm-modal-body">The AI analyser will preserve locked sections and will not update them from this resume import.</p>
+      <ul id="lock-warning-list" class="lock-warning-list"></ul>
+      <div class="confirm-modal-actions lock-warning-actions">
+        <button id="btn-lock-warning-cancel" class="btn-secondary" type="button">Cancel import</button>
+        <button id="btn-lock-warning-manage" class="btn-secondary" type="button">Manage locks</button>
+        <button id="btn-lock-warning-continue" class="btn-save-section" type="button">Continue and preserve</button>
       </div>
     </div>
   </div>

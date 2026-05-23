@@ -33,26 +33,25 @@ Rules:
 - [DONE] Fit score label bug fixed — label now always derived from numeric score, not trusted from AI response (`modules/fitAnalysis.js`).
 - [DONE] Fit Analysis scoring prompt overhauled — added 0–100 rubric with anchor points, replaced over-strict "do not infer" rule with transferable skills recognition.
 - [DONE] Per-profile Fit Analysis inference mode toggle (Transferable / Exact) — stored in profile metadata, visible and switchable in Manage Profiles, explanation text added (`settings/settings.html`, `settings/settings.js`, `settings/settings.css`, `dashboard/dashboard.js`, `modules/fitAnalysis.js`).
+- [DONE] Section-level locking for My Profile AI import (V1, section-blocking only) — users can lock any of 7 profile sections (Personal Details, Summaries, Skills, Experience, Education, Certifications, Additional Background) to prevent AI analyser import from overwriting them. Lock toggles on each section card, pre-import warning modal, enforcement inside `attemptAutofill()` merge block, skipped-section names shown in success status. Lock state stored in `profile.metadata.lockedSections`. Manual edits unaffected. Side-effect fix: `saveProfileData()`, `clearProfile()`, and profile switch/add paths now preserve full `profile.metadata` (was being discarded on every manual save — pre-existing bug). (`modules/schema.js`, `settings/settings.html`, `settings/settings.css`, `settings/settings.js`)
 
 ## Current Main Branch State
 
-Latest known `main` commit:
+Latest known `main` commit (2026-05-22):
 
-`0fa170018ea52277abe2801978124a0f9eb35939` - `docs: add v2 release prep roadmap`
+`c97375e` - `fix: update ATS platforms list for field detection and filling`
 
-This handover branch adds continuity docs only and should be merged into `main` after review.
+Recent merged work on main (not in previous handover entries):
+- `c97375e` fix: update ATS platforms list for field detection and filling
+- `90d1bd6` feat: enhance education date handling in autofill and drafting modules
+- `351b356` feat: implement autofill review feature with UI and logic (form-field autofill review overlay in dashboard)
+- `b2f0415` release: bump to v2.0.0 and update handover gate
 
 ## Next Likely Branch
 
-[BLOCKED UNTIL USER CONFIRMS]
-`release/v2.0-package`
+`feature/profile-section-locking` (just implemented — see Completed list)
 
-Purpose:
-
-- Bump manifest version to `2.0.0`
-- Run `RELEASE_V2_CHECKLIST.md`
-- Prepare v2 release notes
-- Package extension
+Next after that: application pack, or V1.1 polish depending on user priority.
 
 ## Do Not Repeat
 

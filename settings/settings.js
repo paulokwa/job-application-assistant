@@ -28,6 +28,17 @@ const FEEDBACK_EMAIL = 'mwake.dev@gmail.com';
 const DEFAULT_OLLAMA_ENDPOINT = 'http://localhost:11434';
 const SETTINGS_TOUR_SEEN_KEY = 'settingsTourSeenSections';
 
+const SECTION_LABELS = {
+  personalInfo:   'Personal Details',
+  summaries:      'Professional Summaries',
+  skills:         'Skills',
+  experience:     'Work Experience',
+  education:      'Education',
+  certifications: 'Certifications',
+  customSections: 'Additional Background',
+};
+const LOCKABLE_SECTIONS = Object.keys(SECTION_LABELS);
+
 const PROVIDER_MODELS = {
   mock: ['mock-basic'],
   openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'],
@@ -262,6 +273,20 @@ async function init() {
   $('section-profile').addEventListener('input', () => setProfileDirty(true));
   $('section-profile').addEventListener('click', e => {
     if (e.target.closest('.btn-remove')) setProfileDirty(true);
+  });
+
+  // Section lock toggles — save immediately on change, does not dirty the profile form
+  $('section-profile').addEventListener('click', async e => {
+    const btn = e.target.closest('.section-lock-btn');
+    if (!btn) return;
+    const key = btn.dataset.section;
+    const locked = btn.getAttribute('aria-pressed') !== 'true';
+    if (!profile.metadata) profile.metadata = {};
+    if (!profile.metadata.lockedSections) profile.metadata.lockedSections = {};
+    profile.metadata.lockedSections[key] = locked;
+    syncLockToggles(profile.metadata.lockedSections);
+    await saveProfile(profile);
+    showToast(locked ? `${SECTION_LABELS[key]} locked from AI import` : `${SECTION_LABELS[key]} unlocked`);
   });
 
   $('btn-add-profile').addEventListener('click', handleAddProfile);
@@ -533,21 +558,43 @@ async function attemptAutofill(statusEl) {
   startAutofillStatusMessages(loadingMsg, effectiveSettings);
 
   try {
+    const locks = profile.metadata?.lockedSections ?? {};
     const extractedData = await extractProfileFromResume(plainText, effectiveSettings);
     const extractedPersonal = normalizeAutofillPersonalInfo(extractedData.personalInfo || extractedData.personal || {});
+    const skippedSections = [];
+
     profile = {
       ...profile,
-      personalInfo: { ...profile.personalInfo, ...extractedPersonal },
-      summaries: mergeAutofillArray(extractedData.summaries, profile.summaries),
-      skills: extractedData.skills || profile.skills,
-      experience: extractedData.experience || profile.experience,
-      education: extractedData.education || profile.education,
-      certifications: extractedData.certifications || profile.certifications,
-      customSections: mergeAutofillArray(extractedData.customSections || extractedData.customFields || extractedData.additionalSections, profile.customSections),
+      personalInfo: locks.personalInfo
+        ? profile.personalInfo
+        : { ...profile.personalInfo, ...extractedPersonal },
+      summaries: locks.summaries
+        ? profile.summaries
+        : mergeAutofillArray(extractedData.summaries, profile.summaries),
+      skills: locks.skills
+        ? profile.skills
+        : (extractedData.skills || profile.skills),
+      experience: locks.experience
+        ? profile.experience
+        : (extractedData.experience || profile.experience),
+      education: locks.education
+        ? profile.education
+        : (extractedData.education || profile.education),
+      certifications: locks.certifications
+        ? profile.certifications
+        : (extractedData.certifications || profile.certifications),
+      customSections: locks.customSections
+        ? profile.customSections
+        : mergeAutofillArray(extractedData.customSections || extractedData.customFields || extractedData.additionalSections, profile.customSections),
     };
+
+    for (const key of LOCKABLE_SECTIONS) {
+      if (locks[key]) skippedSections.push(SECTION_LABELS[key]);
+    }
+
     populateProfile(profile);
     await saveProfile(profile);
-    renderSuccessStatus(statusEl);
+    renderSuccessStatus(statusEl, skippedSections);
   } catch (e) {
     renderErrorStatus(statusEl, mapError(e).message);
   } finally {
@@ -610,11 +657,13 @@ function renderNoProviderStatus(statusEl) {
   statusEl.appendChild(retryBtn);
 }
 
-function renderSuccessStatus(statusEl) {
+function renderSuccessStatus(statusEl, skippedSections = []) {
   statusEl.textContent = '';
 
   const msg = document.createElement('span');
-  msg.textContent = '✨ Profile saved from your resume. You can review and edit any field.';
+  msg.textContent = skippedSections.length
+    ? `✨ Profile updated from resume. Locked and preserved: ${skippedSections.join(', ')}.`
+    : '✨ Profile saved from your resume. You can review and edit any field.';
   statusEl.appendChild(msg);
 
   const retryBtn = document.createElement('button');
@@ -966,6 +1015,24 @@ async function handleSourceResumeUpload(event) {
       showToast('Resume text was very large, so only the first portion was saved for AI context.');
     } else if (isPdf && qualityLevel !== 'good') {
       showToast('📄 PDF imported — please review the profile fields before generating.');
+    }
+
+    // Pre-flight lock check — show warning if any sections are locked
+    const lockedSections = profile?.metadata?.lockedSections ?? {};
+    const lockedKeys = LOCKABLE_SECTIONS.filter(k => lockedSections[k] === true);
+    if (lockedKeys.length > 0) {
+      const choice = await showLockWarningModal(lockedKeys.map(k => SECTION_LABELS[k]));
+      if (choice === 'cancel') {
+        statusEl.textContent = 'AI import cancelled. Resume saved. Use Retry Auto-fill to analyse when ready.';
+        event.target.value = '';
+        return;
+      }
+      if (choice === 'manage') {
+        statusEl.textContent = 'AI import paused. Adjust locks above and use Retry Auto-fill when ready.';
+        event.target.value = '';
+        return;
+      }
+      // 'continue' — fall through to run auto-fill with locks enforced
     } else {
       showToast('✅ Resume uploaded. Starting AI auto-fill...');
     }
@@ -1000,6 +1067,19 @@ function populateProfile(p) {
   (p.certifications || []).forEach(cert => addCertEntry(cert));
   $('custom-sections-list').innerHTML = '';
   (p.customSections || []).forEach(section => addCustomSectionEntry(section));
+  syncLockToggles(p.metadata?.lockedSections);
+}
+
+function syncLockToggles(lockedSections = {}) {
+  for (const key of LOCKABLE_SECTIONS) {
+    const btn = document.getElementById('lock-btn-' + key);
+    if (!btn) continue;
+    const locked = !!lockedSections[key];
+    btn.setAttribute('aria-pressed', String(locked));
+    btn.classList.toggle('is-locked', locked);
+    btn.querySelector('.lock-icon').textContent = locked ? '🔒' : '🔓';
+    btn.querySelector('.lock-label').textContent = locked ? 'Locked' : 'Lock from AI import';
+  }
 }
 
 // Summaries / Experience / Education Helpers (Simplified)
@@ -1132,7 +1212,7 @@ function collectProfileFromForm() {
 }
 
 async function saveProfileData() {
-  profile = collectProfileFromForm();
+  profile = { ...collectProfileFromForm(), metadata: profile?.metadata };
   await saveProfile(profile);
   const { activeId } = await loadProfiles();
   if (activeId && hasProfileContent(profile)) {
@@ -1163,7 +1243,8 @@ async function clearProfile() {
     education: [],
     certifications: [],
     customSections: [],
-    doNotClaimNotes: ''
+    doNotClaimNotes: '',
+    metadata: profile?.metadata,
   };
   populateProfile(profile);
   setProfileDirty(false);
@@ -1291,6 +1372,35 @@ function showConfirmDialog(title, body, confirmLabel = 'Confirm') {
     $('confirm-btn-ok').addEventListener('click', onOk);
     $('confirm-btn-cancel').addEventListener('click', onCancel);
     $('confirm-overlay').addEventListener('click', onBackdrop);
+  });
+}
+
+// ── Lock Warning Modal ────────────────────────────────────────────────────
+function showLockWarningModal(lockedNames) {
+  return new Promise(resolve => {
+    const list = $('lock-warning-list');
+    list.innerHTML = lockedNames.map(n => `<li>${escHtml(n)}</li>`).join('');
+    $('lock-warning-overlay').classList.remove('hidden');
+    $('btn-lock-warning-cancel').focus();
+
+    const cleanup = result => {
+      $('lock-warning-overlay').classList.add('hidden');
+      $('lock-warning-overlay').removeEventListener('click', onBackdrop);
+      $('btn-lock-warning-continue').removeEventListener('click', onContinue);
+      $('btn-lock-warning-manage').removeEventListener('click', onManage);
+      $('btn-lock-warning-cancel').removeEventListener('click', onCancel);
+      resolve(result);
+    };
+
+    const onContinue = () => cleanup('continue');
+    const onManage   = () => cleanup('manage');
+    const onCancel   = () => cleanup('cancel');
+    const onBackdrop = e => { if (e.target === $('lock-warning-overlay')) cleanup('cancel'); };
+
+    $('btn-lock-warning-continue').addEventListener('click', onContinue);
+    $('btn-lock-warning-manage').addEventListener('click', onManage);
+    $('btn-lock-warning-cancel').addEventListener('click', onCancel);
+    $('lock-warning-overlay').addEventListener('click', onBackdrop);
   });
 }
 
@@ -1645,7 +1755,7 @@ async function handleProfileRowAction(e) {
   const action = btn.dataset.action;
 
   if (action === 'switch') {
-    await saveProfile(collectProfileFromForm());
+    await saveProfile({ ...collectProfileFromForm(), metadata: profile?.metadata });
     await switchProfile(id);
     profile = await loadProfile();
     populateProfile(profile);
@@ -1740,7 +1850,7 @@ async function handleAddProfile() {
 
   const name = `Profile ${profiles.length + 1}`;
   const id   = await createProfile(name);
-  await saveProfile(collectProfileFromForm());
+  await saveProfile({ ...collectProfileFromForm(), metadata: profile?.metadata });
   await switchProfile(id);
   profile = await loadProfile();
   populateProfile(profile);
