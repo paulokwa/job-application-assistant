@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Autofill Multi-Employment Test Form</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; }
+    h1 { font-size: 1.3rem; }
+    h2 { font-size: 1rem; margin-top: 32px; border-top: 2px solid #ccc; padding-top: 12px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 12px; }
+    input[type="text"], input[type="email"], input[type="tel"], textarea {
+      display: block; width: 100%; box-sizing: border-box; padding: 6px 8px;
+      margin-top: 4px; border: 1px solid #aaa; border-radius: 4px; font-size: 0.9rem; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .sensitive { background: #fff3cd; }
+    button[type="submit"] { margin-top: 24px; padding: 10px 20px; background: #2563eb;
+      color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+    pre.note, p.note { font-size: 0.78rem; color: #555; margin-top: 4px; }
+    .spacer-note { font-size: 0.75rem; color: #999; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<h1>Job Application — Multi-Employment Autofill Test</h1>
+
+<p class="note">
+  Open this page in a browser tab. Point the extension at this tab and use
+  <strong>Scan Form Fields</strong>. The 11 hidden inputs between sections 1 and 2
+  are intentional — they push the fieldIndex gap above the 10-index threshold so
+  the grouping pass detects two distinct employment sections.
+</p>
+
+<pre class="note">
+Expected fieldIndex layout (index in querySelectorAll result, 0-based):
+  0   first-name        → personalInfo.firstName           High ✓ pre-checked
+  1   last-name         → personalInfo.lastName            High ✓ pre-checked
+  2   email             → personalInfo.email               High ✓ pre-checked
+  3   phone             → personalInfo.phone               High ✓ pre-checked
+  4   city              → personalInfo.city                High ✓ pre-checked
+──── Employment section 1 (indices 5–9) ─────────────────────
+  5   employer-1        → experience[0].employer           High ✓ pre-checked  (group 1)
+  6   job-title-1       → experience[0].jobTitle           High ✓ pre-checked  (group 1)
+  7   start-date-1      → experience[0].startDate          High ✓ pre-checked  (group 1)
+  8   end-date-1        → experience[0].endDate            High ✓ pre-checked  (group 1)
+  9   responsibilities-1→ experience[0].bulletPoints       Medium ✗ unchecked  (group 1)
+──── 11 hidden inputs (indices 10–20) — skipped by scanner, push gap to 12 ────
+──── Employment section 2 (indices 21–25) ───────────────────
+ 21   employer-2        → experience[1].employer           Medium ✗ unchecked  (group 2)
+ 22   job-title-2       → experience[1].jobTitle           Medium ✗ unchecked  (group 2)
+ 23   start-date-2      → experience[1].startDate          Medium ✗ unchecked  (group 2)
+ 24   end-date-2        → experience[1].endDate            Medium ✗ unchecked  (group 2)
+ 25   duties-2          → experience[1].bulletPoints       Medium ✗ unchecked  (group 2)
+──── Education (indices 26–27) ──────────────────────────────
+ 26   school            → education[0].institution         High ✓ pre-checked
+ 27   degree            → education[0].credential          High ✓ pre-checked
+──── Sensitive (index 28) — MUST be skipped ─────────────────
+ 28   salary            → SKIPPED (sensitive)
+──── Unmatched (index 29) ───────────────────────────────────
+ 29   cover-letter      → unmatched (textarea, "why do you want" exclusion fires)
+
+Gap from responsibilities-1 (9) to employer-2 (21) = 12 > EMPLOYMENT_GAP_THRESHOLD(4) ✓
+Profile requirement: at least 2 experience entries, each with bulletPoints, to see both filled.
+If profile has only 1 experience: group 2 fields become unmatched (not filled with exp[0]).
+</pre>
+
+<form id="test-form" onsubmit="return false;">
+
+  <!-- ── Contact ─────────────────────────────────────────────────── -->
+  <h2>Contact Information</h2>
+  <div class="row">
+    <div>
+      <label for="first-name">First name</label>
+      <input type="text" id="first-name" name="first_name"
+             autocomplete="given-name" placeholder="First name" />
+    </div>
+    <div>
+      <label for="last-name">Last name</label>
+      <input type="text" id="last-name" name="last_name"
+             autocomplete="family-name" placeholder="Last name" />
+    </div>
+  </div>
+
+  <label for="email">Email address</label>
+  <input type="email" id="email" name="email"
+         autocomplete="email" placeholder="you@example.com" />
+
+  <label for="phone">Phone number</label>
+  <input type="tel" id="phone" name="phone"
+         autocomplete="tel" placeholder="+1 000 000 0000" />
+
+  <label for="city">City</label>
+  <input type="text" id="city" name="city"
+         autocomplete="address-level2" placeholder="Halifax" />
+
+  <!-- ── Employment section 1 (fieldIndex 5–9) ─────────────────── -->
+  <h2>Most Recent Employment</h2>
+  <p class="note">
+    Expected overlay: <strong>Employment — [your most recent employer]</strong><br>
+    Confidence: High for employer/title/dates (pre-checked). Medium for responsibilities (unchecked).
+  </p>
+
+  <label for="employer-1">Current / most recent employer</label>
+  <input type="text" id="employer-1" name="employer_1"
+         autocomplete="organization" placeholder="Company name" />
+
+  <label for="job-title-1">Job title</label>
+  <input type="text" id="job-title-1" name="job_title_1"
+         autocomplete="organization-title" placeholder="Your role" />
+
+  <div class="row">
+    <div>
+      <label for="start-date-1">Start date</label>
+      <input type="text" id="start-date-1" name="start_date_1"
+             placeholder="e.g. Jan 2022" aria-label="Employment start date" />
+    </div>
+    <div>
+      <label for="end-date-1">End date</label>
+      <input type="text" id="end-date-1" name="end_date_1"
+             placeholder="e.g. Present" aria-label="Employment end date" />
+    </div>
+  </div>
+
+  <label for="responsibilities-1">Key responsibilities</label>
+  <textarea id="responsibilities-1" name="responsibilities_1" rows="4"
+            placeholder="Describe your key responsibilities and duties in this role."></textarea>
+
+  <!--
+    11 hidden inputs create a fieldIndex gap of 12 between the last visible field of
+    section 1 (responsibilities-1 at index 9) and the first field of section 2 (employer-2
+    at index 21). Gap = 21 - 9 = 12, which exceeds EMPLOYMENT_GAP_THRESHOLD (10),
+    causing the grouping pass to split these into two distinct employment clusters.
+    Hidden inputs are skipped by the autofill scanner but DO advance the NodeList index.
+  -->
+  <input type="hidden" name="spacer_1"  value="" />
+  <input type="hidden" name="spacer_2"  value="" />
+  <input type="hidden" name="spacer_3"  value="" />
+  <input type="hidden" name="spacer_4"  value="" />
+  <input type="hidden" name="spacer_5"  value="" />
+  <input type="hidden" name="spacer_6"  value="" />
+  <input type="hidden" name="spacer_7"  value="" />
+  <input type="hidden" name="spacer_8"  value="" />
+  <input type="hidden" name="spacer_9"  value="" />
+  <input type="hidden" name="spacer_10" value="" />
+  <input type="hidden" name="spacer_11" value="" />
+
+  <!-- ── Employment section 2 (fieldIndex 21–25) ───────────────── -->
+  <h2>Previous Employment</h2>
+  <p class="note">
+    Expected overlay: <strong>Employment — [your second experience employer]</strong><br>
+    Confidence: Medium — all five rows unchecked by default, require explicit review.<br>
+    If your profile has only one experience entry, these fields should be
+    <em>unmatched</em> (not filled with the first job's data).
+  </p>
+
+  <label for="employer-2">Previous employer</label>
+  <input type="text" id="employer-2" name="employer_2"
+         autocomplete="organization" placeholder="Previous company" />
+
+  <label for="job-title-2">Previous job title</label>
+  <input type="text" id="job-title-2" name="job_title_2"
+         autocomplete="organization-title" placeholder="Previous role" />
+
+  <div class="row">
+    <div>
+      <label for="start-date-2">Start date</label>
+      <input type="text" id="start-date-2" name="start_date_2"
+             placeholder="e.g. Mar 2019" aria-label="Start date" />
+    </div>
+    <div>
+      <label for="end-date-2">End date</label>
+      <input type="text" id="end-date-2" name="end_date_2"
+             placeholder="e.g. Dec 2021" aria-label="End date" />
+    </div>
+  </div>
+
+  <label for="duties-2">Job duties</label>
+  <textarea id="duties-2" name="duties_2" rows="4"
+            placeholder="Describe your job duties in this previous role."></textarea>
+
+  <!-- ── Education (fieldIndex 26–27) ──────────────────────────── -->
+  <h2>Education</h2>
+
+  <label for="school">School / university name</label>
+  <input type="text" id="school" name="school"
+         placeholder="University of Halifax" />
+
+  <label for="degree">Degree / credential</label>
+  <input type="text" id="degree" name="degree"
+         placeholder="Bachelor of Science" />
+
+  <!-- ── Sensitive (fieldIndex 28) — must be skipped ────────────── -->
+  <h2>Compensation <small>(sensitive — must be skipped by autofill)</small></h2>
+
+  <label for="salary">Desired salary</label>
+  <input type="text" id="salary" name="salary"
+         class="sensitive" placeholder="Must be skipped — never autofilled" />
+
+  <!-- ── Unmatched (fieldIndex 29) ─────────────────────────────── -->
+  <h2>Cover Letter</h2>
+
+  <label for="cover-letter">Why do you want this role?</label>
+  <textarea id="cover-letter" name="cover_letter" rows="4"
+            placeholder="This textarea should appear as unmatched in the review overlay."></textarea>
+
+  <button type="submit">Submit (do not click — test only)</button>
+</form>
+
+</body>
+</html>

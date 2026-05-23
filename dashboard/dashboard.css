@@ -624,6 +624,25 @@ body {
   letter-spacing: 0;
 }
 
+.autofill-group-toggle {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-2);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.autofill-group-toggle:hover {
+  border-color: var(--color-ink-2);
+  color: var(--color-ink-1);
+}
+
 .autofill-match-list,
 .autofill-skipped-list {
   display: flex;

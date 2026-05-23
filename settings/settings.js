@@ -1110,6 +1110,7 @@ function addExperienceEntry(data = {}) {
   div.style.marginBottom = '12px';
   const roleTitle = data.jobTitle || data.title || '';
   const employer = data.employer || data.company || '';
+  const location = data.location || '';
   const dates = data.dates || (data.startDate ? `${data.startDate} - ${data.endDate || ''}` : '');
   const bullets = Array.isArray(data.bulletPoints) ? data.bulletPoints.join('\n') : (data.bullets || '');
 
@@ -1122,6 +1123,7 @@ function addExperienceEntry(data = {}) {
       <input type="text" class="exp-company" value="${escHtml(employer)}" placeholder="Company" />
       <input type="text" class="exp-dates" value="${escHtml(dates)}" placeholder="Dates" />
     </div>
+    <input type="text" class="exp-location" value="${escHtml(location)}" placeholder="Location (e.g. Halifax, NS)" style="margin-top:8px" />
     <textarea class="exp-bullets" rows="3" placeholder="Bullets" style="margin-top:8px">${escHtml(bullets)}</textarea>
   `;
   $('experience-list').appendChild(div);
@@ -1191,10 +1193,11 @@ function collectProfileFromForm() {
     summaries: readList('.summary-label-input', (el, i) => ({ label: el.value, text: document.querySelectorAll('.summary-text-input')[i].value })),
     skills: $('p-skills').value.split('\n').filter(Boolean),
     experience: readList('.exp-entry', el => ({
-      jobTitle: el.querySelector('.exp-title').value,
-      employer: el.querySelector('.exp-company').value,
-      dates:    el.querySelector('.exp-dates').value,
-      bulletPoints: el.querySelector('.exp-bullets').value.split('\n').filter(Boolean)
+      jobTitle:     el.querySelector('.exp-title').value,
+      employer:     el.querySelector('.exp-company').value,
+      location:     el.querySelector('.exp-location')?.value || '',
+      dates:        el.querySelector('.exp-dates').value,
+      bulletPoints: el.querySelector('.exp-bullets').value.split('\n').filter(Boolean),
     })),
     education: readList('.edu-entry', el => ({
       credential:  el.querySelector('.edu-degree').value,

@@ -315,16 +315,39 @@ function renderAutofillReview() {
   const matches = state.autofillMatches || [];
   const fields  = state.autofillFields  || [];
 
-  const skipped       = fields.filter(f => f.isSensitive || f.isDisabled || f.isReadOnly);
+  // Separate employment-grouped matches (multi-section) from regular matches.
+  const empMatches     = matches.filter(m => m.employmentGroup != null);
+  const regularMatches = matches.filter(m => m.employmentGroup == null);
+
+  const skipped        = fields.filter(f => f.isSensitive || f.isDisabled || f.isReadOnly);
   const unmatchedCount = Math.max(0, fields.length - matches.length - skipped.length);
-  const highMatches   = matches.filter(m => m.confidence === 'high');
-  const mediumMatches = matches.filter(m => m.confidence === 'medium');
+  const highMatches    = regularMatches.filter(m => m.confidence === 'high');
+  const mediumMatches  = regularMatches.filter(m => m.confidence === 'medium');
 
   let html = '';
 
   if (matches.length === 0) {
     html += `<p class="autofill-review-empty">No fields could be matched to your profile. Make sure your profile has details filled in, then scan the form again.</p>`;
   } else {
+    // Employment sections — rendered as named groups when multi-section grouping is active.
+    if (empMatches.length > 0) {
+      const groups = new Map();
+      for (const m of empMatches) {
+        const key = m.employmentGroup.index;
+        if (!groups.has(key)) groups.set(key, { label: m.employmentGroup.label, matches: [] });
+        groups.get(key).matches.push(m);
+      }
+      for (const [, group] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+        const allPreChecked = group.matches.every(m => m.confidence === 'high');
+        const toggleLabel   = allPreChecked ? 'Deselect all' : 'Select all';
+        html += `<div class="autofill-review-section">
+          <h3 class="autofill-review-section-title">${escHtml(group.label)} <span class="autofill-section-count">${group.matches.length}</span><button type="button" class="autofill-group-toggle">${toggleLabel}</button></h3>
+          <div class="autofill-match-list">${group.matches.map(m => renderMatchRow(m, m.confidence === 'high')).join('')}</div>
+        </div>`;
+      }
+    }
+
+    // Regular (personal info, education, single-section employment) in existing high/medium split.
     if (highMatches.length > 0) {
       html += `<div class="autofill-review-section">
         <h3 class="autofill-review-section-title">Ready to fill <span class="autofill-section-count">${highMatches.length}</span></h3>
@@ -760,6 +783,29 @@ async function scanFormFieldsOnPage() {
     updateAutofillStatus(state.autofillFields, summary);
     refreshAutofillCard();
 
+    // Debug: inspect scanned descriptors and match results in the dashboard console.
+    console.group('[JPDA] Scan results');
+    console.table(state.autofillFields.map(f => ({
+      index:       f.fieldIndex,
+      tag:         f.tagName,
+      type:        f.type,
+      label:       f.labelText,
+      aria:        f.ariaLabel,
+      placeholder: f.placeholder,
+      name:        f.name,
+      id:          f.id,
+      sensitive:   f.isSensitive,
+      skip:        f.skipReason || '',
+    })));
+    console.table(matches.map(m => ({
+      profileKey:  m.profileKey,
+      value:       m.profileValue,
+      confidence:  m.confidence,
+      label:       m.field.labelText,
+      group:       m.employmentGroup?.label ?? '',
+    })));
+    console.groupEnd();
+
     const count = state.autofillFields.length;
     showToast(count > 0 ? `✦ ${count} field${count !== 1 ? 's' : ''} scanned, ${matches.length} matched.` : 'No form fields found on this page.');
   } catch (err) {
@@ -906,6 +952,17 @@ function bindEvents() {
   dom.btnFillPage.addEventListener('click', handleFillPage);
   dom.autofillReviewBody.addEventListener('change', e => {
     if (e.target.classList.contains('autofill-row-check')) updateFillPageButton();
+  });
+  dom.autofillReviewBody.addEventListener('click', e => {
+    const btn = e.target.closest('.autofill-group-toggle');
+    if (!btn) return;
+    const section    = btn.closest('.autofill-review-section');
+    if (!section) return;
+    const checkboxes = Array.from(section.querySelectorAll('.autofill-row-check'));
+    const allChecked = checkboxes.every(cb => cb.checked);
+    checkboxes.forEach(cb => { cb.checked = !allChecked; });
+    btn.textContent = allChecked ? 'Select all' : 'Deselect all';
+    updateFillPageButton();
   });
 
   // Revision — button stays disabled until the user has typed something
