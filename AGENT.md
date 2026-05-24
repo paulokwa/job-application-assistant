@@ -30,7 +30,7 @@ If you are an AI agent picking up work on this project, read these files before 
 | `RELEASE_V2_CHECKLIST.md` | Historical checklist for the submitted v2.0 package |
 | `ROADMAP.md` | Future roadmap ideas and suggested branch order after v2.0 |
 | `README.md` | Repo overview, setup, and basic usage |
-| `TROUBLESHOOTING.md` | Resolved technical issues that could recur — check here before debugging familiar-sounding problems |
+| `TROUBLESHOOTING.md` | Resolved technical issues that could recur — **must be read before any work on `modules/autofillMatcher.js`** (entry 16 defines the rule that prevents ATS-specific fixes from breaking other already-working ATS platforms); also check before debugging any API, CSS variable, or settings-page JS issue |
 | `PRODUCT.md` | Strategic context: who the users are, what the product does, design principles, anti-references |
 | `DESIGN.md` | Full design system: tokens, typography, colour strategy, component rules, north star |
 

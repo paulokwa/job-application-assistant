@@ -189,6 +189,30 @@ If this recurs, check for accidental removal of `SETTINGS_TOUR_SEEN_KEY`, `sched
 
 ---
 
+## 16. Autofill fix for one ATS breaks another that was already working
+
+**Symptom:** After fixing autofill for a new ATS (e.g. Lever, Greenhouse, iCIMS), a previously working platform — particularly Workday — stops correctly filling certain fields. Date fields, location fields, or multi-section grouping may regress.
+
+**Root cause:** The fix modified a general matcher (a signal term list, a regex, or a grouping threshold) that is shared across all ATS platforms. The autofill matcher is purely signal-based — general matchers fire on any ATS whose DOM happens to match. Broadening a general matcher to handle site X can silently collide with signals from Workday or other already-working sites.
+
+**The rule — must be followed for every ATS fix:**
+
+> **New ATS quirks get their own specific matchers using that ATS's unique DOM signals (id fragments, unique placeholders, unique aria-label values). Never fix an ATS-specific problem by modifying an existing general matcher.**
+
+Workday-specific matchers are the reference example: `datesectionmonth` and `datesectionyear` id fragments appear only in Workday's DOM. Those matchers will never fire on any other ATS. Each new platform should follow the same pattern — identify a signal that is unique to that ATS and write a scoped matcher for it. General matchers (start date, end date, employer, city, etc.) must stay general and must not be made more permissive to accommodate a specific ATS.
+
+**How to identify an ATS-safe signal:**
+1. Open the ATS form and inspect the failing field — look at `id`, `name`, `placeholder`, `aria-label`, and nearby label text.
+2. Identify a string that is unique to that ATS (e.g. a product-specific id prefix or aria pattern).
+3. Write a new matcher at the bottom of the relevant matcher group using `hasSignal(f, '<unique-signal>')`.
+4. Confirm the new matcher's `test` function cannot fire on a standard field by checking it against the Workday test form (`tests/autofill-multi-employment.html`) and any other existing test fixtures.
+
+**Files to review before any autofill matcher change:**
+- `modules/autofillMatcher.js` — full matcher list; Workday-specific matchers are annotated
+- `tests/autofill-multi-employment.html` — multi-section grouping test form
+
+---
+
 ## 15. Dashboard tone slider thumb does not reach track ends
 
 **Symptom:** The Tone slider's round thumb appears inset from the left and right ends even when set to Formal or Casual.
