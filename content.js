@@ -352,7 +352,7 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     return terms.map(t => `<span class="chip ${fcEscape(cls)}">${fcEscape(t)}</span>`).join('');
   }
 
-  function injectFitCheckCard({ score, matched, unmatched, profiles, activeProfileId, tabId, bestProfile }) {
+  function injectFitCheckCard({ score, matched, unmatched, profiles, activeProfileId, tabId, bestProfile, hasAiProvider, aiMatch, aiMatchError }) {
     // Remove any existing card before re-injecting (e.g. on re-scan or profile switch).
     const existing = document.getElementById('fit-check-root');
     if (existing) existing.remove();
@@ -405,6 +405,43 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           <span class="best-text">Best scoring profile: ${bestName} &middot; ${bestScore}%</span>
           <button class="btn-use-best" id="fc-btn-use-best">Use this profile</button>
         </div>`;
+      }
+    }
+
+    let aiSection = '';
+    if (hasAiProvider) {
+      if (aiMatch && typeof aiMatch === 'object') {
+        const labelMap = {
+          strong_match: 'Strong match', good_match: 'Good match', maybe: 'Possible match',
+          weak_match: 'Weak match', not_recommended: 'Low fit',
+        };
+        const labelText = fcEscape(labelMap[aiMatch.label] || aiMatch.label || '');
+        const aiScore = Math.max(0, Math.min(100, Math.round(Number(aiMatch.score) || 0)));
+        const strongMatches = Array.isArray(aiMatch.strongMatches) ? aiMatch.strongMatches.slice(0, 3) : [];
+        const possibleGaps  = Array.isArray(aiMatch.possibleGaps)  ? aiMatch.possibleGaps.slice(0, 3)  : [];
+        const recommendation = aiMatch.recommendation ? fcEscape(String(aiMatch.recommendation)) : '';
+        aiSection = `
+          <div class="ai-section">
+            <div class="ai-header">
+              <span class="ai-label">AI review</span>
+              <span class="ai-score-badge">${aiScore}% &middot; ${labelText}</span>
+            </div>
+            ${strongMatches.length > 0 ? `<div class="ai-subhead">Strengths</div><ul class="ai-list">${strongMatches.map(s => `<li>${fcEscape(String(s))}</li>`).join('')}</ul>` : ''}
+            ${possibleGaps.length  > 0 ? `<div class="ai-subhead">Possible gaps</div><ul class="ai-list">${possibleGaps.map(g => `<li>${fcEscape(String(g))}</li>`).join('')}</ul>` : ''}
+            ${recommendation ? `<div class="ai-recommendation">${recommendation}</div>` : ''}
+          </div>`;
+      } else if (aiMatchError) {
+        aiSection = `
+          <div class="ai-error-row">
+            <span class="ai-error-text">${fcEscape(String(aiMatchError))}</span>
+            <button class="btn-ai-retry" id="fc-btn-ai-retry">Try again</button>
+          </div>`;
+      } else {
+        aiSection = `
+          <div class="ai-cta-row">
+            <button class="btn-ai-review" id="fc-btn-ai-review">Run AI review</button>
+            <span class="ai-cta-hint">Uses your selected AI provider.</span>
+          </div>`;
       }
     }
 
@@ -548,6 +585,87 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           text-underline-offset: 2px;
         }
         .btn-use-best:hover { color: #1e40af; }
+        .ai-cta-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .btn-ai-review {
+          font-size: 11px;
+          font-family: inherit;
+          font-weight: 600;
+          color: #ffffff;
+          background: #2563eb;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          padding: 5px 10px;
+          white-space: nowrap;
+        }
+        .btn-ai-review:hover { background: #1d4ed8; }
+        .btn-ai-review:disabled { background: #93c5fd; cursor: default; }
+        .ai-cta-hint { font-size: 11px; color: #6b7280; }
+        .ai-section {
+          margin-top: 10px;
+          padding: 8px 10px;
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          border-radius: 8px;
+        }
+        .ai-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          margin-bottom: 6px;
+        }
+        .ai-label {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: #15803d;
+        }
+        .ai-score-badge { font-size: 11px; font-weight: 600; color: #15803d; }
+        .ai-subhead {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: #6b7280;
+          margin-top: 6px;
+          margin-bottom: 3px;
+        }
+        .ai-list { margin: 0; padding-left: 14px; }
+        .ai-list li { font-size: 11px; color: #374151; margin-bottom: 2px; }
+        .ai-recommendation { font-size: 11px; color: #374151; margin-top: 6px; font-style: italic; }
+        .ai-error-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-top: 10px;
+          padding: 7px 10px;
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          border-radius: 8px;
+        }
+        .ai-error-text { font-size: 11px; color: #dc2626; flex: 1; min-width: 0; }
+        .btn-ai-retry {
+          font-size: 11px;
+          font-family: inherit;
+          font-weight: 600;
+          color: #dc2626;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0;
+          white-space: nowrap;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+        .btn-ai-retry:hover { color: #b91c1c; }
         .divider { height: 1px; background: #f3f4f6; margin: 12px 0 10px; }
         .disclaimer {
           font-size: 11px;
@@ -570,6 +688,7 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
         ${matchedSection}
         ${unmatchedSection}
         ${bestProfileSection}
+        ${aiSection}
         <div class="divider"></div>
         <div class="disclaimer">Keyword overlap is a signal, not a verdict. You may still be a strong fit even with a low score.</div>
       </div>
@@ -597,6 +716,34 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           chrome.runtime.sendMessage({
             type: 'FIT_CHECK_PROFILE_CHANGED',
             profileId: bestProfile.id,
+            tabId,
+          });
+        } catch (_) {}
+      });
+    }
+
+    const btnAiReview = shadow.getElementById('fc-btn-ai-review');
+    if (btnAiReview) {
+      btnAiReview.addEventListener('click', () => {
+        btnAiReview.disabled = true;
+        btnAiReview.textContent = 'Checking…';
+        try {
+          chrome.runtime.sendMessage({
+            type: 'RUN_FIT_CHECK_AI',
+            profileId: activeProfileId,
+            tabId,
+          });
+        } catch (_) {}
+      });
+    }
+
+    const btnAiRetry = shadow.getElementById('fc-btn-ai-retry');
+    if (btnAiRetry) {
+      btnAiRetry.addEventListener('click', () => {
+        try {
+          chrome.runtime.sendMessage({
+            type: 'RUN_FIT_CHECK_AI',
+            profileId: activeProfileId,
             tabId,
           });
         } catch (_) {}

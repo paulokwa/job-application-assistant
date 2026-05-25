@@ -52,7 +52,7 @@ const state = {
   },
   docSettings: {},
   profileIndex: [],    // [{id, name}] metadata — kept in sync by populateProfileStrip()
-  lastFitCheck: null,  // { jobKeywords, tab, allProfileScores } — reused when card profile selector changes
+  lastFitCheck: null,  // { jobKeywords, tab, allProfileScores, jobText, jobTitle, jobCompany, lastAiMatch } — reused when card profile selector changes
   currentTab: 'resume',     // 'resume' | 'cover-letter'
   drafts:         { resume: null, 'cover-letter': null },
   originalDrafts: { resume: null, 'cover-letter': null },
@@ -85,6 +85,7 @@ const state = {
 let currentAbortController = null;
 let currentFitAnalysisController = null;
 let currentJobInfoController = null;
+let currentAiMatchController = null;
 let generationStatusTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
@@ -245,7 +246,14 @@ async function init() {
     if (message.type === 'FIT_CHECK_PROFILE_CHANGED') {
       const { profileId, tabId } = message;
       if (!profileId || tabId !== state.lastFitCheck?.tab?.id) return;
+      currentAiMatchController?.abort();
+      currentAiMatchController = null;
       rerenderFitCheckWithProfile(profileId).catch(() => {});
+    }
+    if (message.type === 'RUN_FIT_CHECK_AI') {
+      const { profileId, tabId } = message;
+      if (!profileId || tabId !== state.lastFitCheck?.tab?.id) return;
+      runFitCheckAI(profileId).catch(() => {});
     }
   });
 
@@ -794,11 +802,12 @@ async function runFitCheck(scanResponse, tab) {
     ({ score, matched, unmatched } = scoreMatch(profileKeywords, jobKeywords));
   }
 
-  // Store job keywords and profile scores so the profile-selector re-render can reuse them.
-  state.lastFitCheck = { jobKeywords, tab, allProfileScores };
+  // Store job keywords, profile scores, and job text snapshot so re-renders and AI review can reuse them.
+  state.lastFitCheck = { jobKeywords, tab, allProfileScores, jobText: text, jobTitle: state.jobData.jobTitle || '', jobCompany: state.jobData.company || '', lastAiMatch: null };
 
   const profiles = isMultiProfile ? state.profileIndex : [];
   const bestProfile = allProfileScores.length > 0 ? allProfileScores[0] : null;
+  const hasAiProvider = Boolean(state.settings?.provider);
 
   try {
     await chrome.tabs.sendMessage(tab.id, {
@@ -810,6 +819,9 @@ async function runFitCheck(scanResponse, tab) {
       activeProfileId,
       profiles,
       bestProfile,
+      hasAiProvider,
+      aiMatch: null,
+      aiMatchError: null,
     });
   } catch (err) {
     // Content script may not be responding (e.g. page navigated away between scan and card send).
@@ -831,6 +843,8 @@ async function rerenderFitCheckWithProfile(profileId) {
   const { score, matched, unmatched } = scoreMatch(profileKeywords, fc.jobKeywords);
   const profiles = state.profileIndex.length > 1 ? state.profileIndex : [];
   const bestProfile = fc.allProfileScores?.length > 0 ? fc.allProfileScores[0] : null;
+  const hasAiProvider = Boolean(state.settings?.provider);
+  const cachedAiMatch = fc.lastAiMatch?.profileId === profileId ? fc.lastAiMatch.result : null;
 
   try {
     await chrome.tabs.sendMessage(fc.tab.id, {
@@ -842,9 +856,90 @@ async function rerenderFitCheckWithProfile(profileId) {
       activeProfileId: profileId,
       profiles,
       bestProfile,
+      hasAiProvider,
+      aiMatch: cachedAiMatch,
+      aiMatchError: null,
     });
   } catch (err) {
     console.warn('[JPDA] Fit Check card re-render failed:', err?.message || err);
+  }
+}
+
+function toFitCheckCardAiMatch(result) {
+  if (!result || typeof result !== 'object') return null;
+  return {
+    score: result.score,
+    label: result.label,
+    strongMatches: Array.isArray(result.strongMatches) ? result.strongMatches : [],
+    possibleGaps: Array.isArray(result.possibleGaps) ? result.possibleGaps : [],
+    recommendation: result.recommendation || '',
+  };
+}
+
+async function runFitCheckAI(profileId) {
+  const fc = state.lastFitCheck;
+  if (!fc?.tab?.id || !fc.jobText) return;
+
+  currentAiMatchController?.abort();
+  const controller = new AbortController();
+  currentAiMatchController = controller;
+
+  const hasAiProvider = Boolean(state.settings?.provider);
+  const profiles = state.profileIndex.length > 1 ? state.profileIndex : [];
+  const bestProfile = fc.allProfileScores?.length > 0 ? fc.allProfileScores[0] : null;
+
+  let score = 0, matched = [], unmatched = [];
+  try {
+    const profile = await loadProfileById(profileId);
+    const profileKeywords = extractProfileKeywords(profile || {});
+    ({ score, matched, unmatched } = scoreMatch(profileKeywords, fc.jobKeywords));
+
+    const savedJobShape = {
+      title: fc.jobTitle,
+      company: fc.jobCompany,
+      cleanDescription: fc.jobText.slice(0, 4000),
+      rawContent: fc.jobText.slice(0, 4000),
+    };
+
+    const result = await analyzeFit(savedJobShape, profile, state.settings, '', controller.signal, 'transferable');
+    if (controller.signal.aborted) return;
+
+    const cardAiMatch = toFitCheckCardAiMatch(result);
+    fc.lastAiMatch = { profileId, result: cardAiMatch };
+
+    await chrome.tabs.sendMessage(fc.tab.id, {
+      type: 'SHOW_FIT_CHECK_CARD',
+      score, matched, unmatched,
+      tabId: fc.tab.id,
+      activeProfileId: profileId,
+      profiles,
+      bestProfile,
+      hasAiProvider,
+      aiMatch: cardAiMatch,
+      aiMatchError: null,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+    const errMsg = err?.message === 'fit_no_job_description' ? 'Add a job description before running AI review.'
+      : err?.message === 'fit_missing_profile' ? 'Add profile details before running AI review.'
+      : err?.message === 'no_provider' ? 'Set up an AI provider before running AI review.'
+      : mapError(err).message;
+
+    try {
+      await chrome.tabs.sendMessage(fc.tab.id, {
+        type: 'SHOW_FIT_CHECK_CARD',
+        score, matched, unmatched,
+        tabId: fc.tab.id,
+        activeProfileId: profileId,
+        profiles,
+        bestProfile,
+        hasAiProvider,
+        aiMatch: null,
+        aiMatchError: errMsg,
+      });
+    } catch (_) {}
+  } finally {
+    if (currentAiMatchController === controller) currentAiMatchController = null;
   }
 }
 
