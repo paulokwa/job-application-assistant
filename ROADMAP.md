@@ -232,3 +232,12 @@ Avoid:
 - Promising universal job board extraction
 - Building dozens of custom job-board extractors too early
 - Letting the app submit applications without user review
+
+## Fit Check follow-ups
+
+- Wire Fit Check into context-menu scan path / applySession flow.
+- Add profile selector or best-profile comparison inside the card.
+- Improve keyword scoring with phrase matching and stemming.
+- Add manual AI Match button only after provider availability checks.
+- Add user setting to disable automatic Basic Fit Check after scan.
+- Refine detector for job-search result pages vs single job postings.
