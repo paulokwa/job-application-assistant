@@ -2,6 +2,8 @@
 
 import { extractJobFields } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
+import { detectJobPage } from '../modules/jobPageDetector.js';
+import { extractProfileKeywords, extractJobKeywords, scoreMatch } from '../modules/fitCheck.js';
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
 import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
 import { analyzeFit } from '../modules/fitAnalysis.js';
@@ -693,6 +695,48 @@ function isRestrictedUrl(url) {
   );
 }
 
+// ── Fit Check ─────────────────────────────────────────────────────────────
+// Runs automatically after Scan Page (local only — no AI, no tokens).
+// Detects whether the page looks like a job posting, then scores the active
+// profile against the job text. Injects a Shadow DOM card into the job page.
+
+async function runFitCheck(scanResponse, tab) {
+  if (!tab?.id) return;
+
+  const text = scanResponse.pageText || '';
+  const title = scanResponse.title || tab.title || '';
+  const url = tab.url || '';
+  const structuredData = scanResponse.structuredData || '';
+
+  const { isLikelyJobPosting } = detectJobPage({ url, title, text, structuredData });
+
+  if (!isLikelyJobPosting) {
+    showToast('Fit Check skipped — this page does not look like a job posting.');
+    return;
+  }
+
+  const profileKeywords = extractProfileKeywords(state.profile || {});
+  if (!profileKeywords.length) {
+    showToast('Fit Check needs a saved profile with skills or experience.');
+    return;
+  }
+
+  const jobKeywords = extractJobKeywords(text);
+  const { score, matched, unmatched } = scoreMatch(profileKeywords, jobKeywords);
+
+  try {
+    await chrome.tabs.sendMessage(tab.id, {
+      type: 'SHOW_FIT_CHECK_CARD',
+      score,
+      matched,
+      unmatched,
+    });
+  } catch (err) {
+    // Content script may not be responding (e.g. page navigated away between scan and card send).
+    console.warn('[JPDA] Fit Check card injection failed:', err?.message || err);
+  }
+}
+
 async function scanCurrentPage() {
   const btn = dom.btnScan;
   btn.disabled = true;
@@ -735,6 +779,11 @@ async function scanCurrentPage() {
 
     applyExtractedData(response, tab.url || '', !!response.selectedText);
     showToast('✦ Page scanned');
+
+    // Run Fit Check immediately — local only, no AI, does not block the scan button.
+    runFitCheck(response, tab).catch(err => {
+      console.warn('[JPDA] Fit Check error:', err?.message || err);
+    });
   } catch (err) {
     console.warn('[JPDA] scanCurrentPage error:', err?.message || 'Unknown scan error');
     showToast('⚠️ Could not scan the page. Try the context menu instead.');

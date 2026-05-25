@@ -13,12 +13,18 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
         const title = document.title || '';
         const url = location.href;
 
+        // Collect JSON-LD structured data for job-page detection.
+        const structuredData = Array.from(
+          document.querySelectorAll('script[type="application/ld+json"]')
+        ).map(s => s.textContent || '').join('\n');
+
         sendResponse({
           selectedText: selectedText || null,
           pageText: pageText,
           title: title,
           url: url,
           usedSelection: selectedText.length > 0,
+          structuredData: structuredData,
         });
       } catch (error) {
         sendResponse({ error: 'Failed to extract content.' });
@@ -40,6 +46,16 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
         sendResponse(fillFormFields(message.fills || []));
       } catch (error) {
         sendResponse({ filled: 0, failed: 0, results: [], error: error.message });
+      }
+      return true;
+    }
+
+    if (message.type === 'SHOW_FIT_CHECK_CARD') {
+      try {
+        injectFitCheckCard(message);
+        sendResponse({ ok: true });
+      } catch (error) {
+        sendResponse({ error: error.message });
       }
       return true;
     }
@@ -304,7 +320,178 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     return { filled, failed, results };
   }
 
-  // Month abbreviations where starts-with matching is safe (e.g. "Jan" → "January").
+  // ── Fit Check card ───────────────────────────────────────────────────────
+  // Injected on demand after a successful scan. Uses Shadow DOM so page styles
+  // cannot bleed in and the card's styles cannot pollute the job posting.
+
+  function fcEscape(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function fcScoreLabel(score) {
+    if (score >= 80) return 'Strong keyword overlap';
+    if (score >= 60) return 'Good keyword overlap';
+    if (score >= 30) return 'Partial keyword overlap';
+    return 'Low keyword overlap';
+  }
+
+  function fcScoreColor(score) {
+    if (score >= 80) return '#16a34a';
+    if (score >= 60) return '#2563eb';
+    if (score >= 30) return '#d97706';
+    return '#dc2626';
+  }
+
+  function fcChips(terms, cls) {
+    if (!terms || !terms.length) {
+      return '<span style="color:#9ca3af;font-size:11px;font-style:italic;">None found</span>';
+    }
+    return terms.map(t => `<span class="chip ${fcEscape(cls)}">${fcEscape(t)}</span>`).join('');
+  }
+
+  function injectFitCheckCard({ score, matched, unmatched }) {
+    // Remove any existing card before re-injecting (e.g. on re-scan).
+    const existing = document.getElementById('fit-check-root');
+    if (existing) existing.remove();
+
+    const host = document.createElement('div');
+    host.id = 'fit-check-root';
+    document.body.appendChild(host);
+
+    // mode: 'open' for Phase 1 so DevTools can inspect the shadow tree.
+    const shadow = host.attachShadow({ mode: 'open' });
+
+    const safeScore   = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+    const label       = fcScoreLabel(safeScore);
+    const color       = fcScoreColor(safeScore);
+    const matchedArr  = Array.isArray(matched)   ? matched   : [];
+    const unmatchedArr = Array.isArray(unmatched) ? unmatched : [];
+
+    const matchedSection = matchedArr.length > 0 ? `
+      <div class="section-head">Matched profile signals (${matchedArr.length})</div>
+      <div class="chips">${fcChips(matchedArr, 'chip--matched')}</div>` : '';
+
+    const unmatchedSection = unmatchedArr.length > 0 ? `
+      <div class="section-head">Job terms not clearly found (${unmatchedArr.length})</div>
+      <div class="chips">${fcChips(unmatchedArr, 'chip--unmatched')}</div>` : '';
+
+    shadow.innerHTML = `
+      <style>
+        :host { all: initial; display: block; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        .card {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          z-index: 9000;
+          width: 300px;
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.14);
+          padding: 16px;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-size: 13px;
+          color: #111827;
+          line-height: 1.4;
+        }
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #111827;
+          letter-spacing: -0.01em;
+        }
+        .title-dot { color: #2563eb; }
+        .btn-dismiss {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #9ca3af;
+          font-size: 15px;
+          line-height: 1;
+          padding: 2px 4px;
+          border-radius: 4px;
+          font-family: inherit;
+        }
+        .btn-dismiss:hover { color: #374151; background: #f3f4f6; }
+        .score-row {
+          display: flex;
+          align-items: baseline;
+          gap: 4px;
+          margin-bottom: 12px;
+        }
+        .score-num {
+          font-size: 30px;
+          font-weight: 800;
+          line-height: 1;
+        }
+        .score-pct {
+          font-size: 15px;
+          font-weight: 700;
+        }
+        .score-lbl {
+          font-size: 12px;
+          color: #6b7280;
+          margin-left: 4px;
+        }
+        .section-head {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: #6b7280;
+          margin-bottom: 5px;
+          margin-top: 10px;
+        }
+        .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+        .chip {
+          display: inline-block;
+          font-size: 11px;
+          padding: 2px 8px;
+          border-radius: 99px;
+          white-space: nowrap;
+          font-family: inherit;
+        }
+        .chip--matched  { background: #dcfce7; color: #14532d; }
+        .chip--unmatched { background: #fef9c3; color: #78350f; }
+        .divider { height: 1px; background: #f3f4f6; margin: 12px 0 10px; }
+        .disclaimer {
+          font-size: 11px;
+          color: #9ca3af;
+          font-style: italic;
+          line-height: 1.5;
+        }
+      </style>
+      <div class="card" role="complementary" aria-label="Fit Check result">
+        <div class="header">
+          <span class="title"><span class="title-dot">✦</span> Fit Check</span>
+          <button class="btn-dismiss" id="fc-dismiss" aria-label="Dismiss Fit Check card">✕</button>
+        </div>
+        <div class="score-row">
+          <span class="score-num" style="color:${color}">${safeScore}</span>
+          <span class="score-pct" style="color:${color}">%</span>
+          <span class="score-lbl">${fcEscape(label)}</span>
+        </div>
+        ${matchedSection}
+        ${unmatchedSection}
+        <div class="divider"></div>
+        <div class="disclaimer">Keyword overlap is a signal, not a verdict. You may still be a strong fit even with a low score.</div>
+      </div>
+    `;
+
+    shadow.getElementById('fc-dismiss').addEventListener('click', () => host.remove());
+  }
+
+  // ── Month abbreviations where starts-with matching is safe (e.g. "Jan" → "January").
   // Starts-with is restricted to this set — wrong dropdown selection is worse than no fill.
   const MONTH_PREFIXES = new Set([
     'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug',
