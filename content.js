@@ -352,8 +352,8 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     return terms.map(t => `<span class="chip ${fcEscape(cls)}">${fcEscape(t)}</span>`).join('');
   }
 
-  function injectFitCheckCard({ score, matched, unmatched }) {
-    // Remove any existing card before re-injecting (e.g. on re-scan).
+  function injectFitCheckCard({ score, matched, unmatched, profiles, activeProfileId, tabId }) {
+    // Remove any existing card before re-injecting (e.g. on re-scan or profile switch).
     const existing = document.getElementById('fit-check-root');
     if (existing) existing.remove();
 
@@ -361,14 +361,14 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     host.id = 'fit-check-root';
     document.body.appendChild(host);
 
-    // mode: 'open' for Phase 1 so DevTools can inspect the shadow tree.
     const shadow = host.attachShadow({ mode: 'open' });
 
-    const safeScore   = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
-    const label       = fcScoreLabel(safeScore);
-    const color       = fcScoreColor(safeScore);
-    const matchedArr  = Array.isArray(matched)   ? matched   : [];
+    const safeScore    = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+    const label        = fcScoreLabel(safeScore);
+    const color        = fcScoreColor(safeScore);
+    const matchedArr   = Array.isArray(matched)   ? matched   : [];
     const unmatchedArr = Array.isArray(unmatched) ? unmatched : [];
+    const profilesArr  = Array.isArray(profiles) && profiles.length > 1 ? profiles : [];
 
     const matchedSection = matchedArr.length > 0 ? `
       <div class="section-head">Matched profile signals (${matchedArr.length})</div>
@@ -377,6 +377,18 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     const unmatchedSection = unmatchedArr.length > 0 ? `
       <div class="section-head">Job terms not clearly found (${unmatchedArr.length})</div>
       <div class="chips">${fcChips(unmatchedArr, 'chip--unmatched')}</div>` : '';
+
+    let profileSelectorSection = '';
+    if (profilesArr.length > 1) {
+      const options = profilesArr.map(p =>
+        `<option value="${fcEscape(p.id)}"${p.id === activeProfileId ? ' selected' : ''}>${fcEscape(p.name)}</option>`
+      ).join('');
+      profileSelectorSection = `
+        <div class="profile-row">
+          <label class="profile-label" for="fc-profile-sel">Profile used for score</label>
+          <select id="fc-profile-sel" class="profile-sel">${options}</select>
+        </div>`;
+    }
 
     shadow.innerHTML = `
       <style>
@@ -423,6 +435,30 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           font-family: inherit;
         }
         .btn-dismiss:hover { color: #374151; background: #f3f4f6; }
+        .profile-row { margin-bottom: 12px; }
+        .profile-label {
+          display: block;
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: #6b7280;
+          margin-bottom: 4px;
+        }
+        .profile-sel {
+          width: 100%;
+          font-size: 12px;
+          font-family: inherit;
+          color: #111827;
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          padding: 4px 8px;
+          cursor: pointer;
+          outline: none;
+          appearance: auto;
+        }
+        .profile-sel:focus { border-color: #2563eb; }
         .score-row {
           display: flex;
           align-items: baseline;
@@ -476,6 +512,7 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           <span class="title"><span class="title-dot">✦</span> Fit Check</span>
           <button class="btn-dismiss" id="fc-dismiss" aria-label="Dismiss Fit Check card">✕</button>
         </div>
+        ${profileSelectorSection}
         <div class="score-row">
           <span class="score-num" style="color:${color}">${safeScore}</span>
           <span class="score-pct" style="color:${color}">%</span>
@@ -489,6 +526,19 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     `;
 
     shadow.getElementById('fc-dismiss').addEventListener('click', () => host.remove());
+
+    const profileSel = shadow.getElementById('fc-profile-sel');
+    if (profileSel) {
+      profileSel.addEventListener('change', () => {
+        try {
+          chrome.runtime.sendMessage({
+            type: 'FIT_CHECK_PROFILE_CHANGED',
+            profileId: profileSel.value,
+            tabId,
+          });
+        } catch (_) {}
+      });
+    }
   }
 
   // ── Month abbreviations where starts-with matching is safe (e.g. "Jan" → "January").

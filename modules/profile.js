@@ -85,6 +85,12 @@ export async function switchProfile(id) {
   return normalizeResumeContent(await loadStoredProfile(id));
 }
 
+// Load a profile's content by ID without changing the global activeProfileId.
+// Used by Fit Check profile switching, which is temporary and session-local only.
+export async function loadProfileById(id) {
+  return normalizeResumeContent(await loadStoredProfile(id));
+}
+
 // ── Profile management ────────────────────────────────────────────────────
 
 export async function createProfile(name) {

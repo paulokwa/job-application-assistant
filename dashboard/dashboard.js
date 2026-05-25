@@ -5,7 +5,7 @@ import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } 
 import { detectJobPage } from '../modules/jobPageDetector.js';
 import { extractProfileKeywords, extractJobKeywords, scoreMatch } from '../modules/fitCheck.js';
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
-import { loadProfile, loadProfiles, switchProfile } from '../modules/profile.js';
+import { loadProfile, loadProfileById, loadProfiles, switchProfile } from '../modules/profile.js';
 import { analyzeFit } from '../modules/fitAnalysis.js';
 import { buildAutofillMatches } from '../modules/autofillMatcher.js';
 import { loadProviderSettings, saveProviderSettings } from '../modules/providerSettings.js';
@@ -51,6 +51,8 @@ const state = {
     jobTitle: '', company: '', sourceUrl: '', description: '',
   },
   docSettings: {},
+  profileIndex: [],    // [{id, name}] metadata — kept in sync by populateProfileStrip()
+  lastFitCheck: null,  // { jobKeywords, tab } — reused when card profile selector changes
   currentTab: 'resume',     // 'resume' | 'cover-letter'
   drafts:         { resume: null, 'cover-letter': null },
   originalDrafts: { resume: null, 'cover-letter': null },
@@ -234,6 +236,16 @@ async function init() {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'session' && (changes.extractedData || changes.pendingMode || changes.regenerateRequested)) {
       loadSession();
+    }
+  });
+
+  // Listen for profile-switch events from the Fit Check card on the job page.
+  // The tabId guard ensures only the dashboard tracking that tab handles the rescore.
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'FIT_CHECK_PROFILE_CHANGED') {
+      const { profileId, tabId } = message;
+      if (!profileId || tabId !== state.lastFitCheck?.tab?.id) return;
+      rerenderFitCheckWithProfile(profileId).catch(() => {});
     }
   });
 
@@ -737,16 +749,54 @@ async function runFitCheck(scanResponse, tab) {
   const jobKeywords = extractJobKeywords(text);
   const { score, matched, unmatched } = scoreMatch(profileKeywords, jobKeywords);
 
+  // Store so the profile-selector re-render can reuse the pre-extracted job keywords.
+  state.lastFitCheck = { jobKeywords, tab };
+
+  const activeProfileId = dom.profileSwitcher.dataset.profileId || '';
+  const profiles = state.profileIndex.length > 1 ? state.profileIndex : [];
+
   try {
     await chrome.tabs.sendMessage(tab.id, {
       type: 'SHOW_FIT_CHECK_CARD',
       score,
       matched,
       unmatched,
+      tabId: tab.id,
+      activeProfileId,
+      profiles,
     });
   } catch (err) {
     // Content script may not be responding (e.g. page navigated away between scan and card send).
     console.warn('[JPDA] Fit Check card injection failed:', err?.message || err);
+  }
+}
+
+// Re-score the last scanned job against a different profile and re-inject the card.
+// Called when the user changes the profile selector inside the Fit Check card.
+// Does NOT write to activeProfileId in storage — the selection is temporary.
+async function rerenderFitCheckWithProfile(profileId) {
+  const fc = state.lastFitCheck;
+  if (!fc?.tab?.id) return;
+
+  const profile = await loadProfileById(profileId);
+  const profileKeywords = extractProfileKeywords(profile || {});
+  if (!profileKeywords.length) return; // selected profile has no scoreable content — skip silently
+
+  const { score, matched, unmatched } = scoreMatch(profileKeywords, fc.jobKeywords);
+  const profiles = state.profileIndex.length > 1 ? state.profileIndex : [];
+
+  try {
+    await chrome.tabs.sendMessage(fc.tab.id, {
+      type: 'SHOW_FIT_CHECK_CARD',
+      score,
+      matched,
+      unmatched,
+      tabId: fc.tab.id,
+      activeProfileId: profileId,
+      profiles,
+    });
+  } catch (err) {
+    console.warn('[JPDA] Fit Check card re-render failed:', err?.message || err);
   }
 }
 
@@ -2893,6 +2943,7 @@ async function loadSettings() {
 
 async function populateProfileStrip() {
   const { profiles, activeId } = await loadProfiles();
+  state.profileIndex = profiles;  // keep in sync for Fit Check profile selector
   const activeProfile = profiles.find(p => p.id === activeId) || profiles[0];
   dom.profileSwitcher.textContent = activeProfile?.name || 'General';
   dom.profileSwitcher.dataset.profileId = activeProfile?.id || '';
