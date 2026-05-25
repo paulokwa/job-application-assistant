@@ -815,6 +815,7 @@ function renderChipBuilder() {
 function populateDocSection(d) {
   if (d.defaultType) defaultTypeSelect.setValue(d.defaultType, { silent: true });
   initChipBuilder(d.filenamePattern || '{docType} - {company} - {jobTitle}');
+  $('chk-auto-fit-check').checked = d.autoFitCheck !== false;
 }
 
 function updateFilenamePreview() {
@@ -836,6 +837,7 @@ async function saveDocuments() {
     $('inp-filename-pattern').value.trim(),
     STORAGE_LIMITS.docSettingsFilenamePatternChars
   );
+  docSettings.autoFitCheck = $('chk-auto-fit-check').checked;
   try {
     await chrome.storage.sync.set({ docSettings });
   } catch (err) {

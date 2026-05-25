@@ -50,6 +50,7 @@ const state = {
   jobData: {
     jobTitle: '', company: '', sourceUrl: '', description: '',
   },
+  docSettings: {},
   currentTab: 'resume',     // 'resume' | 'cover-letter'
   drafts:         { resume: null, 'cover-letter': null },
   originalDrafts: { resume: null, 'cover-letter': null },
@@ -200,7 +201,11 @@ async function init() {
   state.profile  = await loadProfile();
   await populateProfileStrip();
 
-  const localData = await chrome.storage.local.get(['sourceResumeText', 'savedDraft', AI_PROVIDER_SETUP_SAVED_KEY, 'theme']);
+  const [localData, syncData] = await Promise.all([
+    chrome.storage.local.get(['sourceResumeText', 'savedDraft', AI_PROVIDER_SETUP_SAVED_KEY, 'theme']),
+    chrome.storage.sync.get(['docSettings']),
+  ]);
+  state.docSettings = syncData.docSettings || {};
   applyTheme(localData.theme || 'system');
   state.sourceResumeText = localData.sourceResumeText || '';
   const aiProviderSetupComplete = localData[AI_PROVIDER_SETUP_SAVED_KEY] || hasExistingAiProviderSetup(state.settings);
@@ -666,6 +671,14 @@ async function applySession(session) {
   const url = session.sourceUrl || raw.url || '';
   applyExtractedData(raw, url, !!raw.selectedText);
 
+  // Trigger Fit Check for context-menu scans when auto Fit Check is enabled.
+  // Not run on history regenerate (stale tab) or when the user has disabled the feature.
+  if (session.sourceTabId && !session.regenerateRequested && state.docSettings?.autoFitCheck !== false) {
+    chrome.tabs.get(session.sourceTabId)
+      .then(tab => { if (tab?.id) return runFitCheck(raw, tab); })
+      .catch(() => {});  // Tab closed or unavailable — silently skip
+  }
+
   if (session.pendingMode) {
     state.lastRunMode = session.pendingMode;
   }
@@ -786,9 +799,11 @@ async function scanCurrentPage() {
     showToast('✦ Page scanned');
 
     // Run Fit Check immediately — local only, no AI, does not block the scan button.
-    runFitCheck(response, tab).catch(err => {
-      console.warn('[JPDA] Fit Check error:', err?.message || err);
-    });
+    if (state.docSettings?.autoFitCheck !== false) {
+      runFitCheck(response, tab).catch(err => {
+        console.warn('[JPDA] Fit Check error:', err?.message || err);
+      });
+    }
   } catch (err) {
     console.warn('[JPDA] scanCurrentPage error:', err?.message || 'Unknown scan error');
     showToast('⚠️ Could not scan the page. Try the context menu instead.');
@@ -967,6 +982,8 @@ function bindEvents() {
     dom.settingsView.classList.remove('visible');
     state.settings = await loadSettings();
     state.profile  = await loadProfile();
+    const { docSettings: refreshedDoc } = await chrome.storage.sync.get(['docSettings']);
+    state.docSettings = refreshedDoc || {};
     dom.mockBanner.classList.toggle('hidden', state.settings?.provider !== 'mock');
     await populateProfileStrip();
     if (state.autofillFields.length > 0) {

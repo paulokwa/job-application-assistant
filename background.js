@@ -141,6 +141,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       extractedData: response,
       sourceUrl: tab.url,
       sourceTitle: tab.title,
+      sourceTabId: tab.id,
     });
 
     // Tell any already-open dashboard to reload session data

@@ -117,6 +117,84 @@ const METADATA_FIELDS = [
   'temporary',
 ];
 
+// URL path segments that unambiguously indicate a job search results page,
+// not a single job posting.
+const SEARCH_RESULT_PATHS = [
+  '/jobs/search',
+  '/job-search',
+  '/find/jobs',
+  '/jobs/find',
+  '/job-results',
+  '/search-jobs',
+  '/jobs/collection',
+];
+
+// Query parameters that indicate a search on consumer job-board domains.
+// Not applied globally — only on domains where we know these params mean "search".
+const SEARCH_QUERY_PARAMS = ['q', 'query', 'keywords', 'search'];
+
+// Consumer job-board domains where query params reliably indicate search pages.
+// ATS platforms (greenhouse, lever, workday…) are intentionally excluded because
+// their query params typically identify single postings, not search results.
+const SEARCH_PARAM_DOMAINS = [
+  'indeed.com',
+  'linkedin.com',
+  'glassdoor.com',
+  'monster.com',
+  'ziprecruiter.com',
+  'careerbuilder.com',
+  'simplyhired.com',
+];
+
+// Path substrings that strongly suggest a single job posting on a search-param domain,
+// preventing the query-param check from blocking real postings.
+const SINGLE_POSTING_PATH_PATTERNS = /\/(view|viewjob|job|position|posting|details|apply|jd)\b/;
+
+// Title patterns that suggest search results pages (used only on known job-board domains).
+const SEARCH_TITLE_PATTERNS = [
+  /\bjobs?\s+near\b/i,
+  /\d+\s+jobs?\s+(found|available|near|in)\b/i,
+  /\bjob\s+results\b/i,
+];
+
+/**
+ * Returns true if the page looks like a job search/listing results page
+ * rather than a single job posting. Conservative — only flags unambiguous signals.
+ */
+function isLikelySearchResultsPage({ url = '', title = '' }) {
+  const urlLower = url.toLowerCase();
+
+  // 1. Path-level signals — unambiguous search result paths
+  for (const path of SEARCH_RESULT_PATHS) {
+    if (urlLower.includes(path)) return true;
+  }
+
+  // 2. Query-param signals — only on known consumer job-board domains
+  const onSearchParamDomain = SEARCH_PARAM_DOMAINS.some(d => urlLower.includes(d));
+  if (onSearchParamDomain) {
+    try {
+      const parsed = new URL(url);
+      const pathLower = parsed.pathname.toLowerCase();
+      const looksLikeSinglePosting = SINGLE_POSTING_PATH_PATTERNS.test(pathLower);
+      if (!looksLikeSinglePosting) {
+        const hasSearchParam = SEARCH_QUERY_PARAMS.some(p => parsed.searchParams.has(p));
+        if (hasSearchParam) return true;
+      }
+    } catch (_) {
+      // Malformed URL — skip this check
+    }
+  }
+
+  // 3. Title signals — last resort, only on known job-board domains
+  const onKnownJobDomain = onSearchParamDomain || KNOWN_ATS_HOSTS.some(h => urlLower.includes(h));
+  if (onKnownJobDomain) {
+    const titleLower = title.toLowerCase();
+    if (SEARCH_TITLE_PATTERNS.some(re => re.test(titleLower))) return true;
+  }
+
+  return false;
+}
+
 // Phrases that indicate an application flow is present.
 const APPLICATION_PHRASES = [
   'apply now',
@@ -148,6 +226,15 @@ const APPLICATION_PHRASES = [
  */
 export function detectJobPage({ url = '', title = '', text = '', structuredData = '' } = {}) {
   const reasons = [];
+
+  // 0. Early exit: obvious search/listing result pages — checked before positive signals
+  if (isLikelySearchResultsPage({ url, title })) {
+    return {
+      isLikelyJobPosting: false,
+      confidence: 0,
+      reasons: ['Page appears to be a job search results listing'],
+    };
+  }
 
   // 1. JSON-LD structured data — highest-confidence signal, short-circuit
   if (structuredData && structuredData.includes('"JobPosting"')) {
