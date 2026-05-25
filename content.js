@@ -352,7 +352,7 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     return terms.map(t => `<span class="chip ${fcEscape(cls)}">${fcEscape(t)}</span>`).join('');
   }
 
-  function injectFitCheckCard({ score, matched, unmatched, profiles, activeProfileId, tabId }) {
+  function injectFitCheckCard({ score, matched, unmatched, profiles, activeProfileId, tabId, bestProfile }) {
     // Remove any existing card before re-injecting (e.g. on re-scan or profile switch).
     const existing = document.getElementById('fit-check-root');
     if (existing) existing.remove();
@@ -388,6 +388,24 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           <label class="profile-label" for="fc-profile-sel">Profile used for score</label>
           <select id="fc-profile-sel" class="profile-sel">${options}</select>
         </div>`;
+    }
+
+    let bestProfileSection = '';
+    if (bestProfile && typeof bestProfile === 'object') {
+      if (bestProfile.id === activeProfileId) {
+        bestProfileSection = `
+        <div class="best-row">
+          <span class="best-text">Best scoring profile: Current profile</span>
+        </div>`;
+      } else {
+        const bestName  = fcEscape(bestProfile.name || '');
+        const bestScore = Math.max(0, Math.min(100, Math.round(Number(bestProfile.score) || 0)));
+        bestProfileSection = `
+        <div class="best-row">
+          <span class="best-text">Best scoring profile: ${bestName} &middot; ${bestScore}%</span>
+          <button class="btn-use-best" id="fc-btn-use-best">Use this profile</button>
+        </div>`;
+      }
     }
 
     shadow.innerHTML = `
@@ -499,6 +517,37 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
         }
         .chip--matched  { background: #dcfce7; color: #14532d; }
         .chip--unmatched { background: #fef9c3; color: #78350f; }
+        .best-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-top: 10px;
+          padding: 7px 10px;
+          background: #eff6ff;
+          border: 1px solid #dbeafe;
+          border-radius: 8px;
+        }
+        .best-text {
+          font-size: 11px;
+          color: #1d4ed8;
+          flex: 1;
+          min-width: 0;
+        }
+        .btn-use-best {
+          font-size: 11px;
+          font-family: inherit;
+          font-weight: 600;
+          color: #1d4ed8;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0;
+          white-space: nowrap;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+        .btn-use-best:hover { color: #1e40af; }
         .divider { height: 1px; background: #f3f4f6; margin: 12px 0 10px; }
         .disclaimer {
           font-size: 11px;
@@ -520,6 +569,7 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
         </div>
         ${matchedSection}
         ${unmatchedSection}
+        ${bestProfileSection}
         <div class="divider"></div>
         <div class="disclaimer">Keyword overlap is a signal, not a verdict. You may still be a strong fit even with a low score.</div>
       </div>
@@ -534,6 +584,19 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           chrome.runtime.sendMessage({
             type: 'FIT_CHECK_PROFILE_CHANGED',
             profileId: profileSel.value,
+            tabId,
+          });
+        } catch (_) {}
+      });
+    }
+
+    const btnUseBest = shadow.getElementById('fc-btn-use-best');
+    if (btnUseBest && bestProfile) {
+      btnUseBest.addEventListener('click', () => {
+        try {
+          chrome.runtime.sendMessage({
+            type: 'FIT_CHECK_PROFILE_CHANGED',
+            profileId: bestProfile.id,
             tabId,
           });
         } catch (_) {}

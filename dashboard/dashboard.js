@@ -52,7 +52,7 @@ const state = {
   },
   docSettings: {},
   profileIndex: [],    // [{id, name}] metadata — kept in sync by populateProfileStrip()
-  lastFitCheck: null,  // { jobKeywords, tab } — reused when card profile selector changes
+  lastFitCheck: null,  // { jobKeywords, tab, allProfileScores } — reused when card profile selector changes
   currentTab: 'resume',     // 'resume' | 'cover-letter'
   drafts:         { resume: null, 'cover-letter': null },
   originalDrafts: { resume: null, 'cover-letter': null },
@@ -740,20 +740,65 @@ async function runFitCheck(scanResponse, tab) {
     return;
   }
 
-  const profileKeywords = extractProfileKeywords(state.profile || {});
-  if (!profileKeywords.length) {
-    showToast('Fit Check needs a saved profile with skills or experience.');
-    return;
+  const jobKeywords = extractJobKeywords(text);
+  const activeProfileId = dom.profileSwitcher.dataset.profileId || '';
+  const isMultiProfile = state.profileIndex.length > 1;
+
+  let score, matched, unmatched;
+  let allProfileScores = [];
+
+  if (isMultiProfile) {
+    // Load all profile contents in parallel — one failure does not block the rest.
+    const settled = await Promise.allSettled(
+      state.profileIndex.map(p => loadProfileById(p.id))
+    );
+
+    // Score each profile; exclude those with no extractable keywords.
+    for (let i = 0; i < state.profileIndex.length; i++) {
+      const { id, name } = state.profileIndex[i];
+      const result = settled[i];
+      if (result.status !== 'fulfilled') continue;
+      const keywords = extractProfileKeywords(result.value || {});
+      if (!keywords.length) continue;
+      const s = scoreMatch(keywords, jobKeywords);
+      allProfileScores.push({ id, name, score: s.score });
+    }
+
+    // Sort descending; prefer the currently active profile in a tie.
+    allProfileScores.sort((a, b) =>
+      b.score !== a.score ? b.score - a.score
+      : a.id === activeProfileId ? -1
+      : b.id === activeProfileId ? 1
+      : 0
+    );
+
+    if (!allProfileScores.length) {
+      showToast('Fit Check needs a saved profile with skills or experience.');
+      return;
+    }
+
+    // Score the active profile for the card display (may be 0 if it has no keywords).
+    const activeIdx = state.profileIndex.findIndex(p => p.id === activeProfileId);
+    const activeResult = activeIdx >= 0 ? settled[activeIdx] : null;
+    const activeKeywords = activeResult?.status === 'fulfilled'
+      ? extractProfileKeywords(activeResult.value || {})
+      : [];
+    ({ score, matched, unmatched } = scoreMatch(activeKeywords, jobKeywords));
+  } else {
+    // Single profile — existing behavior unchanged.
+    const profileKeywords = extractProfileKeywords(state.profile || {});
+    if (!profileKeywords.length) {
+      showToast('Fit Check needs a saved profile with skills or experience.');
+      return;
+    }
+    ({ score, matched, unmatched } = scoreMatch(profileKeywords, jobKeywords));
   }
 
-  const jobKeywords = extractJobKeywords(text);
-  const { score, matched, unmatched } = scoreMatch(profileKeywords, jobKeywords);
+  // Store job keywords and profile scores so the profile-selector re-render can reuse them.
+  state.lastFitCheck = { jobKeywords, tab, allProfileScores };
 
-  // Store so the profile-selector re-render can reuse the pre-extracted job keywords.
-  state.lastFitCheck = { jobKeywords, tab };
-
-  const activeProfileId = dom.profileSwitcher.dataset.profileId || '';
-  const profiles = state.profileIndex.length > 1 ? state.profileIndex : [];
+  const profiles = isMultiProfile ? state.profileIndex : [];
+  const bestProfile = allProfileScores.length > 0 ? allProfileScores[0] : null;
 
   try {
     await chrome.tabs.sendMessage(tab.id, {
@@ -764,6 +809,7 @@ async function runFitCheck(scanResponse, tab) {
       tabId: tab.id,
       activeProfileId,
       profiles,
+      bestProfile,
     });
   } catch (err) {
     // Content script may not be responding (e.g. page navigated away between scan and card send).
@@ -772,7 +818,7 @@ async function runFitCheck(scanResponse, tab) {
 }
 
 // Re-score the last scanned job against a different profile and re-inject the card.
-// Called when the user changes the profile selector inside the Fit Check card.
+// Called when the user changes the profile selector or clicks "Use this profile" in the Fit Check card.
 // Does NOT write to activeProfileId in storage — the selection is temporary.
 async function rerenderFitCheckWithProfile(profileId) {
   const fc = state.lastFitCheck;
@@ -784,6 +830,7 @@ async function rerenderFitCheckWithProfile(profileId) {
 
   const { score, matched, unmatched } = scoreMatch(profileKeywords, fc.jobKeywords);
   const profiles = state.profileIndex.length > 1 ? state.profileIndex : [];
+  const bestProfile = fc.allProfileScores?.length > 0 ? fc.allProfileScores[0] : null;
 
   try {
     await chrome.tabs.sendMessage(fc.tab.id, {
@@ -794,6 +841,7 @@ async function rerenderFitCheckWithProfile(profileId) {
       tabId: fc.tab.id,
       activeProfileId: profileId,
       profiles,
+      bestProfile,
     });
   } catch (err) {
     console.warn('[JPDA] Fit Check card re-render failed:', err?.message || err);
