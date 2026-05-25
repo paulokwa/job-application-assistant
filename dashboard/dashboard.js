@@ -444,7 +444,7 @@ async function handleFillPage() {
       return;
     }
 
-    if (isRestrictedUrl(tab.url)) {
+    if (tab.url && isRestrictedUrl(tab.url)) {
       showToast('⚠️ Cannot fill fields on this page type.');
       return;
     }
@@ -750,7 +750,12 @@ async function scanCurrentPage() {
       return;
     }
 
-    if (isRestrictedUrl(tab.url)) {
+    // Only block early if we actually know the URL is restricted.
+    // Without the `tabs` permission, chrome.tabs.query omits `url` for tabs
+    // where activeTab was not freshly granted — undefined URL is not the same
+    // as a restricted URL. Let executeScript attempt injection and fail on its
+    // own if the page genuinely blocks scripts.
+    if (tab.url && isRestrictedUrl(tab.url)) {
       showToast('⚠️ Cannot scan this page — open a job posting in a normal browser tab first.');
       return;
     }
@@ -806,7 +811,7 @@ async function scanFormFieldsOnPage() {
       return;
     }
 
-    if (isRestrictedUrl(tab.url)) {
+    if (tab.url && isRestrictedUrl(tab.url)) {
       showToast('⚠️ Cannot scan this page — open the job application form in a normal browser tab first.');
       return;
     }
