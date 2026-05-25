@@ -8,6 +8,7 @@ const KNOWN_ATS_HOSTS = [
   'lever.co',
   'jobs.lever.co',
   'myworkdayjobs.com',
+  'myworkday.com',
   'ashbyhq.com',
   'jobs.ashbyhq.com',
   'smartrecruiters.com',
@@ -24,9 +25,33 @@ const KNOWN_ATS_HOSTS = [
   'teamtailor.com',
   'dover.com',
   'rippling.com/hiring',
+  // UKG / UltiPro (common in Canada and US)
+  'ultipro.ca',
+  'ultipro.com',
+  'recruiting.ultipro.ca',
+  'recruiting.ultipro.com',
+  'ukg.com',
+  // Ceridian Dayforce (dominant in Canada)
+  'dayforce.com',
+  'ceridian.com',
+  // SAP SuccessFactors
+  'successfactors.com',
+  'successfactors.eu',
+  // Oracle / Taleo cloud
+  'oraclecloud.com',
+  // Other common platforms
+  'humi.ca',
+  'personio.com',
+  'pinpointhq.com',
+  'dover.io',
+  'jazz.co',
+  'jazzhr.com',
+  'breezy.hr',
+  'recruitingbypaychex.com',
 ];
 
 // Phrases that commonly appear as section headings in job postings.
+// Use only straight apostrophes here — smart quotes are normalised before matching.
 const SECTION_HEADERS = [
   'responsibilities',
   'requirements',
@@ -44,6 +69,22 @@ const SECTION_HEADERS = [
   'your responsibilities',
   'role requirements',
   'the role',
+  // Additional headers seen on UltiPro, Dayforce, and similar platforms
+  "what you'll likely have",
+  "what you will likely have",
+  "what you'll need",
+  "what you will need",
+  'what we offer',
+  "here's the deal",
+  'job details',
+  'position summary',
+  'position overview',
+  'job summary',
+  'who you are',
+  'about you',
+  'nice to have',
+  'must have',
+  'day in the life',
 ];
 
 // Metadata-like labels common in job postings.
@@ -62,6 +103,18 @@ const METADATA_FIELDS = [
   'experience level',
   'seniority level',
   'department',
+  // Additional metadata seen on Canadian / UltiPro-style postings
+  'job category',
+  'requisition',
+  'travel required',
+  'hourly rate',
+  'rate of pay',
+  'noc code',
+  'posting date',
+  'start date',
+  'contract',
+  'permanent',
+  'temporary',
 ];
 
 // Phrases that indicate an application flow is present.
@@ -75,6 +128,9 @@ const APPLICATION_PHRASES = [
   'resume or cv',
   'submit your resume',
   'submit your cv',
+  'to be considered',
+  'send your resume',
+  'click apply',
 ];
 
 /**
@@ -104,7 +160,12 @@ export function detectJobPage({ url = '', title = '', text = '', structuredData 
 
   let score = 0;
   const urlLower = url.toLowerCase();
-  const combined = (text + ' ' + title).toLowerCase();
+  // Normalise Unicode smart quotes/apostrophes to straight equivalents before
+  // matching so phrases like "what you'll do" match "what you’ll do".
+  const combined = (text + ' ' + title)
+    .toLowerCase()
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[“”]/g, '"');
 
   // 2. Known ATS / job board domain (25 pts)
   const atsDomain = KNOWN_ATS_HOSTS.find(host => urlLower.includes(host));
