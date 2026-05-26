@@ -2,7 +2,7 @@
 
 ## Current Release Status
 
-- v2.0 submitted to the Chrome Web Store (2026-05-22). Pending review.
+- v2.0 submitted to the Chrome Web Store on 2026-05-22 and accepted by Google.
 - `main` is the active development branch for post-v2 / v3 candidate work.
 
 ## Next Action Gate
@@ -13,9 +13,11 @@ Status:
 - [DONE] User completed two manual steps before submitting v2.0 (confirmed 2026-05-22):
   1. Updated Chrome Web Store screenshots to show Saved Jobs and Fit Analysis.
   2. Pasted updated overview copy into the Chrome Web Store developer dashboard.
-- [WAITING] v2.0 Chrome Web Store review result.
+- [DONE] v2.0 submitted to the Chrome Web Store (2026-05-22).
+- [DONE] v2.0 accepted by Google.
+- [WAITING] User to confirm next v3 candidate priority and v3.0 release scope.
 
-Next planned work: v3 candidate review, Fit Check manual smoke testing, Application Pack, or v3 polish - user to confirm priority once v2.0 review clears.
+Next planned work: v3 candidate review, Fit Check manual smoke testing, Application Pack, Job Dashboard Stats, Session Scan Payload Cap, or v3 polish - user to confirm priority.
 
 ## v3 Candidate Work In Progress
 
@@ -149,7 +151,7 @@ See `ROADMAP.md`. Do not duplicate the full roadmap here.
 ## Release Checklists
 
 See `RELEASE_V3_CHECKLIST.md` for active v3 planning.
-See `RELEASE_V2_CHECKLIST.md` only as the historical checklist for the already-submitted v2.0 package.
+See `RELEASE_V2_CHECKLIST.md` only as the historical checklist for the already-submitted and accepted v2.0 package.
 
 ## Handover Maintenance Rule
 
