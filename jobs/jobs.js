@@ -82,6 +82,45 @@ function fitScoreClass(score) {
   return 'fit-score fit-score--weak';
 }
 
+function numericFitScore(job) {
+  const value = job?.fitAnalysis?.score;
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number) : null;
+}
+
+function savedJobStats(jobs) {
+  return jobs.reduce((stats, job) => {
+    stats.total += 1;
+    const score = numericFitScore(job);
+    if (score !== null && score >= 75) {
+      stats.strong += 1;
+    } else if (score !== null && score >= 50) {
+      stats.good += 1;
+    } else {
+      stats.developing += 1;
+    }
+    return stats;
+  }, { total: 0, strong: 0, good: 0, developing: 0 });
+}
+
+function updateJobsStats(jobs) {
+  const statsBar = document.getElementById('jobs-stats');
+  if (!statsBar) return;
+
+  if (!jobs.length) {
+    statsBar.classList.add('hidden');
+    return;
+  }
+
+  const stats = savedJobStats(jobs);
+  document.getElementById('jobs-stat-total').textContent = String(stats.total);
+  document.getElementById('jobs-stat-strong').textContent = String(stats.strong);
+  document.getElementById('jobs-stat-good').textContent = String(stats.good);
+  document.getElementById('jobs-stat-developing').textContent = String(stats.developing);
+  statsBar.classList.remove('hidden');
+}
+
 function listItems(items) {
   const values = Array.isArray(items) ? items.filter(Boolean) : [];
   if (!values.length) return '<li>No items returned.</li>';
@@ -188,6 +227,7 @@ async function refreshJobs() {
 function render(jobs) {
   const list = document.getElementById('jobs-list');
   const empty = document.getElementById('empty-state');
+  updateJobsStats(jobs);
 
   if (!jobs.length) {
     list.classList.add('hidden');

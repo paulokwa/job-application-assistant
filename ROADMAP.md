@@ -149,18 +149,18 @@ See `## Autofill Known Limitations / Future Improvements` for next steps.
 
 ### 7. Job Dashboard Stats
 
+Status: **Complete on `main`** (2026-05-26).
+
 Suggested branch: `feature/job-dashboard-stats`
 
 Goal: make Saved Jobs feel more like an active job-search workspace.
 
-Possible stats:
+Completed scope:
 
 - Total saved jobs
-- Strong matches
-- Good matches
-- Ready to apply
-- Applied
-- Rejected
+- Strong matches (fit score >= 75)
+- Good matches (fit score 50-74)
+- Developing (fit score < 50 or unscored)
 
 ### 8. Storage Cleanup After Migration Confidence
 
