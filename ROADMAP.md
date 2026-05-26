@@ -6,7 +6,7 @@ This document captures release prep notes and future roadmap ideas. It is planni
 
 Version 1.0 is live on the Chrome Web Store.
 
-Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and is pending review. The v2.0 release checklist is complete: manifest bumped, smoke tests passed, privacy policy verified, screenshots updated, and overview copy updated.
+Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by Google. The v2.0 release checklist is complete: manifest bumped, smoke tests passed, privacy policy verified, screenshots updated, and overview copy updated.
 
 `main` currently contains:
 
@@ -28,9 +28,9 @@ Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and is pending r
 - [DONE] Final smoke tests passed.
 - [DONE] Chrome Web Store listing screenshots and overview copy updated.
 - [DONE] v2.0 submitted to the Chrome Web Store on 2026-05-22.
-- [WAITING] Chrome Web Store review result.
+- [DONE] v2.0 accepted by Google.
 
-Do not package or submit v3.0 until the v2.0 review result is known and the user confirms.
+v3.0 planning can continue, but do not package or submit v3.0 until the user explicitly confirms the release scope.
 
 ## Final v2.0 Smoke Test Checklist
 
@@ -178,9 +178,9 @@ Goal: cap very large temporary scan payloads before writing to `chrome.storage.s
 
 Why later: persistent storage risks were handled first. Session storage is temporary, so this can wait unless huge pages cause practical issues.
 
-## Suggested Order After v2.0 Submission
+## Suggested Order After v2.0 Acceptance
 
-1. ~~`release/v2.0-prep`~~ — complete; v2.0 submitted on 2026-05-22 and pending Chrome Web Store review
+1. ~~`release/v2.0-prep`~~ — complete; v2.0 submitted on 2026-05-22 and accepted by Google
 2. ~~`feature/assisted-form-fill`~~ — MVP complete on `main` (see above)
 3. `feature/job-dashboard-stats` — low-risk, visible Saved Jobs improvement
 4. `fix/session-scan-payload-cap` — low-risk maintenance guard
