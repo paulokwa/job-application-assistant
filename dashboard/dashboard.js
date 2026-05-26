@@ -3233,6 +3233,7 @@ function normalizeResumeDraft(parsed) {
   }));
 
   return {
+    headline: String(parsed.headline || ''),
     summary: String(parsed.summary || parsed.professionalSummary || ''),
     skills: toStringArray(parsed.skills),
     experience,
