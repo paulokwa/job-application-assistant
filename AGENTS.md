@@ -9,8 +9,8 @@ Before planning or coding, read these files in order:
 5. ROADMAP.md
 6. TROUBLESHOOTING.md
 
-Current release gate:
-Do not package or submit v3.0 until the v2.0 Chrome Web Store review result is known and the user confirms.
+Current release status:
+v2.0 was accepted by Google after Chrome Web Store submission. v3.0 planning can continue, but do not package or submit v3.0 until the user explicitly confirms the release scope.
 
 Important v3 release risk:
 Direct PDF download currently uses the Chrome `debugger` permission. Review `RELEASE_V3_CHECKLIST.md` before deciding whether it can ship.
