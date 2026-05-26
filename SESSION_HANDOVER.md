@@ -51,6 +51,17 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
 - [DONE] Section-level locking for My Profile AI import (V1, section-blocking only) - users can lock any of 7 profile sections to prevent AI analyser import from overwriting them. Lock state stored in `profile.metadata.lockedSections`. Side-effect fix: `saveProfileData()`, `clearProfile()`, and profile switch/add paths now preserve full `profile.metadata`. (`modules/schema.js`, `settings/settings.html`, `settings/settings.css`, `settings/settings.js`)
 - [DONE] Lock button UX polish - label updated to "Locked from AI import"; `syncLockToggles()` updates `title` attribute dynamically. (`settings/settings.js`)
 - [DONE] Education dates fix - `normalizeResumeDraft()` was silently dropping education dates when AI returned `year`/`graduationYear` keys. Added `normalizeEducationDraft()` helper with full fallback chain. (`dashboard/dashboard.js`)
+- [DONE] Cover letter export — last-paragraph spacing and styling fixes across all four templates (2026-05-26):
+  - `8639d41` - `fix: cover letter closing block spacing and styling across all templates`
+  - Root cause: `<p>` tags had browser-default `margin-top: 1em` not reset, causing additive margin stacking in Chrome's PDF renderer. Sidebar additionally had `gap: 20pt` on `.main-content` compounding the closing block's `margin-top`. Fixed by resetting `<p>` margins, zeroing last-paragraph bottom margin, calibrating closing block margins per template, and removing compact's `<strong>` wrapper from closing text.
+- [DONE] AI-generated resume `headline` field (2026-05-26):
+  - `90a9b87` - `feat: generate tailored resume headline per application`
+  - `8ffc342` - `fix: pass headline through normalizeResumeDraft`
+  - Sidebar template was hardcoding `experience[0]?.jobTitle` as the subtitle regardless of the target role. New `headline` field added to schema, AI prompt, and `normalizeResumeDraft`. Sidebar render now uses `headline || experience[0]?.jobTitle`.
+  - **Key gotcha:** `normalizeResumeDraft` in `dashboard.js` explicitly whitelists fields — any new top-level resume field must be added there or it is silently dropped.
+- [DONE] `{name}` chip added to filename builder (2026-05-26):
+  - `b840e53` - `feat: add {name} variable to filename chip builder`
+  - Added to `ALL_CHIPS` in `settings.js`, `buildFilename` in `modules/template.js`, preview substitution in `updateFilenamePreview`, and `getSuggestedFilenameBase` in `dashboard.js`.
 - [DONE] Fit Check v3 candidate work (2026-05-25):
   - `d1b1ea8` - `feat: add local Fit Check scoring after job page scan`
   - `d95e78e` - `docs: add Fit Check follow-up items to ROADMAP`
@@ -78,9 +89,9 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
 
 ## Current Main Branch State
 
-Latest known `main` commit (2026-05-25):
+Latest known `main` commit (2026-05-26):
 
-`13a94e7` - `fix: whitelist Fit Check AI review card payload`
+`b840e53` - `feat: add {name} variable to filename chip builder`
 
 Working tree was clean when this handover was updated.
 

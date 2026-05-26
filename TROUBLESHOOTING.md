@@ -213,6 +213,39 @@ Workday-specific matchers are the reference example: `datesectionmonth` and `dat
 
 ---
 
+## 17. Cover letter PDF export — last paragraph has extra space before the closing block
+
+**Symptom:** When downloading or printing the cover letter as PDF, the gap between the last body paragraph and the closing block ("Sincerely," / name) is noticeably larger than the spacing between body paragraphs. The classic template shows a moderate extra gap; sidebar was the worst. In some templates the closing text also appeared the wrong size or colour compared to the body.
+
+**Root cause (two compounding issues):**
+
+1. `<p>` tags in all four `renderCoverLetter` functions only set `margin-bottom` via inline style, leaving the browser-default `margin-top: 1em` in place. Chrome's PDF/print renderer does not always collapse adjacent margins the same way the live browser preview does — instead of `max(marginA, marginB)` you get `marginA + marginB`. The last `<p>` was worst-hit because its uncollapsed bottom margin added to the container's own `margin-bottom`, then the closing block's `margin-top` stacked on top as well.
+
+2. Sidebar's `.main-content` uses `display: flex; flex-direction: column; gap: 20pt`. The flex `gap` adds to any `margin-top` on a flex child, so the closing block's `margin-top: 40pt` + `gap: 20pt` = 60pt total, versus 15pt between body paragraphs.
+
+**Fix (applied `8639d41`):**
+- All `<p>` tags changed to `margin: 0 0 Xpt 0` (reset top margin) and the last `<p>` gets `margin: 0`.
+- Paragraphs container `margin-bottom` removed where present (classic).
+- Closing block `margin-top` reduced per template to give ~1.3× inter-paragraph spacing. Sidebar set to `margin-top: 0` so only the flex gap provides the spacing.
+- Compact's closing changed from `<strong>` to `<div>` (closing text was rendering bold).
+- Modern and sidebar closing text given explicit `font-size: 10.5pt` and body text colour to match paragraphs.
+
+**If this recurs:** Check whether the affected template's parent container uses a flex `gap` — if so, the closing block `margin-top` must account for it (or be set to 0 and rely on the gap alone).
+
+---
+
+## 18. New resume JSON field silently dropped after AI generation
+
+**Symptom:** A new field is added to the resume schema and the AI prompt, the AI returns it correctly, but it never appears in the rendered template. The field is present in the raw AI response but missing from `state.drafts.resume`.
+
+**Root cause:** `normalizeResumeDraft()` in `dashboard/dashboard.js` rebuilds the parsed AI response as an explicit object, listing only known fields. Any field not in that explicit list is silently discarded before the draft is stored or rendered. The `normalizeResumeContent()` function in `modules/schema.js` is not called in this path.
+
+**Fix:** Add the new field to the `return { ... }` block inside `normalizeResumeDraft()` in `dashboard.js`. Example — `headline` was added as `headline: String(parsed.headline || '')`.
+
+**Rule:** Every new top-level resume field must be explicitly listed in `normalizeResumeDraft`. This is the single gate all AI resume output passes through. Adding it to `schema.js` alone is not sufficient.
+
+---
+
 ## 15. Dashboard tone slider thumb does not reach track ends
 
 **Symptom:** The Tone slider's round thumb appears inset from the left and right ends even when set to Formal or Casual.
