@@ -19,6 +19,24 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
 
 ## v3 Candidate Work In Progress
 
+- Application Email Assistant added on `main` (2026-05-26):
+  - New "Prepare application email" button in the Export PDF card — enabled whenever a job description is loaded, no generated resume/cover letter required.
+  - Clicking opens a full-screen overlay (same slide-in pattern as Settings/History/Jobs/Autofill Review) with a complete review panel — the user must review before any action is taken, nothing is sent automatically.
+  - `modules/emailDrafting.js` (new): `prepareApplicationEmail(jobData, profile, settings, options?, signal?)` — builds system/user prompts, calls `callAI()`, follows existing drafting.js patterns. Includes `EMAIL_HALLUCINATION_GUARD` blocking invention of salary, availability, work authorization, certifications, language ability. `doNotClaimNotes` surfaced via `profileToPromptText`. JSON schema embedded in system prompt.
+  - AI classifies the posting into two paths: Path A (special application instructions detected — apply by email, reference/competition numbers, screening questions, salary expectations, availability, subject line format, deadlines) or Path B (no special instructions — clean generic professional email). Context banner in overlay reflects which path was taken.
+  - Returned JSON schema: `hasSpecialInstructions`, `applicationMethod`, `recipientEmail`, `subject`, `emailBody`, `detectedInstructionsSummary`, `requiredItems`, `screeningQuestions` (with `suggestedAnswer`, `needsUserConfirmation`, `reason`), `attachmentsReminder`, `warnings`, `mailtoRecommended`.
+  - Normalization in `dashboard.js` (`normalizeEmailResult`): coerces all fields to correct types, validates `recipientEmail` contains `@`, normalizes `applicationMethod` to `email|website|unknown`, builds and length-checks `mailtoUrl` (≤ 2000 encoded chars), sets `mailtoRecommended: false` if URL too long / no email / method not email.
+  - Mock mode (`modules/mock.js` — `generateMockApplicationEmail`): detects special-instruction keywords in description (`email`, `reference`, `competition number`, `screening`, `salary`, `availability`, `subject line`) — returns special-instructions mock or generic mock accordingly.
+  - Manual instruction override textarea: always visible at the top of the overlay; user can paste missed instructions before/after generation; content sent as `extraInstructions` in user prompt, labeled authoritative.
+  - Pre-send checklist replaces bare action area: 5 checkboxes (confirm recipient, confirm screening answers, attach resume, attach cover letter, confirm reference number). Amber-tinted callout: "Files are not attached automatically when opening your email app." Open email app button sits below the checklist.
+  - `mailto:` link: only shown when `applicationMethod === 'email'` AND `recipientEmail` found AND encoded URL ≤ 2000 chars. If body too long, link hidden and fallback message shown instead.
+  - Missing resume/cover letter notice shown in overlay if either document has not been generated yet.
+  - Abort controller (`currentEmailController`) cancels in-flight AI if user closes overlay or clicks Regenerate.
+  - `refreshExportButtons()` updated to enable/disable the email button based on `state.jobData.description`.
+  - **Do not send email automatically. Do not invent user facts. Do not attempt file attachments through mailto.**
+
+
+
 - Direct PDF download was added as a separate export path from the existing print-dialog Save as PDF flow.
 - The print-dialog Save as PDF function should remain available as the fallback/default export path.
 - Direct PDF download currently preserves formatting and respects filename settings, but depends on Chrome `debugger` plus `downloads` permissions.
@@ -91,7 +109,7 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
 
 Latest known `main` commit (2026-05-26):
 
-`b840e53` - `feat: add {name} variable to filename chip builder`
+`feat: add Application Email Assistant feature` — committed end of session 2026-05-26.
 
 Working tree was clean when this handover was updated.
 

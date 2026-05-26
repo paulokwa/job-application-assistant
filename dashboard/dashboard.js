@@ -2,6 +2,7 @@
 
 import { extractJobFields } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
+import { prepareApplicationEmail } from '../modules/emailDrafting.js';
 import { detectJobPage } from '../modules/jobPageDetector.js';
 import { extractProfileKeywords, extractJobKeywords, scoreMatch } from '../modules/fitCheck.js';
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
@@ -86,6 +87,7 @@ let currentAbortController = null;
 let currentFitAnalysisController = null;
 let currentJobInfoController = null;
 let currentAiMatchController = null;
+let currentEmailController = null;
 let generationStatusTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
@@ -196,6 +198,38 @@ const dom = {
   btnEditCL:          $('btn-edit-cl'),
   btnClearResume:     $('btn-clear-resume'),
   btnClearCL:         $('btn-clear-cl'),
+
+  // Email assistant
+  btnPrepareEmail:        $('btn-prepare-email'),
+  emailAssistantView:     $('email-assistant-view'),
+  btnCloseEmailAssistant: $('btn-close-email-assistant'),
+  btnRegenEmail:          $('btn-regen-email'),
+  emailPanelLoading:      $('email-panel-loading'),
+  emailPanelError:        $('email-panel-error'),
+  emailPanelErrorMsg:     $('email-panel-error-msg'),
+  btnEmailErrorRetry:     $('btn-email-error-retry'),
+  emailPanelResult:       $('email-panel-result'),
+  emailContextBanner:     $('email-context-banner'),
+  emailDocsMissing:       $('email-docs-missing'),
+  emailRecipientGroup:    $('email-recipient-group'),
+  emailRecipientDisplay:  $('email-recipient-display'),
+  btnCopyRecipient:       $('btn-copy-recipient'),
+  emailSubjectDisplay:    $('email-subject-display'),
+  btnCopySubject:         $('btn-copy-subject'),
+  emailBodyDisplay:       $('email-body-display'),
+  btnCopyBody:            $('btn-copy-body'),
+  emailChecklistGroup:    $('email-checklist-group'),
+  emailChecklist:         $('email-checklist'),
+  btnCopyChecklist:       $('btn-copy-checklist'),
+  emailQuestionsGroup:    $('email-questions-group'),
+  emailQuestionsList:     $('email-questions-list'),
+  emailAttachmentsGroup:  $('email-attachments-group'),
+  emailAttachmentsList:   $('email-attachments-list'),
+  emailWarningsGroup:     $('email-warnings-group'),
+  emailWarningsList:      $('email-warnings-list'),
+  btnOpenEmailApp:        $('btn-open-email-app'),
+  emailMailtoTooLong:     $('email-mailto-too-long'),
+  emailExtraInstructions: $('email-extra-instructions'),
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -1260,6 +1294,16 @@ function bindEvents() {
   dom.btnDownloadResume.addEventListener('click', () => downloadPdfDraft('resume'));
   dom.btnDownloadCL.addEventListener('click', () => downloadPdfDraft('cover-letter'));
   dom.btnDownloadMerged.addEventListener('click', () => downloadPdfDraft('merged'));
+
+  // Email assistant
+  dom.btnPrepareEmail.addEventListener('click', openEmailAssistant);
+  dom.btnCloseEmailAssistant.addEventListener('click', closeEmailAssistant);
+  dom.btnRegenEmail.addEventListener('click', runEmailGeneration);
+  dom.btnEmailErrorRetry.addEventListener('click', runEmailGeneration);
+  dom.btnCopySubject.addEventListener('click', () => copyEmailField(dom.emailSubjectDisplay.value, 'Subject copied'));
+  dom.btnCopyRecipient.addEventListener('click', () => copyEmailField(dom.emailRecipientDisplay.value, 'Email address copied'));
+  dom.btnCopyBody.addEventListener('click', () => copyEmailField(dom.emailBodyDisplay.value, 'Email body copied'));
+  dom.btnCopyChecklist.addEventListener('click', copyEmailChecklist);
 
   // Error Retry
   dom.btnErrorRetry.addEventListener('click', () => {
@@ -2945,6 +2989,241 @@ function refreshExportButtons() {
   dom.btnDownloadCL.disabled = !hasCL;
   dom.btnDownloadMerged.disabled = !(hasResume && hasCL);
   dom.btnAtsScan.disabled = !hasResume || !state.jobData.description;
+  dom.btnPrepareEmail.disabled = !state.jobData.description;
+  dom.btnPrepareEmail.title = state.jobData.description
+    ? 'Prepare a draft application email using AI'
+    : 'Scan or paste a job posting first';
+}
+
+// ── Application Email Assistant ───────────────────────────────────────────
+
+function openEmailAssistant() {
+  dom.emailAssistantView.classList.add('visible');
+  runEmailGeneration();
+}
+
+function closeEmailAssistant() {
+  dom.emailAssistantView.classList.remove('visible');
+  if (currentEmailController) {
+    currentEmailController.abort();
+    currentEmailController = null;
+  }
+}
+
+async function runEmailGeneration() {
+  if (!state.jobData.description) {
+    showToast('Scan or paste a job posting first.');
+    return;
+  }
+  if (!state.settings?.provider) {
+    setEmailState('error', 'No AI provider configured. Open Settings to set one up.');
+    return;
+  }
+
+  if (currentEmailController) currentEmailController.abort();
+  currentEmailController = new AbortController();
+
+  setEmailState('loading');
+
+  try {
+    const options = {
+      resumeGenerated: Boolean(state.drafts.resume),
+      coverLetterGenerated: Boolean(state.drafts['cover-letter']),
+      extraInstructions: dom.emailExtraInstructions.value.trim(),
+    };
+
+    const raw = await prepareApplicationEmail(
+      state.jobData,
+      state.profile,
+      state.settings,
+      options,
+      currentEmailController.signal,
+    );
+
+    const parsed = tryParseJson(raw);
+    if (!parsed) {
+      setEmailState('error', 'AI returned an unreadable response. Try regenerating.');
+      return;
+    }
+
+    const result = normalizeEmailResult(parsed);
+    renderEmailPanel(result, options);
+    setEmailState('result');
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+    const msg = mapError(err).message;
+    setEmailState('error', msg);
+  }
+}
+
+function setEmailState(which, errorMsg) {
+  dom.emailPanelLoading.classList.toggle('hidden', which !== 'loading');
+  dom.emailPanelError.classList.toggle('hidden', which !== 'error');
+  dom.emailPanelResult.classList.toggle('hidden', which !== 'result');
+  dom.btnRegenEmail.disabled = which === 'loading';
+  if (which === 'error' && errorMsg) dom.emailPanelErrorMsg.textContent = errorMsg;
+}
+
+function normalizeEmailResult(parsed) {
+  const toArr = v => Array.isArray(v) ? v.filter(s => s != null).map(String) : (v ? [String(v)] : []);
+  const toStr = (v, fallback = '') => (typeof v === 'string' && v.trim()) ? v.trim() : fallback;
+  const method = ['email', 'website', 'unknown'].includes(parsed.applicationMethod)
+    ? parsed.applicationMethod : 'unknown';
+
+  const recipientEmail = (typeof parsed.recipientEmail === 'string' && parsed.recipientEmail.includes('@'))
+    ? parsed.recipientEmail.trim() : null;
+
+  const subject = toStr(parsed.subject, 'Application for [Job Title]');
+  const emailBody = toStr(parsed.emailBody, 'Please find attached my resume for your review.');
+
+  const mailtoUrl = buildMailtoUrl(recipientEmail, subject, emailBody);
+
+  const screeningQuestions = toArr(parsed.screeningQuestions).map(q => {
+    if (typeof q !== 'object' || !q) return null;
+    return {
+      question: toStr(q.question),
+      suggestedAnswer: (typeof q.suggestedAnswer === 'string' && q.suggestedAnswer.trim()) ? q.suggestedAnswer.trim() : null,
+      needsUserConfirmation: Boolean(q.needsUserConfirmation),
+      reason: toStr(q.reason),
+    };
+  }).filter(q => q && q.question);
+
+  return {
+    hasSpecialInstructions: Boolean(parsed.hasSpecialInstructions),
+    applicationMethod: method,
+    recipientEmail,
+    subject,
+    emailBody,
+    detectedInstructionsSummary: toArr(parsed.detectedInstructionsSummary),
+    requiredItems: toArr(parsed.requiredItems),
+    screeningQuestions,
+    attachmentsReminder: toArr(parsed.attachmentsReminder),
+    warnings: toArr(parsed.warnings),
+    mailtoRecommended: recipientEmail !== null && method === 'email' && mailtoUrl !== null,
+    mailtoUrl,
+  };
+}
+
+function buildMailtoUrl(recipientEmail, subject, body) {
+  if (!recipientEmail) return null;
+  const url = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return url.length <= 2000 ? url : null;
+}
+
+function renderEmailPanel(result, options = {}) {
+  // Context banner
+  const banner = dom.emailContextBanner;
+  banner.className = 'email-context-banner';
+  if (result.hasSpecialInstructions) {
+    banner.classList.add('email-context-banner--special');
+    banner.textContent = 'Special application instructions found. Review carefully before sending.';
+  } else {
+    banner.classList.add('email-context-banner--generic');
+    banner.textContent = 'No special application instructions were detected. Here is a standard application email you can use.';
+  }
+
+  // Document generation warnings
+  const missing = [];
+  if (!options.resumeGenerated) missing.push('You have not generated a resume yet — generate one before sending your application.');
+  if (!options.coverLetterGenerated) missing.push('You have not generated a cover letter yet — consider generating one before sending.');
+  if (missing.length) {
+    dom.emailDocsMissing.textContent = missing.join(' ');
+    dom.emailDocsMissing.classList.remove('hidden');
+  } else {
+    dom.emailDocsMissing.classList.add('hidden');
+  }
+
+  // Recipient
+  if (result.recipientEmail) {
+    dom.emailRecipientDisplay.value = result.recipientEmail;
+    dom.emailRecipientGroup.classList.remove('hidden');
+  } else {
+    dom.emailRecipientGroup.classList.add('hidden');
+  }
+
+  // Subject and body
+  dom.emailSubjectDisplay.value = result.subject;
+  dom.emailBodyDisplay.value = result.emailBody;
+
+  // Required checklist
+  if (result.requiredItems.length) {
+    dom.emailChecklist.innerHTML = result.requiredItems
+      .map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    dom.emailChecklistGroup.classList.remove('hidden');
+  } else {
+    dom.emailChecklistGroup.classList.add('hidden');
+  }
+
+  // Screening questions
+  if (result.screeningQuestions.length) {
+    dom.emailQuestionsList.innerHTML = result.screeningQuestions.map(q => {
+      const answer = q.suggestedAnswer
+        ? `<div class="email-question-answer">${escapeHtml(q.suggestedAnswer)}</div>`
+        : `<div class="email-question-answer">[Please confirm: fill in your answer]</div>`;
+      const badge = q.needsUserConfirmation
+        ? `<span class="email-confirm-badge">Needs your confirmation</span>`
+        : '';
+      return `<div class="email-question-card">
+        <div class="email-question-text">${escapeHtml(q.question)}</div>
+        ${answer}
+        ${badge}
+      </div>`;
+    }).join('');
+    dom.emailQuestionsGroup.classList.remove('hidden');
+  } else {
+    dom.emailQuestionsGroup.classList.add('hidden');
+  }
+
+  // Attachments
+  if (result.attachmentsReminder.length) {
+    dom.emailAttachmentsList.innerHTML = result.attachmentsReminder
+      .map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    dom.emailAttachmentsGroup.classList.remove('hidden');
+  } else {
+    dom.emailAttachmentsGroup.classList.add('hidden');
+  }
+
+  // Warnings
+  if (result.warnings.length) {
+    dom.emailWarningsList.innerHTML = result.warnings
+      .map(w => `<li>${escapeHtml(w)}</li>`).join('');
+    dom.emailWarningsGroup.classList.remove('hidden');
+  } else {
+    dom.emailWarningsGroup.classList.add('hidden');
+  }
+
+  // mailto button
+  if (result.mailtoRecommended && result.mailtoUrl) {
+    dom.btnOpenEmailApp.href = result.mailtoUrl;
+    dom.btnOpenEmailApp.classList.remove('hidden');
+    dom.emailMailtoTooLong.classList.add('hidden');
+  } else if (result.applicationMethod === 'email' && result.recipientEmail && !result.mailtoUrl) {
+    dom.btnOpenEmailApp.classList.add('hidden');
+    dom.emailMailtoTooLong.classList.remove('hidden');
+  } else {
+    dom.btnOpenEmailApp.classList.add('hidden');
+    dom.emailMailtoTooLong.classList.add('hidden');
+  }
+}
+
+function copyEmailField(text, label) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => showToast(label)).catch(() => showToast('Copy failed — try selecting and copying manually.'));
+}
+
+function copyEmailChecklist() {
+  const items = [...dom.emailChecklist.querySelectorAll('li')]
+    .map(li => `• ${li.textContent}`).join('\n');
+  if (!items) return;
+  navigator.clipboard.writeText(items).then(() => showToast('Checklist copied')).catch(() => showToast('Copy failed.'));
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 // ── ATS Check ─────────────────────────────────────────────────────────────

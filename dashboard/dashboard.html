@@ -401,6 +401,10 @@
           </div>
           <button id="btn-download-merged" class="btn-secondary hidden" style="width: 100%; margin-bottom: 4px;" disabled>Merged Document</button>
           <p class="export-hint export-hint--download">Opens a Save As dialog with your filename settings.</p>
+
+          <div class="export-group-label export-group-label--email">Application Email</div>
+          <button id="btn-prepare-email" class="btn-secondary" style="width: 100%;" disabled type="button">Prepare application email</button>
+          <p class="export-hint">AI reads the job posting and drafts an application email. Review before sending.</p>
         </div>
       </section>
 
@@ -479,6 +483,137 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Application Email Assistant Overlay ── -->
+  <div id="email-assistant-view" class="settings-overlay" role="dialog" aria-label="Application Email Assistant" aria-modal="true">
+    <div class="overlay-header">
+      <button id="btn-close-email-assistant" class="back-btn" type="button" aria-label="Close email assistant">
+        <span aria-hidden="true">←</span> Cancel
+      </button>
+      <span class="overlay-title">Application Email Assistant</span>
+      <button id="btn-regen-email" class="btn-scan email-regen-btn" type="button">Regenerate</button>
+    </div>
+
+    <div class="overlay-content email-panel-scroll">
+
+      <!-- Manual instruction override — always visible -->
+      <div class="email-manual-instructions">
+        <label class="email-manual-label" for="email-extra-instructions">Paste any application instructions here if they were missed</label>
+        <textarea id="email-extra-instructions" class="email-extra-ta" rows="3" placeholder="e.g. Please include salary expectations and availability. Reference number: 2024-ADMIN-003."></textarea>
+        <p class="email-manual-hint">Included in the next generation — click Regenerate after pasting.</p>
+      </div>
+
+      <!-- Loading -->
+      <div id="email-panel-loading" class="email-panel-loading hidden" role="status" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Preparing application email…</span>
+      </div>
+
+      <!-- Error -->
+      <div id="email-panel-error" class="email-panel-error hidden" role="alert">
+        <div id="email-panel-error-msg" class="email-panel-error-msg"></div>
+        <button id="btn-email-error-retry" class="btn-secondary btn-sm" type="button">Retry</button>
+      </div>
+
+      <!-- Result -->
+      <div id="email-panel-result" class="hidden">
+
+        <!-- Context banner -->
+        <div id="email-context-banner" class="email-context-banner" role="status"></div>
+
+        <!-- Unsent warning about bottom-of-page instructions -->
+        <div class="email-scan-warning" role="note">
+          If the job posting has instructions near the bottom that may not have loaded, scroll to the bottom of the posting and re-scan before using this email.
+        </div>
+
+        <!-- Documents not yet generated -->
+        <div id="email-docs-missing" class="email-docs-missing hidden" role="note"></div>
+
+        <!-- Recipient -->
+        <div id="email-recipient-group" class="email-field-group hidden">
+          <div class="email-field-label">To</div>
+          <div class="email-field-row">
+            <input id="email-recipient-display" type="text" class="email-field-input" readonly aria-label="Recipient email address" />
+            <button id="btn-copy-recipient" class="btn-copy" type="button">Copy</button>
+          </div>
+        </div>
+
+        <!-- Subject -->
+        <div class="email-field-group">
+          <div class="email-field-label">Subject</div>
+          <div class="email-field-row">
+            <input id="email-subject-display" type="text" class="email-field-input" readonly aria-label="Email subject line" />
+            <button id="btn-copy-subject" class="btn-copy" type="button">Copy</button>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div class="email-field-group">
+          <div class="email-field-label-row">
+            <span class="email-field-label">Email body</span>
+            <button id="btn-copy-body" class="btn-copy" type="button">Copy body</button>
+          </div>
+          <textarea id="email-body-display" class="email-body-textarea" readonly aria-label="Email body"></textarea>
+        </div>
+
+        <!-- Required checklist -->
+        <div id="email-checklist-group" class="email-section hidden">
+          <div class="email-section-header">
+            <span class="email-section-title">Required items</span>
+            <button id="btn-copy-checklist" class="btn-copy btn-sm" type="button">Copy all</button>
+          </div>
+          <ul id="email-checklist" class="email-list"></ul>
+        </div>
+
+        <!-- Screening questions -->
+        <div id="email-questions-group" class="email-section hidden">
+          <div class="email-section-header">
+            <span class="email-section-title">Screening questions</span>
+          </div>
+          <div id="email-questions-list" class="email-questions-list"></div>
+        </div>
+
+        <!-- Attachments -->
+        <div id="email-attachments-group" class="email-section hidden">
+          <div class="email-section-header">
+            <span class="email-section-title">Attachments</span>
+          </div>
+          <p class="email-attachments-note">Attachments cannot be added automatically. After opening your email app, manually attach your files.</p>
+          <ul id="email-attachments-list" class="email-list"></ul>
+        </div>
+
+        <!-- Warnings -->
+        <div id="email-warnings-group" class="email-section email-section--warning hidden">
+          <div class="email-section-header">
+            <span class="email-section-title">Warnings</span>
+          </div>
+          <ul id="email-warnings-list" class="email-list email-list--warning"></ul>
+        </div>
+
+        <!-- Pre-send checklist -->
+        <div class="email-presend-section email-section">
+          <div class="email-section-header">
+            <span class="email-section-title">Before sending</span>
+          </div>
+          <div class="email-presend-items">
+            <label class="email-check-item"><input type="checkbox" class="email-check"> Confirm the recipient email is correct.</label>
+            <label class="email-check-item"><input type="checkbox" class="email-check"> Confirm any screening answers.</label>
+            <label class="email-check-item"><input type="checkbox" class="email-check"> Attach your resume.</label>
+            <label class="email-check-item"><input type="checkbox" class="email-check"> Attach your cover letter, if required.</label>
+            <label class="email-check-item"><input type="checkbox" class="email-check"> Confirm any job reference number is included, if required.</label>
+          </div>
+          <p class="email-attach-note">Files are not attached automatically when opening your email app.</p>
+        </div>
+
+        <!-- Open email app -->
+        <div class="email-actions">
+          <a id="btn-open-email-app" class="btn-primary hidden" role="button" aria-label="Open email app with this draft">Open email app</a>
+          <p id="email-mailto-too-long" class="email-mailto-note hidden">This email is too long to open automatically. Copy the subject and body instead.</p>
+        </div>
+
+      </div><!-- /email-panel-result -->
+    </div><!-- /email-panel-scroll -->
+  </div><!-- /email-assistant-view -->
 
   <script type="module" src="dashboard.js"></script>
 
