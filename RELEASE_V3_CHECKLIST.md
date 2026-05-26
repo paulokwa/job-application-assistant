@@ -1,10 +1,11 @@
 # v3.0 Release Checklist
 
-Version 2.0 has already been submitted to the Chrome Web Store and is pending review. This checklist is for the future v3.0 package based on post-v2 work on `main`.
+Version 2.0 has been accepted by Google after Chrome Web Store submission. This checklist is for the future v3.0 package based on post-v2 work on `main`.
 
 ## Release Gate
 
-- Do not package or submit v3.0 until the v2.0 Chrome Web Store review result is known and the user confirms.
+- v3.0 planning can continue now that v2.0 has been accepted.
+- Do not package or submit v3.0 until the user explicitly confirms the release scope.
 - Before any v3 packaging, confirm whether the direct PDF download feature should ship publicly.
 
 ## Important Permission Review
