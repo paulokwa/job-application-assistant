@@ -254,11 +254,11 @@ export function renderCoverLetter(data) {
         </div>
 
         <div class="summary" style="font-size: 10.5pt;">
-          ${content.paragraphs.map(p => `<p style="margin-bottom: 15pt;">${p}</p>`).join('')}
+          ${content.paragraphs.map((p, i, arr) => `<p style="margin: 0 0 ${i < arr.length - 1 ? '15pt' : '0'} 0;">${p}</p>`).join('')}
         </div>
 
-        <div class="keep-together" style="margin-top: 40pt;">
-          <div style="color: #64748b; margin-bottom: 8pt;">${content.closing || 'Sincerely,'}</div>
+        <div class="keep-together" style="margin-top: 0;">
+          <div style="margin-bottom: 8pt; font-size: 10.5pt; color: #475569; line-height: 1.6;">${content.closing || 'Sincerely,'}</div>
           <div style="font-weight: 700; color: #0f172a; font-size: 12pt;">${content.signOff || personalInfo.fullName}</div>
         </div>
       </main>

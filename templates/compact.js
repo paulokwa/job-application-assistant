@@ -158,11 +158,11 @@ export function renderCoverLetter(data) {
         </div>
 
         <div style="line-height: 1.4;">
-          ${content.paragraphs.map(p => `<p style="margin-bottom: 10pt;">${p}</p>`).join('')}
+          ${content.paragraphs.map((p, i, arr) => `<p style="margin: 0 0 ${i < arr.length - 1 ? '10pt' : '0'} 0;">${p}</p>`).join('')}
         </div>
 
-        <div class="keep-together" style="margin-top: 30pt;">
-          <strong>${content.closing || 'Sincerely,'}</strong><br>
+        <div class="keep-together" style="margin-top: 13pt;">
+          <div style="margin-bottom: 8pt;">${content.closing || 'Sincerely,'}</div>
           <span style="font-weight: 800; text-transform: uppercase;">${content.signOff || personalInfo.fullName}</span>
         </div>
       </div>
