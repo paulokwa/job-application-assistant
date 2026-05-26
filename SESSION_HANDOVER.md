@@ -109,7 +109,7 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
 
 Latest known `main` commit (2026-05-26):
 
-`feat: add Application Email Assistant feature` — committed end of session 2026-05-26.
+`8fd3770` - `feat: add Application Email Assistant feature`
 
 Working tree was clean when this handover was updated.
 
