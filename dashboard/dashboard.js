@@ -2503,6 +2503,7 @@ function getSuggestedFilenameBase(pattern, targets) {
   return buildFilename(pattern, {
     jobTitle: state.jobData.jobTitle,
     company: state.jobData.company,
+    name: state.profile?.personalInfo?.fullName,
     docType,
   });
 }

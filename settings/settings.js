@@ -20,7 +20,7 @@ let docSettings = {};
 let profileDirty = false;
 let autofillStatusTimers = [];
 
-const ALL_CHIPS = ['{docType}', '{company}', '{jobTitle}', '{date}'];
+const ALL_CHIPS = ['{docType}', '{company}', '{jobTitle}', '{name}', '{date}'];
 let activeChips = ['{docType}', '{company}', '{jobTitle}'];
 const MAX_SOURCE_RESUME_BYTES = 10 * 1024 * 1024;
 const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
@@ -821,9 +821,11 @@ function populateDocSection(d) {
 function updateFilenamePreview() {
   const pattern = $('inp-filename-pattern').value || '{docType} - {company} - {jobTitle}';
   const today = new Date().toISOString().slice(0, 10);
+  const profileName = ($('p-name')?.value || '').trim() || 'Your Name';
   const sub = (t, docType) => t
     .replace(/\{jobTitle\}/gi, 'Role')
     .replace(/\{company\}/gi,  'Company')
+    .replace(/\{name\}/gi,     profileName)
     .replace(/\{date\}/gi,     today)
     .replace(/\{docType\}/gi,  docType)
     + '.pdf';

@@ -21,17 +21,19 @@ export function downloadBlob(blob, filename) {
  * Builds a filename from a pattern + job context.
  * Supported variables: {jobTitle}, {company}, {date}, {docType}
  */
-export function buildFilename(pattern, { jobTitle, company, date, docType }) {
+export function buildFilename(pattern, { jobTitle, company, date, docType, name }) {
   const today = date || new Date().toISOString().slice(0, 10);
   const sanitizedJob = sanitize(jobTitle) || 'Role';
   const sanitizedCompany = sanitize(company) || 'Company';
   const sanitizedDocType = sanitize(docType) || 'Document';
+  const sanitizedName = sanitize(name) || 'Name';
 
   return (pattern || '{docType} - {company} - {jobTitle}')
     .replace(/\{jobTitle\}/gi, sanitizedJob)
     .replace(/\{company\}/gi,  sanitizedCompany)
     .replace(/\{date\}/gi,     today)
-    .replace(/\{docType\}/gi,  sanitizedDocType);
+    .replace(/\{docType\}/gi,  sanitizedDocType)
+    .replace(/\{name\}/gi,     sanitizedName);
 }
 
 function sanitize(str) {
