@@ -6,7 +6,7 @@ This document captures release prep notes and future roadmap ideas. It is planni
 
 Version 1.0 is live on the Chrome Web Store.
 
-Version 2.0 release checklist is complete (manifest bumped, smoke tests passed, privacy policy verified). CWS screenshots and overview copy have been updated. v2.0 is ready to submit.
+Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and is pending review. The v2.0 release checklist is complete: manifest bumped, smoke tests passed, privacy policy verified, screenshots updated, and overview copy updated.
 
 `main` currently contains:
 
@@ -17,15 +17,20 @@ Version 2.0 release checklist is complete (manifest bumped, smoke tests passed, 
 - Clear session cleanup
 - Storage quota guards
 - Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
+- Post-v2 / v3 candidate work including Fit Check improvements, direct PDF download, and Application Email Assistant
 
-## v2.0 Release Prep
+## v2.0 Release Status
 
-- Decide version number. Recommended: `2.0.0`, because Saved Jobs and Fit Analysis are substantial user-facing additions.
-- Prepare release notes/changelog.
-- Confirm manifest version bump.
-- Confirm packaged extension loads cleanly.
-- Run final smoke tests.
-- Review Chrome Web Store listing and screenshots if the new features should be shown.
+- [DONE] Version number set to `2.0.0`.
+- [DONE] Release notes/changelog prepared.
+- [DONE] Manifest version bumped.
+- [DONE] Packaged extension loaded cleanly.
+- [DONE] Final smoke tests passed.
+- [DONE] Chrome Web Store listing screenshots and overview copy updated.
+- [DONE] v2.0 submitted to the Chrome Web Store on 2026-05-22.
+- [WAITING] Chrome Web Store review result.
+
+Do not package or submit v3.0 until the v2.0 review result is known and the user confirms.
 
 ## Final v2.0 Smoke Test Checklist
 
@@ -173,14 +178,16 @@ Goal: cap very large temporary scan payloads before writing to `chrome.storage.s
 
 Why later: persistent storage risks were handled first. Session storage is temporary, so this can wait unless huge pages cause practical issues.
 
-## Suggested Order After v2.0 Prep
+## Suggested Order After v2.0 Submission
 
-1. ~~`release/v2.0-prep`~~ — complete
+1. ~~`release/v2.0-prep`~~ — complete; v2.0 submitted on 2026-05-22 and pending Chrome Web Store review
 2. ~~`feature/assisted-form-fill`~~ — MVP complete on `main` (see above)
-3. `feature/application-pack-actions`
-4. `feature/use-fit-analysis-in-generation`
-5. `feature/batch-job-intake`
-6. `feature/job-url-import`
+3. `feature/job-dashboard-stats` — low-risk, visible Saved Jobs improvement
+4. `fix/session-scan-payload-cap` — low-risk maintenance guard
+5. `feature/application-pack-actions`
+6. `feature/use-fit-analysis-in-generation`
+7. `feature/batch-job-intake`
+8. `feature/job-url-import`
 
 ### Autofill improvements (suggested branch: `feature/autofill-improvements`)
 
@@ -235,9 +242,9 @@ Avoid:
 
 ## Fit Check follow-ups
 
-- Wire Fit Check into context-menu scan path / applySession flow.
-- Add profile selector or best-profile comparison inside the card.
-- Improve keyword scoring with phrase matching and stemming.
-- Add manual AI Match button only after provider availability checks.
-- Add user setting to disable automatic Basic Fit Check after scan.
-- Refine detector for job-search result pages vs single job postings.
+- [DONE] Wire Fit Check into context-menu scan path / applySession flow.
+- [DONE] Add profile selector or best-profile comparison inside the card.
+- [DONE] Improve keyword scoring with phrase matching and normalization.
+- [DONE] Add manual AI Match button only after provider availability checks.
+- [DONE] Add user setting to disable automatic Basic Fit Check after scan.
+- [TODO] Refine detector for job-search result pages vs single job postings.
