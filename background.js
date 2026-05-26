@@ -3,6 +3,8 @@
 // content.js is never injected automatically — only on explicit user action.
 
 const openSidePanelTabs = new Set();
+const SESSION_SCAN_TEXT_CAP_CHARS = 60000;
+const SESSION_SCAN_TRUNCATION_MARKER = '\n\n[Truncated: page text exceeded session storage cap]';
 
 // ── Setup ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +44,26 @@ function isRestrictedUrl(url) {
 async function captureTab(tabId) {
   await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
   return chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_CONTENT' });
+}
+
+function capSessionScanText(value) {
+  if (value === null || value === undefined) return value;
+  const text = String(value);
+  if (text.length <= SESSION_SCAN_TEXT_CAP_CHARS) return text;
+
+  // Protect session storage from huge scanned pages while keeping enough text for normal generation.
+  const keepChars = Math.max(0, SESSION_SCAN_TEXT_CAP_CHARS - SESSION_SCAN_TRUNCATION_MARKER.length);
+  return text.slice(0, keepChars) + SESSION_SCAN_TRUNCATION_MARKER;
+}
+
+function capSessionScanPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+
+  const capped = { ...payload };
+  for (const field of ['pageText', 'selectedText', 'structuredData']) {
+    if (field in capped) capped[field] = capSessionScanText(capped[field]);
+  }
+  return capped;
 }
 
 function markSidePanelOpen(tabId, isOpen) {
@@ -138,7 +160,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     }
 
     await chrome.storage.session.set({
-      extractedData: response,
+      extractedData: capSessionScanPayload(response),
       sourceUrl: tab.url,
       sourceTitle: tab.title,
       sourceTabId: tab.id,

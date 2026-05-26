@@ -172,11 +172,17 @@ Important: do not do this immediately. Wait until the local migration has been u
 
 ### 9. Session Scan Payload Cap
 
+Status: **Complete on `main`** (2026-05-26).
+
 Suggested branch: `fix/session-scan-payload-cap`
 
 Goal: cap very large temporary scan payloads before writing to `chrome.storage.session`.
 
-Why later: persistent storage risks were handled first. Session storage is temporary, so this can wait unless huge pages cause practical issues.
+Completed scope:
+
+- Context-menu scan payloads cap large text fields before session storage writes.
+- Full-page dashboard handoff caps the temporary job description payload before session storage writes.
+- Small scan metadata such as title, company, URL, source title, source type, and tab ID stays intact.
 
 ## Suggested Order After v2.0 Acceptance
 

@@ -34,6 +34,8 @@ const MAX_EDITED_HTML_CHARS = 500000;
 const MAX_SAVED_JOBS = 50;
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
+const SESSION_SCAN_TEXT_CAP_CHARS = 60000;
+const SESSION_SCAN_TRUNCATION_MARKER = '\n\n[Truncated: page text exceeded session storage cap]';
 const MAX_SYNC_FIELD_LENGTHS = {
   jobTitle: 140,
   company: 120,
@@ -1350,6 +1352,16 @@ function parsePositiveInt(value) {
   return Number.isInteger(number) && number > 0 ? number : null;
 }
 
+function capSessionScanText(value) {
+  if (value === null || value === undefined) return value;
+  const text = String(value);
+  if (text.length <= SESSION_SCAN_TEXT_CAP_CHARS) return text;
+
+  // Protect session storage from huge scanned pages while keeping enough text for normal generation.
+  const keepChars = Math.max(0, SESSION_SCAN_TEXT_CAP_CHARS - SESSION_SCAN_TRUNCATION_MARKER.length);
+  return text.slice(0, keepChars) + SESSION_SCAN_TRUNCATION_MARKER;
+}
+
 async function getScanTargetTab() {
   if (sourceTabId) {
     try {
@@ -1388,7 +1400,7 @@ async function persistCurrentJobContextForFullPage() {
     extractedData: {
       jobTitle,
       company,
-      pageText: description,
+      pageText: capSessionScanText(description),
       url: sourceUrl,
     },
     sourceUrl,
