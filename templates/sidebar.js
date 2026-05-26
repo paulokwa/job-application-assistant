@@ -124,7 +124,7 @@ export const styles = `
 `;
 
 export function render(data) {
-  const { personalInfo, summary, experience, education, skills, certifications, projects } = data;
+  const { personalInfo, headline, summary, experience, education, skills, certifications, projects } = data;
 
   return `
     <div class="resume-container">
@@ -174,7 +174,7 @@ export function render(data) {
       <main class="main-content">
         <header class="header">
           <h1>${personalInfo.fullName}</h1>
-          <div class="job-title-top">${experience[0]?.jobTitle || 'Professional'}</div>
+          <div class="job-title-top">${headline || experience[0]?.jobTitle || 'Professional'}</div>
         </header>
 
         ${summary ? `

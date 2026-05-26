@@ -58,6 +58,7 @@
 /**
  * @typedef {Object} ResumeContent
  * @property {PersonalInfo} personalInfo
+ * @property {string} headline
  * @property {string} summary
  * @property {Experience[]} experience
  * @property {Education[]} education
@@ -80,6 +81,7 @@ export const DEFAULT_RESUME_CONTENT = {
     portfolio: '',
     website: '',
   },
+  headline: '',
   summary: '',
   summaries: [],
   experience: [],
@@ -136,6 +138,7 @@ export function normalizeResumeContent(data = {}) {
 
   return {
     personalInfo: normalizePersonalInfo(data),
+    headline: data.headline || '',
     summary: data.summary || (data.summaries?.[0]?.text) || '',
     summaries: Array.isArray(data.summaries) ? data.summaries.map(s => ({
       label: s.label || 'Summary',

@@ -71,6 +71,7 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
   ].join('\n\n');
 
   const resumeSchema = {
+    headline: "A short professional headline (3–6 words) positioning the candidate for the target role — e.g. 'Administrative Professional | Office Operations'. Reflect the target job, not the user's most recent job title.",
     summary: "A 3-4 sentence professional summary tailored to the job.",
     skills: ["Skill 1", "Skill 2", "..."],
     experience: [
