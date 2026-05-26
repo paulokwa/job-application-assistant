@@ -186,6 +186,9 @@ function sortSavedJobs(jobs) {
     if (currentSort === 'created_desc') {
       return timeValue(b.createdAt) - timeValue(a.createdAt);
     }
+    if (currentSort === 'updated_desc') {
+      return timeValue(b.updatedAt || b.createdAt) - timeValue(a.updatedAt || a.createdAt);
+    }
     if (currentSort === 'status') {
       return statusLabel(a.status).localeCompare(statusLabel(b.status)) ||
         timeValue(b.updatedAt || b.createdAt) - timeValue(a.updatedAt || a.createdAt);
