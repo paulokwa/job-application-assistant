@@ -21,17 +21,17 @@ Before starting work, report:
 - Next gated action
 - What is already completed and must not be repeated
 
-Release gate: do not start packaging or submitting v3.0 until the v2.0 Chrome Web Store review result is known and the user confirms they are ready to proceed.
+Release gate: v2.0 has been accepted by Google. v3.0 planning can continue, but do not package or submit v3.0 until the user explicitly confirms the release scope.
 
 ## Required reading reference
 
 | File | Purpose |
 |---|---|
-| `START_HERE.md` | First-stop summary for new sessions, current release gate, and active v3 risk |
+| `START_HERE.md` | First-stop summary for new sessions, current release status, and active v3 risk |
 | `AGENTS.md` | Short authoritative startup checklist and stop conditions |
-| `SESSION_HANDOVER.md` | Current release gate, completed v2 work, v3 candidate work, and do-not-repeat list |
-| `RELEASE_V3_CHECKLIST.md` | Required checklist for future v3.0 packaging after the v2.0 review gate clears |
-| `RELEASE_V2_CHECKLIST.md` | Historical checklist for the submitted v2.0 package |
+| `SESSION_HANDOVER.md` | Current release status, completed v2 work, v3 candidate work, and do-not-repeat list |
+| `RELEASE_V3_CHECKLIST.md` | Required checklist for future v3.0 packaging after the user confirms release scope |
+| `RELEASE_V2_CHECKLIST.md` | Historical checklist for the accepted v2.0 package |
 | `ROADMAP.md` | Future roadmap ideas and suggested branch order after v2.0 |
 | `README.md` | Repo overview, setup, and basic usage |
 | `TROUBLESHOOTING.md` | Resolved technical issues that could recur — **must be read before any work on `modules/autofillMatcher.js`** (entry 16 defines the rule that prevents ATS-specific fixes from breaking other already-working ATS platforms); also check before debugging any API, CSS variable, or settings-page JS issue |
