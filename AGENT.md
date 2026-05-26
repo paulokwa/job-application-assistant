@@ -2,12 +2,16 @@
 
 ## Session Startup Protocol
 
-Every AI agent/Codex/Claude session must read these files before planning or coding:
+Every AI agent/Codex/Claude session must start with `START_HERE.md`, then read these files before planning or coding:
 
-1. `SESSION_HANDOVER.md` if present
-2. `RELEASE_V3_CHECKLIST.md`
-3. `ROADMAP.md`
-4. `README.md` as needed
+1. `SESSION_HANDOVER.md`
+2. `AGENT.md`
+3. `RELEASE_V3_CHECKLIST.md`
+4. `ROADMAP.md`
+5. `TROUBLESHOOTING.md`
+6. `README.md` as needed
+
+`AGENTS.md` is the short authoritative startup checklist. This file gives the fuller project rules and should stay aligned with `AGENTS.md` and `START_HERE.md`.
 
 Before starting work, report:
 
@@ -19,12 +23,12 @@ Before starting work, report:
 
 Release gate: do not start packaging or submitting v3.0 until the v2.0 Chrome Web Store review result is known and the user confirms they are ready to proceed.
 
-If you are an AI agent picking up work on this project, read these files before doing anything:
-
-## Required reading
+## Required reading reference
 
 | File | Purpose |
 |---|---|
+| `START_HERE.md` | First-stop summary for new sessions, current release gate, and active v3 risk |
+| `AGENTS.md` | Short authoritative startup checklist and stop conditions |
 | `SESSION_HANDOVER.md` | Current release gate, completed v2 work, v3 candidate work, and do-not-repeat list |
 | `RELEASE_V3_CHECKLIST.md` | Required checklist for future v3.0 packaging after the v2.0 review gate clears |
 | `RELEASE_V2_CHECKLIST.md` | Historical checklist for the submitted v2.0 package |
