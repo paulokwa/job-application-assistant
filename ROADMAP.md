@@ -50,18 +50,20 @@ v3.0 planning can continue, but do not package or submit v3.0 until the user exp
 
 ### 1. Application Pack Actions
 
+Status: **Phase 1 complete on `main`** (2026-05-26).
+
 Suggested branch: `feature/application-pack-actions`
 
 Goal: let a saved job become a launchpad for application materials.
 
-Possible first scope:
+Phase 1 completed scope:
 
 - Generate tailored resume from saved job
 - Generate cover letter from saved job
-- Generate recruiter message
 
 Later scope:
 
+- Generate recruiter message
 - Generate short application answers
 - Generate follow-up message
 - Suggest follow-up date/reminder text

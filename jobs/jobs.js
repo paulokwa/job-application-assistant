@@ -4,6 +4,7 @@ import { openSafeHttpUrl } from '../modules/url.js';
 import { compactSavedJobs, isStorageQuotaError, storageQuotaMessage } from '../modules/storageLimits.js';
 
 const SAVED_JOBS_KEY = 'savedJobs';
+const GENERATION_MODES = new Set(['resume', 'cover-letter']);
 const STATUSES = [
   ['needs_review', 'Needs review'],
   ['saved', 'Saved'],
@@ -177,6 +178,10 @@ function sortText(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeGenerationMode(mode) {
+  return GENERATION_MODES.has(mode) ? mode : '';
+}
+
 function sortSavedJobs(jobs) {
   const sorted = [...jobs];
   sorted.sort((a, b) => {
@@ -295,6 +300,8 @@ function render(jobs) {
         <button class="action-btn" data-action="analyze" type="button" ${isAnalyzing ? 'disabled' : ''}>
           ${isAnalyzing ? 'Analyzing...' : job.fitAnalysis ? 'Re-analyze' : 'Analyze Fit'}
         </button>
+        <button class="action-btn" data-action="generate-resume" type="button">Generate resume</button>
+        <button class="action-btn" data-action="generate-cover-letter" type="button">Generate cover letter</button>
         <button class="action-btn action-btn--primary" data-action="load" type="button">Load into generator</button>
         ${openButton}
         <button class="action-btn action-btn--danger" data-action="delete" type="button">Delete</button>
@@ -352,13 +359,13 @@ async function deleteSavedJob(id) {
   await saveSavedJobs(jobs.filter(job => job.id !== id));
 }
 
-async function loadIntoGenerator(id) {
+async function loadIntoGenerator(id, options = {}) {
   const jobs = await loadSavedJobs();
   const job = jobs.find(item => item.id === id);
   if (!job) return;
 
-  await chrome.storage.session.remove(['pendingMode', 'regenerateRequested']);
-  await chrome.storage.session.set({
+  const generationMode = normalizeGenerationMode(options.generationMode);
+  const sessionPayload = {
     extractedData: {
       pageText: job.cleanDescription || '',
       jobTitle: job.title || '',
@@ -373,9 +380,17 @@ async function loadIntoGenerator(id) {
       id: job.id,
       loadedAt: new Date().toISOString(),
     },
-  });
+  };
+  if (generationMode) sessionPayload.pendingMode = generationMode;
 
-  window.parent?.postMessage({ type: 'JPDA_SAVED_JOB_LOADED', id: job.id }, window.location.origin);
+  await chrome.storage.session.remove(['pendingMode', 'regenerateRequested']);
+  await chrome.storage.session.set(sessionPayload);
+
+  window.parent?.postMessage({
+    type: generationMode ? 'JPDA_SAVED_JOB_GENERATE_REQUESTED' : 'JPDA_SAVED_JOB_LOADED',
+    id: job.id,
+    mode: generationMode,
+  }, window.location.origin);
 }
 
 async function requestFitAnalysis(id) {
@@ -417,6 +432,14 @@ async function init() {
 
     if (btn.dataset.action === 'load') {
       await loadIntoGenerator(id);
+    }
+
+    if (btn.dataset.action === 'generate-resume') {
+      await loadIntoGenerator(id, { generationMode: 'resume' });
+    }
+
+    if (btn.dataset.action === 'generate-cover-letter') {
+      await loadIntoGenerator(id, { generationMode: 'cover-letter' });
     }
 
     if (btn.dataset.action === 'delete') {

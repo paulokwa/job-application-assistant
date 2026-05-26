@@ -32,6 +32,12 @@ const SAVED_JOBS_KEY = 'savedJobs';
 const EDITED_HTML_SAVE_DELAY_MS = 500;
 const MAX_EDITED_HTML_CHARS = 500000;
 const MAX_SAVED_JOBS = 50;
+const SAVED_JOB_GENERATION_MODES = new Set(['resume', 'cover-letter']);
+const SAVED_JOBS_MESSAGE_TYPES = new Set([
+  'JPDA_SAVED_JOB_LOADED',
+  'JPDA_SAVED_JOB_GENERATE_REQUESTED',
+  'JPDA_ANALYZE_FIT_REQUESTED',
+]);
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
 const SESSION_SCAN_TEXT_CAP_CHARS = 60000;
@@ -298,7 +304,19 @@ async function init() {
 }
 
 function loadSession() {
-  chrome.storage.session.get(null).then(applySession);
+  return chrome.storage.session.get(null).then(applySession);
+}
+
+function normalizeSavedJobGenerationMode(mode) {
+  return SAVED_JOB_GENERATION_MODES.has(mode) ? mode : '';
+}
+
+function generationModeLabel(mode) {
+  return mode === 'resume' ? 'resume' : 'cover letter';
+}
+
+function isFromJobsFrame(event) {
+  return event.source === document.getElementById('jobs-frame')?.contentWindow;
 }
 
 function refreshAutofillCard() {
@@ -1189,12 +1207,30 @@ function bindEvents() {
   // Saved jobs
   dom.btnJobs.addEventListener('click', () => dom.jobsView.classList.add('visible'));
   dom.btnCloseJobs.addEventListener('click', () => dom.jobsView.classList.remove('visible'));
-  window.addEventListener('message', e => {
+  window.addEventListener('message', async e => {
     if (e.origin !== window.location.origin) return;
+    if (SAVED_JOBS_MESSAGE_TYPES.has(e.data?.type) && !isFromJobsFrame(e)) return;
     if (e.data?.type === 'JPDA_SAVED_JOB_LOADED') {
       dom.jobsView.classList.remove('visible');
-      loadSession();
+      await loadSession();
       showToast('Loaded saved job. Generate when ready.');
+      return;
+    }
+    if (e.data?.type === 'JPDA_SAVED_JOB_GENERATE_REQUESTED') {
+      const mode = normalizeSavedJobGenerationMode(e.data.mode);
+      dom.jobsView.classList.remove('visible');
+      await loadSession();
+      await chrome.storage.session.remove(['pendingMode']);
+      if (!mode) {
+        showToast('Loaded saved job. Generate when ready.');
+        return;
+      }
+      if (await confirmOverwrite(mode)) {
+        showToast(`Loaded saved job. Generating ${generationModeLabel(mode)}...`);
+        runGeneration(mode);
+      } else {
+        showToast('Loaded saved job. Generation canceled.');
+      }
       return;
     }
     if (e.data?.type === 'JPDA_ANALYZE_FIT_REQUESTED') {
