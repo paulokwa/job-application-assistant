@@ -23,7 +23,7 @@ Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by 
 - Storage quota guards
 - Session scan payload cap for large temporary scan text
 - Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
-- Post-v2 / v3 candidate work including Fit Check improvements, direct PDF download, and Application Email Assistant
+- Post-v2 / v3 candidate work including Fit Check improvements, direct PDF download, Application Email Assistant, Application Pack actions, and targeted autofill matcher improvements
 
 ## v2.0 Release Status
 
@@ -54,25 +54,23 @@ v3.0 planning can continue, but do not package or submit v3.0 until the user exp
 
 ## Active Roadmap Ideas
 
-### 1. Fit Check follow-up — search-results detector refinement
+### 1. v3 Release Readiness Review
 
-Goal: refine detector behavior for job-search results pages vs single job postings.
+Goal: review the accumulated post-v2 candidate work and decide what should ship in v3.0.
 
-This is the only remaining Fit Check follow-up currently listed as incomplete.
+Important: do not package or submit v3.0 until the user explicitly confirms the release scope. Re-review the direct PDF download `debugger` permission before any v3 package is prepared.
 
-### 2. Autofill improvements
-
-Suggested branch: `feature/autofill-improvements`
-
-See `## Autofill Known Limitations / Future Improvements` for scope.
-
-### 3. Storage Cleanup After Migration Confidence
+### 2. Storage Cleanup After Migration Confidence
 
 Suggested branch: `maintenance/cleanup-old-sync-storage`
 
 Goal: eventually remove old sync copies of provider settings and profile data after the local-first migration has proven safe.
 
 Important: do not do this immediately. Wait until the local migration has been used successfully in a released version.
+
+## Later Autofill Improvements
+
+Autofill remains a broad future bucket, but no immediate autofill implementation task is selected. Keep changes targeted, deterministic, and review-before-fill; follow `TROUBLESHOOTING.md` entry 16 before modifying `modules/autofillMatcher.js`.
 
 ## Later Intake Experiments
 
@@ -122,6 +120,31 @@ Preferred behavior:
 Treat it as a link collector first, not guaranteed full job-description extraction.
 
 ## Completed Roadmap Items
+
+### Fit Check Search-Results Detector Refinement
+
+Status: **Complete on `main`** (2026-05-27).
+
+Completed scope:
+
+- Search/listing page detection now includes additional path patterns and high-precision page-text phrases such as save-search and job-alert language.
+- Glassdoor `/Job/...jobs-SRCH...` search pages are skipped, while real `/job-listing/...` postings can still pass when posting content signals are present.
+- `detectJobPage()` return values include `isLikelySearchPage`.
+- Dashboard Fit Check skip toast distinguishes search/listing pages from generic non-job pages.
+- Lightweight Node detector checks cover LinkedIn, Indeed, Glassdoor, Greenhouse/Lever-style postings, JSON-LD JobPosting, and plain non-job pages.
+
+### Autofill Graduation Year And GitHub Matching
+
+Status: **Complete on `main`** (2026-05-27).
+
+Completed scope:
+
+- Added a graduation-year select matcher that extracts the last four-digit year from education dates.
+- Added `toGraduationYear()` helper.
+- Added GitHub, GitHub Profile, and GitHub URL signals to the existing portfolio matcher.
+- Added `tests/autofill-multi-education.html` fixture for multi-education grouping and graduation-year select review.
+- Fixed the stale employment fixture threshold comment.
+- No content script, dashboard, settings, manifest, or fill-logic changes.
 
 ### Application Pack Actions — Phase 1
 
@@ -227,9 +250,8 @@ Guardrails (permanent):
 
 ## Suggested Order For Active Work
 
-1. Fit Check detector refinement (no branch yet)
-2. `feature/autofill-improvements`
-3. `maintenance/cleanup-old-sync-storage`
+1. v3 Release Readiness Review
+2. `maintenance/cleanup-old-sync-storage` after released migration confidence
 
 ## Autofill Known Limitations / Future Improvements
 
@@ -239,8 +261,8 @@ These are known constraints of the current MVP. None block local testing; they a
 
 - Field matching currently uses deterministic rules only. AI-assisted matching for custom question fields (e.g. "Why do you want to work here?") is a future consideration.
 - Multiple employment history sections are not fully mapped — only the most recent experience entry is used per field group.
-- Multiple education entries are not mapped — only the first education entry is used.
-- Employment and education date handling is basic because profile dates are stored as freeform strings (e.g. "Jan 2021"). Structured month/year fields on application forms may not match reliably.
+- Multiple education entries can be grouped for clear repeated education sections, but unusual ATS layouts may still need targeted fixtures or matchers.
+- Employment and education date handling is basic because profile dates are stored as freeform strings (e.g. "Jan 2021"). Graduation year selects are supported, but other structured month/year fields may still need targeted handling.
 - Month/year dropdown support is limited to exact and case-insensitive text matching, plus a starts-with pass restricted to known month abbreviations only.
 
 ### Field identity
@@ -277,12 +299,3 @@ Avoid:
 - Promising universal job board extraction
 - Building dozens of custom job-board extractors too early
 - Letting the app submit applications without user review
-
-## Fit Check follow-ups
-
-- [DONE] Wire Fit Check into context-menu scan path / applySession flow.
-- [DONE] Add profile selector or best-profile comparison inside the card.
-- [DONE] Improve keyword scoring with phrase matching and normalization.
-- [DONE] Add manual AI Match button only after provider availability checks.
-- [DONE] Add user setting to disable automatic Basic Fit Check after scan.
-- [TODO] Refine detector for job-search result pages vs single job postings.

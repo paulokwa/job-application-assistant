@@ -17,7 +17,7 @@ Status:
 - [DONE] v2.0 accepted by Google.
 - [WAITING] User to confirm next v3 candidate priority and v3.0 release scope.
 
-Next planned work: v3 candidate review, Fit Check manual smoke testing, Application Pack later phases, batch/manual multi-job intake, job URL import, or v3 polish - user to confirm priority and release scope.
+Next planned work: v3 release readiness review or deferred storage cleanup after released migration confidence - user to confirm priority and v3.0 release scope.
 
 ## v3 Candidate Work In Progress
 
@@ -82,6 +82,10 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
 - [DONE] `{name}` chip added to filename builder (2026-05-26):
   - `b840e53` - `feat: add {name} variable to filename chip builder`
   - Added to `ALL_CHIPS` in `settings.js`, `buildFilename` in `modules/template.js`, preview substitution in `updateFilenamePreview`, and `getSuggestedFilenameBase` in `dashboard.js`.
+- [DONE] Application Pack Actions complete on `main` (2026-05-26 to 2026-05-27):
+  - Saved Jobs can launch resume-only and cover-letter-only generation.
+  - Saved Jobs can prepare recruiter messages, follow-up messages, reminder text, short application answers, and application email drafts.
+  - All actions remain review-first: nothing is sent, scheduled, attached, submitted, or form-filled automatically.
 - [DONE] Fit Check v3 candidate work (2026-05-25):
   - `d1b1ea8` - `feat: add local Fit Check scoring after job page scan`
   - `d95e78e` - `docs: add Fit Check follow-up items to ROADMAP`
@@ -92,6 +96,13 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
   - `fdbc1fe` - `feat: add profile selector to Fit Check card for multi-profile users`
   - `55cd8ec` - `feat: add best-profile comparison to Fit Check card`
   - `13a94e7` - `fix: whitelist Fit Check AI review card payload`
+- [DONE] Fit Check search-results detector refinement (2026-05-27):
+  - `c30b005` - `fix: refine Fit Check search results detection`
+  - Added search/listing path patterns and high-precision text patterns such as save-search and job-alert phrases.
+  - Fixed the Glassdoor `/Job/...jobs-SRCH...` search-page false negative while preserving `/job-listing/...` single postings with content signals.
+  - Added `isLikelySearchPage` to all `detectJobPage()` return objects.
+  - Dashboard skip toast now distinguishes search/listing pages from generic non-job pages.
+  - Added lightweight Node detector checks for LinkedIn, Indeed, Glassdoor, Greenhouse/Lever-style postings, JSON-LD, and plain non-job pages.
 - [DONE] Saved Jobs workspace upgrades (2026-05-26):
   - `de17007` - `feat: add saved jobs stats bar` - compact Saved Jobs stats row showing total, strong matches, good matches, and developing/unscored jobs.
   - `90e4582` - `fix: support recently updated saved jobs sort` - Recently updated sort uses `updatedAt || createdAt`, newest first.
@@ -112,12 +123,19 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
   - `regroupEmploymentMatches` assignable pass updated - applies `toMonth()`/`toYear()`/`toMonthYear()`/raw based on field id signals, with `splitDates()` fallback for profiles that store dates as a single string.
   - Test form added: `tests/autofill-multi-employment.html` - 30-field form with 11 hidden spacer inputs engineered to produce a fieldIndex gap exceeding the threshold, validating two-section grouping detection.
   - Known quirk: profiles where the dates separator is stored as an unusual Unicode dash may still need manual confirmation across profiles; `\p{Dash}` fix was applied.
+- [DONE] Autofill graduation year and GitHub matching (2026-05-27):
+  - `d9cd644` - `feat: improve autofill graduation year and GitHub matching`
+  - Added `toGraduationYear()` helper and a select-only graduation year matcher that extracts the last four-digit year from education dates.
+  - Multi-education regrouping preserves graduation-year extraction for later education sections.
+  - Added GitHub, GitHub Profile, and GitHub URL signals to the existing portfolio matcher.
+  - Added `tests/autofill-multi-education.html` and fixed the stale threshold comment in `tests/autofill-multi-employment.html`.
+  - No `content.js`, dashboard, settings, manifest, or autofill fill-logic changes.
 
 ## Current Main Branch State
 
-Latest known `main` commit (2026-05-26):
+Latest known `main` commit (2026-05-27):
 
-`a26f3b4` - `feat: use fit analysis context for saved job generation`
+`d9cd644` - `feat: improve autofill graduation year and GitHub matching`
 
 Working tree had doc-only roadmap/handover updates when this handover was refreshed.
 
@@ -132,8 +150,10 @@ Working tree had doc-only roadmap/handover updates when this handover was refres
 - Do not redo the session scan payload cap.
 - Do not rewrite roadmap docs unless the user asks.
 - Do not rebuild Fit Check Phases 1-3; current `main` already has Basic Fit Check, auto/context-menu support, better scoring, multi-profile selector, best-profile row, and manual AI review.
+- Do not redo Fit Check search/listing detector refinement; current `main` already skips common search/listing pages, handles Glassdoor SRCH pages, returns `isLikelySearchPage`, and has lightweight detector checks.
 - Do not send Fit Check AI internals to `content.js`; keep the card payload whitelisted and do not expose `suggestedAngle`, provider settings, API keys, raw profile data, or job text to the content script.
 - Do not add AI to the autofill matcher - it is intentionally deterministic and rule-based.
+- Do not redo graduation year select or GitHub portfolio matching in `modules/autofillMatcher.js`; those targeted matcher improvements are complete.
 - Do not change `content.js`, the profile schema/storage (beyond documented UI additions), fill logic, or ATS-specific adapters unless the user explicitly requests it.
 - Do not auto-submit forms or fill sensitive/legal/demographic fields.
 - Do not guess missing work locations or invent months for year-only dates.
@@ -152,6 +172,16 @@ Working tree had doc-only roadmap/handover updates when this handover was refres
   - `node --check content.js`
   - `git diff --check -- dashboard/dashboard.js content.js` reported only line-ending normalization warnings.
   - Manual live Chrome extension test was not run in that audit session.
+- Fit Check detector refinement checks passed after `c30b005`:
+  - `node --check modules/jobPageDetector.js`
+  - `node --check dashboard/dashboard.js`
+  - `node --check tests/jobPageDetector.test.js`
+  - `node tests/jobPageDetector.test.js`
+  - Manual live Chrome extension test was not run in that session.
+- Autofill graduation year/GitHub matcher checks passed after `d9cd644`:
+  - `node --check modules/autofillMatcher.js`
+  - `git diff --check`
+  - Manual live Chrome extension test was not run in that session.
 
 ## Future Roadmap
 
