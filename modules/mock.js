@@ -229,6 +229,28 @@ export function generateMockApplicationEmail(jobData, profile) {
   }, null, 2);
 }
 
+export function generateMockRecruiterMessage(jobData, profile) {
+  const name = profile?.personalInfo?.fullName || '[Your Name]';
+  const jobTitle = jobData?.jobTitle || jobData?.title || 'the role';
+  const company = jobData?.company || 'your organization';
+  const skills = asArray(profile?.skills).slice(0, 2);
+  const strengths = skills.length
+    ? `My background includes ${skills.join(' and ')}, based on the profile details I have saved.`
+    : 'My background appears relevant, but I would review the profile details before sending this.';
+
+  return JSON.stringify({
+    subject: `Question about ${jobTitle} at ${company}`,
+    messageBody: `Hello,\n\nI noticed the ${jobTitle} opportunity at ${company} and wanted to reach out. ${strengths} I would appreciate the chance to learn whether my background may be a fit or whether there is a better contact path for this opening.\n\nThank you for your time,\n${name}`,
+    warnings: [
+      '[Demo mode] This is a simulated recruiter outreach draft. Review all facts before sending.',
+      'This is written as initial outreach and does not claim prior contact, referral, or application status.'
+    ],
+    notes: [
+      'Nothing is sent automatically. Copy the message only after review.'
+    ]
+  }, null, 2);
+}
+
 export function mockReviseDraft(currentDraft, request, docType) {
   let parsed;
   try {

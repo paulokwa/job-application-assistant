@@ -3,6 +3,7 @@
 import { extractJobFields } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
 import { prepareApplicationEmail } from '../modules/emailDrafting.js';
+import { generateRecruiterMessage } from '../modules/recruiterMessage.js';
 import { detectJobPage } from '../modules/jobPageDetector.js';
 import { extractProfileKeywords, extractJobKeywords, scoreMatch } from '../modules/fitCheck.js';
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
@@ -37,6 +38,7 @@ const SAVED_JOBS_MESSAGE_TYPES = new Set([
   'JPDA_SAVED_JOB_LOADED',
   'JPDA_SAVED_JOB_GENERATE_REQUESTED',
   'JPDA_ANALYZE_FIT_REQUESTED',
+  'JPDA_RECRUITER_MESSAGE_REQUESTED',
 ]);
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
@@ -97,6 +99,9 @@ let currentFitAnalysisController = null;
 let currentJobInfoController = null;
 let currentAiMatchController = null;
 let currentEmailController = null;
+let currentRecruiterController = null;
+let currentRecruiterJob = null;
+let currentRecruiterRequestId = 0;
 let generationStatusTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
@@ -239,6 +244,26 @@ const dom = {
   btnOpenEmailApp:        $('btn-open-email-app'),
   emailMailtoTooLong:     $('email-mailto-too-long'),
   emailExtraInstructions: $('email-extra-instructions'),
+
+  // Recruiter message
+  recruiterMessageView:     $('recruiter-message-view'),
+  btnCloseRecruiterMessage: $('btn-close-recruiter-message'),
+  btnRegenRecruiterMessage: $('btn-regen-recruiter-message'),
+  recruiterPanelLoading:    $('recruiter-panel-loading'),
+  recruiterPanelError:      $('recruiter-panel-error'),
+  recruiterPanelErrorMsg:   $('recruiter-panel-error-msg'),
+  btnRecruiterErrorRetry:   $('btn-recruiter-error-retry'),
+  recruiterPanelResult:     $('recruiter-panel-result'),
+  recruiterContextBanner:   $('recruiter-context-banner'),
+  recruiterSubjectGroup:    $('recruiter-subject-group'),
+  recruiterSubjectDisplay:  $('recruiter-subject-display'),
+  btnCopyRecruiterSubject:  $('btn-copy-recruiter-subject'),
+  recruiterBodyDisplay:     $('recruiter-body-display'),
+  btnCopyRecruiterBody:     $('btn-copy-recruiter-body'),
+  recruiterWarningsGroup:   $('recruiter-warnings-group'),
+  recruiterWarningsList:    $('recruiter-warnings-list'),
+  recruiterNotesGroup:      $('recruiter-notes-group'),
+  recruiterNotesList:       $('recruiter-notes-list'),
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -1237,6 +1262,10 @@ function bindEvents() {
     }
     if (e.data?.type === 'JPDA_ANALYZE_FIT_REQUESTED') {
       handleFitAnalysisRequest(e.data.id);
+      return;
+    }
+    if (e.data?.type === 'JPDA_RECRUITER_MESSAGE_REQUESTED') {
+      openRecruiterMessageFromSavedJob(e.data.id);
     }
   });
 
@@ -1344,6 +1373,11 @@ function bindEvents() {
   dom.btnCopyRecipient.addEventListener('click', () => copyEmailField(dom.emailRecipientDisplay.value, 'Email address copied'));
   dom.btnCopyBody.addEventListener('click', () => copyEmailField(dom.emailBodyDisplay.value, 'Email body copied'));
   dom.btnCopyChecklist.addEventListener('click', copyEmailChecklist);
+  dom.btnCloseRecruiterMessage.addEventListener('click', closeRecruiterMessage);
+  dom.btnRegenRecruiterMessage.addEventListener('click', runRecruiterMessageGeneration);
+  dom.btnRecruiterErrorRetry.addEventListener('click', runRecruiterMessageGeneration);
+  dom.btnCopyRecruiterSubject.addEventListener('click', () => copyEmailField(dom.recruiterSubjectDisplay.value, 'Subject copied'));
+  dom.btnCopyRecruiterBody.addEventListener('click', () => copyEmailField(dom.recruiterBodyDisplay.value, 'Message copied'));
 
   // Error Retry
   dom.btnErrorRetry.addEventListener('click', () => {
@@ -3269,6 +3303,147 @@ function copyEmailChecklist() {
     .map(li => `• ${li.textContent}`).join('\n');
   if (!items) return;
   navigator.clipboard.writeText(items).then(() => showToast('Checklist copied')).catch(() => showToast('Copy failed.'));
+}
+
+// Recruiter message
+
+async function openRecruiterMessageFromSavedJob(id) {
+  if (!id) return;
+
+  const requestId = ++currentRecruiterRequestId;
+  dom.jobsView.classList.remove('visible');
+  dom.recruiterMessageView.classList.add('visible');
+  currentRecruiterJob = null;
+  setRecruiterState('loading');
+
+  try {
+    currentRecruiterJob = await loadSavedJobForRecruiterMessage(id);
+    if (requestId !== currentRecruiterRequestId) return;
+    await runRecruiterMessageGeneration();
+  } catch (err) {
+    if (requestId !== currentRecruiterRequestId) return;
+    setRecruiterState('error', err?.message || 'Saved job could not be loaded.');
+  }
+}
+
+function closeRecruiterMessage() {
+  currentRecruiterRequestId += 1;
+  dom.recruiterMessageView.classList.remove('visible');
+  currentRecruiterJob = null;
+  if (currentRecruiterController) {
+    currentRecruiterController.abort();
+    currentRecruiterController = null;
+  }
+}
+
+async function loadSavedJobForRecruiterMessage(id) {
+  const data = await chrome.storage.local.get(SAVED_JOBS_KEY);
+  const savedJobs = Array.isArray(data[SAVED_JOBS_KEY]) ? data[SAVED_JOBS_KEY] : [];
+  const job = savedJobs.find(item => item.id === id);
+  if (!job) throw new Error('Saved job not found.');
+
+  return {
+    id: job.id,
+    jobTitle: job.title || '',
+    company: job.company || '',
+    sourceUrl: job.sourceUrl || '',
+    description: job.cleanDescription || job.rawContent || '',
+  };
+}
+
+async function runRecruiterMessageGeneration() {
+  if (!currentRecruiterJob) {
+    setRecruiterState('error', 'Saved job could not be loaded.');
+    return;
+  }
+
+  state.settings = await loadSettings();
+  state.profile = await loadProfile();
+
+  if (!state.settings?.provider) {
+    setRecruiterState('error', 'No AI provider configured. Open Settings to set one up.');
+    return;
+  }
+
+  if (currentRecruiterController) currentRecruiterController.abort();
+  const controller = new AbortController();
+  currentRecruiterController = controller;
+
+  setRecruiterState('loading');
+
+  try {
+    const raw = await generateRecruiterMessage(
+      currentRecruiterJob,
+      state.profile,
+      state.settings,
+      controller.signal,
+      state.sourceResumeText
+    );
+    const parsed = tryParseJson(raw);
+    if (!parsed) {
+      setRecruiterState('error', 'AI returned an unreadable response. Try regenerating.');
+      return;
+    }
+
+    renderRecruiterPanel(normalizeRecruiterMessageResult(parsed));
+    setRecruiterState('result');
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+    setRecruiterState('error', mapError(err).message);
+  } finally {
+    if (currentRecruiterController === controller) currentRecruiterController = null;
+  }
+}
+
+function setRecruiterState(which, errorMsg) {
+  dom.recruiterPanelLoading.classList.toggle('hidden', which !== 'loading');
+  dom.recruiterPanelError.classList.toggle('hidden', which !== 'error');
+  dom.recruiterPanelResult.classList.toggle('hidden', which !== 'result');
+  dom.btnRegenRecruiterMessage.disabled = which === 'loading';
+  if (which === 'error' && errorMsg) dom.recruiterPanelErrorMsg.textContent = errorMsg;
+}
+
+function normalizeRecruiterMessageResult(parsed) {
+  const toArr = v => Array.isArray(v)
+    ? v.filter(s => s != null).map(String).map(s => s.trim()).filter(Boolean)
+    : (v ? [String(v).trim()].filter(Boolean) : []);
+  const toStr = v => (typeof v === 'string' && v.trim()) ? v.trim() : '';
+  return {
+    subject: toStr(parsed.subject),
+    messageBody: toStr(parsed.messageBody || parsed.body || parsed.message) || 'Hello,\n\nI am interested in this opportunity and would appreciate the chance to connect.\n\nThank you.',
+    warnings: toArr(parsed.warnings),
+    notes: toArr(parsed.notes),
+  };
+}
+
+function renderRecruiterPanel(result) {
+  dom.recruiterContextBanner.textContent = 'Initial outreach draft. Review before copying. Nothing is sent automatically.';
+
+  if (result.subject) {
+    dom.recruiterSubjectDisplay.value = result.subject;
+    dom.recruiterSubjectGroup.classList.remove('hidden');
+  } else {
+    dom.recruiterSubjectDisplay.value = '';
+    dom.recruiterSubjectGroup.classList.add('hidden');
+  }
+
+  dom.recruiterBodyDisplay.value = result.messageBody;
+
+  if (result.warnings.length) {
+    dom.recruiterWarningsList.innerHTML = result.warnings
+      .map(warning => `<li>${escapeHtml(warning)}</li>`).join('');
+    dom.recruiterWarningsGroup.classList.remove('hidden');
+  } else {
+    dom.recruiterWarningsGroup.classList.add('hidden');
+  }
+
+  if (result.notes.length) {
+    dom.recruiterNotesList.innerHTML = result.notes
+      .map(note => `<li>${escapeHtml(note)}</li>`).join('');
+    dom.recruiterNotesGroup.classList.remove('hidden');
+  } else {
+    dom.recruiterNotesGroup.classList.add('hidden');
+  }
 }
 
 function escapeHtml(str) {

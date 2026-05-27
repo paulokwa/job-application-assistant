@@ -60,14 +60,8 @@ Suggested branch: `feature/application-pack-actions`
 
 Goal: let a saved job become a launchpad for application materials.
 
-Completed Phase 1 scope:
-
-- Generate tailored resume from saved job
-- Generate cover letter from saved job
-
 Remaining possible scope:
 
-- Generate recruiter message
 - Generate short application answers
 - Generate follow-up message
 - Suggest follow-up date/reminder text
@@ -149,6 +143,16 @@ Completed scope:
 - Saved Jobs can launch cover-letter-only generation using an existing saved job.
 - Existing Load into generator behavior remains available.
 
+### Application Pack Actions - Recruiter Message
+
+Status: **Complete on `main`** (2026-05-26).
+
+Completed scope:
+
+- Saved Jobs can launch a short recruiter/networking outreach message from an existing saved job.
+- Dashboard shows a review overlay with optional subject, message body, warnings/notes, copy actions, regenerate, and close.
+- Recruiter messages are initial outreach only: nothing is sent automatically, no `mailto:` is opened, and no content script path is used.
+
 ### Use Fit Analysis As Generation Context
 
 Status: **Complete on `main`** (2026-05-26).
@@ -200,7 +204,7 @@ Guardrails (permanent):
 
 ## Suggested Order For Active Work
 
-1. `feature/application-pack-actions` — continue with recruiter message as the next small Application Pack item
+1. `feature/application-pack-actions` — continue with short application answers or follow-up message as the next small Application Pack item
 2. `feature/batch-job-intake`
 3. `feature/job-url-import`
 4. `feature/job-link-scan`
