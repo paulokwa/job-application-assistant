@@ -2510,7 +2510,11 @@ function printDraft(...types) {
   if (targets.includes('merged')) {
     const resumeData = { ...state.drafts.resume, personalInfo: state.profile.personalInfo };
     const clData = { personalInfo: state.profile.personalInfo, content: state.drafts['cover-letter'] };
-    const html = renderMergedDocument(state.templateId, resumeData, clData, options);
+    const mergedFilenameBase = getSuggestedFilenameBase(state.docSettings.filenamePattern, ['merged']);
+    const html = withDocumentTitle(
+      renderMergedDocument(state.templateId, resumeData, clData, options),
+      mergedFilenameBase
+    );
     const printWin = window.open('', '_blank');
     if (!printWin) {
       showToast('❌ Pop-up blocked! Please allow pop-ups for this extension.');
@@ -2531,13 +2535,19 @@ function printDraft(...types) {
     let html;
     if (state.hasEdits[tab]) {
       const iframe = tab === 'resume' ? dom.previewResumeFrame : dom.previewCLFrame;
-      html = getIframeHtml(iframe);
+      html = withDocumentTitle(
+        getIframeHtml(iframe),
+        getSuggestedFilenameBase(state.docSettings.filenamePattern, [tab])
+      );
     } else {
       const draft = state.drafts[tab];
       const data = tab === 'resume'
         ? { ...draft, personalInfo: state.profile.personalInfo }
         : { personalInfo: state.profile.personalInfo, content: draft };
-      html = renderDocument(state.templateId, tab, data, options);
+      html = withDocumentTitle(
+        renderDocument(state.templateId, tab, data, options),
+        getSuggestedFilenameBase(state.docSettings.filenamePattern, [tab])
+      );
     }
 
     const printWin = window.open('', '_blank');
