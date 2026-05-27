@@ -6,26 +6,18 @@ Version 2.0 has been accepted by Google after Chrome Web Store submission. This 
 
 - v3.0 planning can continue now that v2.0 has been accepted.
 - Do not package or submit v3.0 until the user explicitly confirms the release scope.
-- Before any v3 packaging, confirm whether the direct PDF download feature should ship publicly.
+- Direct PDF Download was removed/deferred for store-safety before v3 packaging.
 
-## Important Permission Review
+## Permission Review
 
-- Direct PDF download currently depends on the Chrome `debugger` permission to call Chrome's print-to-PDF engine and preserve formatting.
-- `debugger` is a powerful permission and may slow Chrome Web Store review or trigger rejection if reviewers decide it is excessive for the extension's purpose.
-- `debugger` cannot be moved to optional permissions.
-- `debugger` adds high-risk user-facing permission warnings, including access to the page debugger backend and broad page data access.
-- `downloads` is also required for the Save As download flow and filename control.
-- Before submitting v3.0, decide one of:
-  - Ship direct PDF download and document/justify `debugger` and `downloads` in the Chrome Web Store privacy/permission fields.
-  - Remove or hide direct PDF download and remove `debugger`/`downloads` from `manifest.json`.
-  - Replace the debugger-based PDF path with a store-safer PDF generation approach if one preserves formatting well enough.
+- The print-dialog Save as PDF path remains the supported export path.
+- Print export sets the print-window document title from the configured filename pattern so Chrome's Save as PDF dialog can suggest the user's preferred filename.
+- Direct PDF Download was removed/deferred and no longer requires the powerful PDF-generation permissions.
+- Confirm `manifest.json` does not include `debugger` or `downloads` unless a future, explicitly approved feature requires them.
 
 ## Candidate v3 Work
 
-- Export PDF UI split into two paths:
-  - Print via dialog: existing browser print flow.
-  - Download PDF: direct download using filename settings.
-- Download PDF options:
+- Export PDF UI uses the store-safer print-dialog flow:
   - Resume + Cover Letter
   - Resume Only
   - Cover Letter Only
@@ -45,19 +37,19 @@ Version 2.0 has been accepted by Google after Chrome Web Store submission. This 
 - Bump `manifest.json` version to `3.0.0` only when preparing the v3 package.
 - Confirm the extension name and description still match the Chrome Web Store listing.
 - Confirm all permissions and host permissions are expected.
-- Specifically re-review `debugger` and `downloads` before packaging.
+- Confirm `debugger` and `downloads` are absent unless a future release scope explicitly reintroduces a permission-requiring feature.
 - Confirm Fit Check changes did not add new permissions. `manifest.json` was not changed by Fit Check Phase 3.
 
 ## Smoke Test Checklist
 
 - Settings -> Documents filename pattern saves and reloads.
 - Settings -> Documents Auto Fit Check toggle saves and reloads.
-- Generate Resume only, then Download PDF -> Resume Only uses the configured filename.
-- Generate Cover Letter only, then Download PDF -> Cover Letter Only uses the configured filename.
-- Generate Resume + Cover Letter, then Download PDF -> Resume + Cover Letter downloads two separate PDFs.
-- Generate Resume + Cover Letter, then Download PDF -> Merged Document downloads one combined PDF.
-- Confirm direct PDF formatting matches the existing print-based output closely enough.
-- Confirm print-based Save as PDF still works as before.
+- Generate Resume only, then Print -> Resume Only opens the print dialog and Save as PDF suggests the configured filename.
+- Generate Cover Letter only, then Print -> Cover Letter Only opens the print dialog and Save as PDF suggests the configured filename.
+- Generate Resume + Cover Letter, then Print -> Resume + Cover Letter opens two print dialogs/windows with per-document filename titles.
+- Generate Resume + Cover Letter, then Print -> Merged Document opens one print dialog/window with the merged filename title.
+- Confirm no Direct PDF Download buttons are visible.
+- Confirm print-based Save as PDF formatting still works as before.
 - With Auto Fit Check enabled and no provider configured, Scan Page on a job posting shows the Basic Fit Check card and no AI review button.
 - With Auto Fit Check disabled, Scan Page and context-menu scans do not show the Fit Check card.
 - With an AI provider configured, the Fit Check card shows Run AI review, and AI runs only after clicking it.
@@ -71,16 +63,11 @@ Version 2.0 has been accepted by Google after Chrome Web Store submission. This 
 
 ## Listing / Privacy Check
 
-- If shipping direct PDF download, update listing copy or release notes to distinguish print export from direct PDF download.
-- If shipping `debugger`, add a clear permission justification in the developer dashboard.
+- Do not mention Direct PDF Download as a shipped feature unless it is explicitly reintroduced in a future release.
 - If mentioning Fit Check AI review in listing or release notes, describe it as manual and provider-backed. Avoid implying automatic AI analysis or submission help.
 - Confirm the privacy policy and Chrome Web Store privacy fields accurately describe document generation/download behavior and any permission-sensitive behavior.
 
-## Rollback Plan
+## Deferred Direct Download Notes
 
-If direct PDF download is not suitable for Chrome Web Store submission:
-
-- Remove the Download PDF button group from `dashboard/dashboard.html`.
-- Remove direct PDF download styles from `dashboard/dashboard.css`.
-- Remove direct PDF download handlers/helpers from `dashboard/dashboard.js`.
-- Remove `debugger` and `downloads` from `manifest.json` unless another feature requires them.
+- Direct PDF Download was removed/deferred for v3 store-safety.
+- Reintroducing it would require a fresh permission review, Chrome Web Store justification, UI copy, and release-scope confirmation.

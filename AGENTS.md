@@ -12,8 +12,8 @@ Before planning or coding, read these files in order:
 Current release status:
 v2.0 was accepted by Google after Chrome Web Store submission. v3.0 planning can continue, but do not package or submit v3.0 until the user explicitly confirms the release scope.
 
-Important v3 release risk:
-Direct PDF download currently uses the Chrome `debugger` permission. Review `RELEASE_V3_CHECKLIST.md` before deciding whether it can ship.
+Important v3 release note:
+Direct PDF download was removed/deferred for store-safety. Keep the print-dialog Save as PDF path available.
 
 Before doing work, report:
 

@@ -1776,10 +1776,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   line-height: 1.4;
 }
 
-.export-group-label--download {
-  margin-top: 12px;
-}
-
 .export-hint {
   font-size: 11.5px;
   color: var(--color-ink-3);
@@ -1789,10 +1785,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 .export-hint strong { color: var(--color-ink-2); }
-
-.export-hint--download {
-  padding-top: 0;
-}
 
 .ai-review-warning {
   margin-bottom: 10px;

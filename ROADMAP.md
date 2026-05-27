@@ -23,7 +23,7 @@ Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by 
 - Storage quota guards
 - Session scan payload cap for large temporary scan text
 - Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
-- Post-v2 / v3 candidate work including Fit Check improvements, direct PDF download, Application Email Assistant, Application Pack actions, and targeted autofill matcher improvements
+- Post-v2 / v3 candidate work including Fit Check improvements, print filename support, Application Email Assistant, Application Pack actions, and targeted autofill matcher improvements
 
 ## v2.0 Release Status
 
@@ -58,7 +58,7 @@ v3.0 planning can continue, but do not package or submit v3.0 until the user exp
 
 Goal: review the accumulated post-v2 candidate work and decide what should ship in v3.0.
 
-Important: do not package or submit v3.0 until the user explicitly confirms the release scope. Re-review the direct PDF download `debugger` permission before any v3 package is prepared.
+Important: do not package or submit v3.0 until the user explicitly confirms the release scope. Direct PDF Download has been removed/deferred for store-safety; keep the print-dialog Save as PDF path available.
 
 ## Later Autofill Improvements
 
@@ -112,6 +112,17 @@ Preferred behavior:
 Treat it as a link collector first, not guaranteed full job-description extraction.
 
 ## Completed Roadmap Items
+
+### Direct PDF Download Removed For Store-Safety
+
+Status: **Complete on `main`** (2026-05-27).
+
+Completed scope:
+
+- Direct PDF Download UI and dashboard code were removed/deferred before v3 release.
+- `debugger` and `downloads` permissions were removed from `manifest.json`.
+- Print / Save as PDF remains the supported export path.
+- Print export keeps filename preference support by setting the print-window document title from the configured filename pattern.
 
 ### Storage Cleanup After Migration Confidence
 

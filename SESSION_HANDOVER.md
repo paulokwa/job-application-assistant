@@ -39,10 +39,9 @@ Next planned work: v3 release readiness review - user to confirm priority and v3
 
 
 
-- Direct PDF download was added as a separate export path from the existing print-dialog Save as PDF flow.
-- The print-dialog Save as PDF function should remain available as the fallback/default export path.
-- Direct PDF download currently preserves formatting and respects filename settings, but depends on Chrome `debugger` plus `downloads` permissions.
-- Important release risk: `debugger` is powerful, cannot be optional, may slow Chrome Web Store review, and may be rejected as excessive. Review `RELEASE_V3_CHECKLIST.md` before any v3 packaging or submission.
+- Direct PDF Download was removed/deferred for store-safety before v3 packaging.
+- The print-dialog Save as PDF function remains the supported export path.
+- Print export now sets the print-window document title from the configured filename pattern, so Chrome Save as PDF can suggest the user's preferred filename.
 - Fit Check v3 candidate work was added on `main`:
   - Local Basic Fit Check scoring after job-page scan.
   - Context-menu scan support and a Settings -> Documents toggle for automatic Fit Check.
@@ -134,12 +133,17 @@ Next planned work: v3 release readiness review - user to confirm priority and v3
   - Provider settings and profile data now use local-only reads/writes.
   - Removed legacy `chrome.storage.sync` fallback migration for provider/profile data.
   - Other intentional `chrome.storage.sync` usage for low-sensitivity settings/history was left untouched.
+- [DONE] Direct PDF Download removed/deferred for store-safety (2026-05-27):
+  - Removed Direct PDF Download UI and dashboard code.
+  - Removed `debugger` and `downloads` permissions from `manifest.json`.
+  - Kept Print / Save as PDF export.
+  - Print export keeps filename preference support through print-window document titles.
 
 ## Current Main Branch State
 
 Latest known `main` commit (2026-05-27):
 
-`3ba57d7` - `docs: refresh roadmap and handover after v3 candidate work`
+`5289447` - `fix: apply filename pattern to print export titles`
 
 Working tree had doc-only roadmap/handover updates when this handover was refreshed.
 

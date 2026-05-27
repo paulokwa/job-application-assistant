@@ -8,9 +8,7 @@
     "storage",
     "activeTab",
     "scripting",
-    "sidePanel",
-    "debugger",
-    "downloads"
+    "sidePanel"
   ],
   "host_permissions": [
     "https://api.openai.com/*",
