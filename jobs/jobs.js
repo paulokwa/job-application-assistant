@@ -182,6 +182,34 @@ function normalizeGenerationMode(mode) {
   return GENERATION_MODES.has(mode) ? mode : '';
 }
 
+function normalizedFitText(value) {
+  return String(value || '').trim();
+}
+
+function normalizedFitList(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(item => normalizedFitText(item))
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function loadedJobFitAnalysis(job) {
+  const analysis = job?.fitAnalysis;
+  if (!analysis) return null;
+
+  const fitContext = {
+    suggestedAngle: normalizedFitText(analysis.suggestedAngle),
+    strongMatches: normalizedFitList(analysis.strongMatches),
+    possibleGaps: normalizedFitList(analysis.possibleGaps),
+  };
+
+  if (!fitContext.suggestedAngle && !fitContext.strongMatches.length && !fitContext.possibleGaps.length) {
+    return null;
+  }
+  return fitContext;
+}
+
 function sortSavedJobs(jobs) {
   const sorted = [...jobs];
   sorted.sort((a, b) => {
@@ -381,9 +409,11 @@ async function loadIntoGenerator(id, options = {}) {
       loadedAt: new Date().toISOString(),
     },
   };
+  const fitContext = loadedJobFitAnalysis(job);
+  if (fitContext) sessionPayload.loadedJobFitAnalysis = fitContext;
   if (generationMode) sessionPayload.pendingMode = generationMode;
 
-  await chrome.storage.session.remove(['pendingMode', 'regenerateRequested']);
+  await chrome.storage.session.remove(['pendingMode', 'regenerateRequested', 'loadedJobFitAnalysis']);
   await chrome.storage.session.set(sessionPayload);
 
   window.parent?.postMessage({

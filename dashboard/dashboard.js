@@ -77,6 +77,7 @@ const state = {
   profile: null,
   sourceResumeText: '',
   lastRunMode: null,
+  loadedFitContext: null,
   generationReceipt: null,
   atsRevision: false,
   editMode: { resume: false, 'cover-letter': false },
@@ -737,6 +738,7 @@ function applyExtractedData(raw, url, usedSelection) {
 }
 
 async function applySession(session) {
+  state.loadedFitContext = session?.loadedJobFitAnalysis || null;
   if (!session || !session.extractedData) {
     return;
   }
@@ -1578,9 +1580,9 @@ async function runGeneration(mode) {
 
       let raw;
       if (type === 'resume') {
-        raw = await generateResume(state.jobData, state.profile, state.settings, state.sourceResumeText, signal, state.tone);
+        raw = await generateResume(state.jobData, state.profile, state.settings, state.sourceResumeText, signal, state.tone, state.loadedFitContext);
       } else {
-        raw = await generateCoverLetter(state.jobData, state.profile, state.settings, state.sourceResumeText, signal, state.tone, state.clLength);
+        raw = await generateCoverLetter(state.jobData, state.profile, state.settings, state.sourceResumeText, signal, state.tone, state.clLength, state.loadedFitContext);
       }
 
       const parsed = normalizeDraftContent(type, tryParseJson(raw));
@@ -1665,6 +1667,7 @@ async function persistSavedDraftSnapshot(savedDraft, { toastOnQuota = true } = {
 // Saved Jobs
 
 function markManualEntryIfEmpty() {
+  state.loadedFitContext = null;
   if (state.currentJobMeta?.rawContent) return;
   state.currentJobMeta = {
     sourceType: 'manual_entry',
@@ -2756,6 +2759,7 @@ async function clearSession() {
       'pendingMode',
       'regenerateRequested',
       'loadedSavedJob',
+      'loadedJobFitAnalysis',
     ]),
   ]);
 
@@ -2763,6 +2767,7 @@ async function clearSession() {
   state.jobData     = { jobTitle: '', company: '', sourceUrl: '', description: '' };
   state.currentJobMeta = { sourceType: 'manual_entry', rawContent: '', aiJobInfoAttemptedFor: '' };
   state.lastRunMode = null;
+  state.loadedFitContext = null;
   state.generationReceipt = null;
   state.editedHtml  = { resume: null, 'cover-letter': null };
   clearTimeout(editedHtmlSaveTimers.resume);

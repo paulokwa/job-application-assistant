@@ -72,6 +72,8 @@ Product rule: the app prepares materials, but the user reviews and stays in cont
 
 ### 2. Use Fit Analysis As Generation Context
 
+Status: **Complete on `main`** (2026-05-26).
+
 Suggested branch: `feature/use-fit-analysis-in-generation`
 
 Goal: when a saved job has Fit Analysis, generation can optionally use:
@@ -85,6 +87,8 @@ Important:
 - Do not invent qualifications.
 - Treat possible gaps as caution areas, not things to fake.
 - Keep generated content grounded in the profile/source resume.
+
+- [DONE] Saved-job resume and cover-letter generation can use existing Fit Analysis as advisory context: suggested angle, strong matches, and possible gaps. Possible gaps are treated as caution areas only.
 
 ### 3. Batch/Manual Multi-Job Intake
 

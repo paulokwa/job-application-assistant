@@ -55,12 +55,44 @@ const JSON_OUTPUT_INSTRUCTION = `OUTPUT FORMAT:
 Your final response must be valid JSON ONLY. No markdown code blocks, no preamble, no trailing text.
 Follow the provided schema exactly.`;
 
+function buildFitContextBlock(fitContext) {
+  if (!fitContext) return '';
+
+  const lines = [
+    '=== FIT ANALYSIS CONTEXT (advisory only) ===',
+    'This context was pre-computed by a separate analysis. Use it ONLY as framing guidance.',
+    'Do NOT invent, claim, or imply any qualification, credential, skill, or experience that is not',
+    'already explicitly present in the source resume or profile above.',
+    '',
+  ];
+
+  if (fitContext.suggestedAngle) {
+    lines.push(`Suggested positioning angle: ${fitContext.suggestedAngle}`, '');
+  }
+
+  if (Array.isArray(fitContext.strongMatches) && fitContext.strongMatches.length) {
+    lines.push('Verified strong matches from profile to emphasize:');
+    fitContext.strongMatches.forEach(match => lines.push(`- ${match}`));
+    lines.push('');
+  }
+
+  if (Array.isArray(fitContext.possibleGaps) && fitContext.possibleGaps.length) {
+    lines.push('Possible gaps — treat as CAUTION AREAS only. Do NOT fabricate experience or skills to address them:');
+    fitContext.possibleGaps.forEach(gap => lines.push(`- ${gap}`));
+    lines.push('');
+  }
+
+  lines.push('=== END FIT ANALYSIS CONTEXT ===');
+  return lines.join('\n');
+}
+
 // ── Resume Generation ─────────────────────────────────────────────────────
 
-export async function generateResume(jobData, profile, settings, sourceResumeText = '', signal, tone = 30) {
+export async function generateResume(jobData, profile, settings, sourceResumeText = '', signal, tone = 30, fitContext = null) {
   if (isMock(settings)) return generateMockResume(jobData, profile, sourceResumeText);
   const profileText = profileToPromptText(profile);
   const truthBlock = buildSourceTruthBlock(profileText, sourceResumeText);
+  const fitContextBlock = buildFitContextBlock(fitContext);
 
   const systemPrompt = [
     'You are an expert resume writer helping a job seeker tailor their resume to a specific job posting.',
@@ -105,28 +137,33 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
     certifications: ["Certification 1", "Certification 2"]
   };
 
-  const userPrompt = [
+  const userPromptParts = [
     `TARGET JOB TITLE: ${jobData.jobTitle}`,
     `TARGET EMPLOYER: ${jobData.company}`,
     `=== JOB DESCRIPTION ===\n${jobData.description}\n=== END JOB DESCRIPTION ===`,
     '',
     truthBlock,
     '',
+  ];
+  if (fitContextBlock) userPromptParts.push(fitContextBlock, '');
+  userPromptParts.push(
     'TASK: Tailor the user profile/resume content to the target job description.',
     '',
     JSON_OUTPUT_INSTRUCTION,
-    JSON.stringify(resumeSchema, null, 2),
-  ].join('\n');
+    JSON.stringify(resumeSchema, null, 2)
+  );
+  const userPrompt = userPromptParts.join('\n');
 
   return callAI(systemPrompt, userPrompt, settings, signal);
 }
 
 // ── Cover Letter Generation ───────────────────────────────────────────────
 
-export async function generateCoverLetter(jobData, profile, settings, sourceResumeText = '', signal, tone = 30, clLength = 'standard') {
+export async function generateCoverLetter(jobData, profile, settings, sourceResumeText = '', signal, tone = 30, clLength = 'standard', fitContext = null) {
   if (isMock(settings)) return generateMockCoverLetter(jobData, profile, sourceResumeText);
   const profileText = profileToPromptText(profile);
   const truthBlock = buildSourceTruthBlock(profileText, sourceResumeText);
+  const fitContextBlock = buildFitContextBlock(fitContext);
 
   const systemPrompt = [
     'You are an expert cover letter writer and career coach.',
@@ -149,18 +186,22 @@ export async function generateCoverLetter(jobData, profile, settings, sourceResu
     signOff: profile.personalInfo.fullName
   };
 
-  const userPrompt = [
+  const userPromptParts = [
     `TARGET JOB TITLE: ${jobData.jobTitle}`,
     `TARGET EMPLOYER: ${jobData.company}`,
     `=== JOB DESCRIPTION ===\n${jobData.description}\n=== END JOB DESCRIPTION ===`,
     '',
     truthBlock,
     '',
+  ];
+  if (fitContextBlock) userPromptParts.push(fitContextBlock, '');
+  userPromptParts.push(
     'TASK: Write a tailored, persuasive cover letter body.',
     '',
     JSON_OUTPUT_INSTRUCTION,
-    JSON.stringify(coverLetterSchema, null, 2),
-  ].join('\n');
+    JSON.stringify(coverLetterSchema, null, 2)
+  );
+  const userPrompt = userPromptParts.join('\n');
 
   return callAI(systemPrompt, userPrompt, settings, signal);
 }
