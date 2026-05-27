@@ -68,7 +68,7 @@ Possible intake methods:
 
 Recommended first version: manual multi-job paste using separators or multiple cards.
 
-### 3. Job URL Import
+### 2. Job URL Import
 
 Suggested branch: `feature/job-url-import`
 
@@ -83,7 +83,7 @@ Preferred behavior:
 
 Important: do not promise universal extraction from every job board.
 
-### 4. Search Results Page Link Scan
+### 3. Search Results Page Link Scan
 
 Suggested branch: `feature/job-link-scan`
 
@@ -97,7 +97,7 @@ Preferred behavior:
 
 Treat it as a link collector first, not guaranteed full job-description extraction.
 
-### 5. Storage Cleanup After Migration Confidence
+### 4. Storage Cleanup After Migration Confidence
 
 Suggested branch: `maintenance/cleanup-old-sync-storage`
 
@@ -105,13 +105,13 @@ Goal: eventually remove old sync copies of provider settings and profile data af
 
 Important: do not do this immediately. Wait until the local migration has been used successfully in a released version.
 
-### 6. Autofill improvements
+### 5. Autofill improvements
 
 Suggested branch: `feature/autofill-improvements`
 
 See `## Autofill Known Limitations / Future Improvements` for scope.
 
-### 7. Fit Check follow-up — search-results detector refinement
+### 6. Fit Check follow-up — search-results detector refinement
 
 Goal: refine detector behavior for job-search results pages vs single job postings.
 
@@ -223,12 +223,12 @@ Guardrails (permanent):
 
 ## Suggested Order For Active Work
 
-1. `feature/application-pack-actions` — continue with short application answers or follow-up message as the next small Application Pack item
-2. `feature/batch-job-intake`
-3. `feature/job-url-import`
-4. `feature/job-link-scan`
-5. `maintenance/cleanup-old-sync-storage`
-6. `feature/autofill-improvements`
+1. `feature/batch-job-intake`
+2. `feature/job-url-import`
+3. `feature/job-link-scan`
+4. `maintenance/cleanup-old-sync-storage`
+5. `feature/autofill-improvements`
+6. Fit Check detector refinement (no branch yet)
 
 ## Autofill Known Limitations / Future Improvements
 
