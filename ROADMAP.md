@@ -36,7 +36,7 @@ Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by 
 - [DONE] v2.0 submitted to the Chrome Web Store on 2026-05-22.
 - [DONE] v2.0 accepted by Google.
 
-v3.0 planning can continue, but do not package or submit v3.0 until the user explicitly confirms the release scope.
+v3.0 release scope is confirmed for smoke testing. Do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission.
 
 ## Final v2.0 Smoke Test Checklist
 
@@ -54,11 +54,11 @@ v3.0 planning can continue, but do not package or submit v3.0 until the user exp
 
 ## Active Roadmap Ideas
 
-### 1. v3 Release Readiness Review
+### 1. v3 Smoke Test
 
-Goal: review the accumulated post-v2 candidate work and decide what should ship in v3.0.
+Goal: run the full v3 smoke test against the confirmed release scope before packaging.
 
-Important: do not package or submit v3.0 until the user explicitly confirms the release scope. Direct PDF Download has been removed/deferred for store-safety; keep the print-dialog Save as PDF path available.
+Important: do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission. Direct PDF Download has been removed/deferred for store-safety; keep the print-dialog Save as PDF path available.
 
 ## Later Autofill Improvements
 
@@ -264,7 +264,7 @@ Guardrails (permanent):
 
 ## Suggested Order For Active Work
 
-1. v3 Release Readiness Review
+1. v3 Smoke Test
 
 ## Autofill Known Limitations / Future Improvements
 

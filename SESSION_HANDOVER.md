@@ -15,9 +15,11 @@ Status:
   2. Pasted updated overview copy into the Chrome Web Store developer dashboard.
 - [DONE] v2.0 submitted to the Chrome Web Store (2026-05-22).
 - [DONE] v2.0 accepted by Google.
-- [WAITING] User to confirm next v3 candidate priority and v3.0 release scope.
+- [DONE] v3.0 release scope confirmed for smoke testing.
+- [DONE] `manifest.json` bumped to `3.0.0`.
+- [WAITING] Full v3 smoke test before packaging/submission.
 
-Next planned work: v3 release readiness review - user to confirm priority and v3.0 release scope.
+Next planned work: run the full v3 smoke test. Do not package or submit until smoke tests pass and the user explicitly confirms packaging/submission.
 
 ## v3 Features Added Since v2.0
 
@@ -145,9 +147,9 @@ All items in this section are complete on `main` as of 2026-05-27. Kept here for
 
 Latest known `main` commit (2026-05-27):
 
-`e2314f3` - `refactor: remove direct PDF download before v3`
+`297b45c` - `docs: update v3 release checklist after direct PDF removal`
 
-Working tree is clean.
+Working tree has the v3 manifest/docs prep changes until committed.
 
 ## Do Not Repeat
 

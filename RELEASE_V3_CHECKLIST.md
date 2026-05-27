@@ -5,7 +5,9 @@ Version 2.0 has been accepted by Google after Chrome Web Store submission. This 
 ## Release Gate
 
 - v3.0 planning can continue now that v2.0 has been accepted.
-- Do not package or submit v3.0 until the user explicitly confirms the release scope.
+- v3.0 release scope is confirmed for smoke testing.
+- `manifest.json` should now be `3.0.0`.
+- Do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission.
 - Direct PDF Download was removed/deferred for store-safety before v3 packaging.
 
 ## Permission Review
@@ -30,7 +32,7 @@ All post-v2 candidate work is complete on `main`. Key features added since v2.0:
 
 ## Manifest Version Check
 
-- Bump `manifest.json` version to `3.0.0` only when preparing the v3 package.
+- Confirm `manifest.json` version is `3.0.0`.
 - Confirm the extension name and description still match the Chrome Web Store listing.
 - Confirm all permissions and host permissions are expected.
 - Confirm `debugger` and `downloads` are absent unless a future release scope explicitly reintroduces a permission-requiring feature.
@@ -89,11 +91,11 @@ All post-v2 candidate work is complete on `main`. Key features added since v2.0:
 
 ## Packaging Steps
 
-Complete these steps only after the user explicitly confirms the v3.0 release scope:
+Run the pre-package checks and smoke tests first. Complete packaging/submission only after smoke tests pass and the user explicitly confirms packaging/submission:
 
 1. Confirm working tree is clean: `git status`
 2. Confirm latest commit is the expected release baseline: `git log --oneline -5`
-3. Bump `manifest.json` version to `3.0.0`
+3. Confirm `manifest.json` version is `3.0.0`
 4. Reload the unpacked extension in Chrome
 5. Run the smoke test checklist above
 6. Update Chrome Web Store listing description to include Application Pack Actions, autofill, and Fit Check improvements
