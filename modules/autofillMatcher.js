@@ -160,6 +160,12 @@ function toYear(dateStr) {
   return m ? m[1] : '';
 }
 
+function toGraduationYear(datesStr) {
+  if (!datesStr) return '';
+  const matches = datesStr.match(/\b(\d{4})\b/g);
+  return matches ? matches[matches.length - 1] : '';
+}
+
 // ── Matchers ──────────────────────────────────────────────────────────────────
 // Tried in order — first match wins for each field.
 // 'high'   → unambiguous; safe to pre-check in the review modal.
@@ -228,7 +234,10 @@ const MATCHERS = [
     get: p => p.personalInfo?.portfolio || p.personalInfo?.website || '',
     confidence: 'high',
     reason: 'label matches portfolio or personal website',
-    test: f => hasSignal(f, 'portfolio', 'personal website', 'personal site', 'personal url'),
+    test: f => hasSignal(f,
+      'portfolio', 'personal website', 'personal site', 'personal url',
+      'github', 'github profile', 'github url',
+    ),
   },
 
   // ── Location — city before province so the city matcher takes a dedicated "city" field ──
@@ -457,6 +466,18 @@ const MATCHERS = [
         'graduation year', 'graduation date', 'grad year', 'graduated',
         'education date', 'education dates', 'school dates',
         'attended dates', 'dates attended',
+      ),
+  },
+  {
+    profileKey: 'education[0].dates',
+    get: p => toGraduationYear(p.education?.[0]?.dates || ''),
+    confidence: 'medium',
+    reason: 'Graduation year select dropdown (last year extracted from education dates)',
+    test: f =>
+      f.tagName === 'select' &&
+      hasSignal(f,
+        'graduation year', 'grad year', 'year graduated', 'year of graduation',
+        'year completed', 'completion year',
       ),
   },
 ];
@@ -707,7 +728,18 @@ function regroupEducationMatches(matches, profile) {
 
     for (const match of validClusters[i]) {
       const fieldType = fieldTypeFromKey(match.profileKey);
-      const value     = eduEntry[fieldType] || '';
+      let value = eduEntry[fieldType] || '';
+      if (
+        fieldType === 'dates' &&
+        match.field.tagName === 'select' &&
+        hasSignal(
+          match.field,
+          'graduation year', 'grad year', 'year graduated', 'year of graduation',
+          'year completed', 'completion year'
+        )
+      ) {
+        value = toGraduationYear(value);
+      }
 
       if (!value) {
         droppedCount++;
