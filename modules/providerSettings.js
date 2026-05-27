@@ -1,6 +1,5 @@
 // modules/providerSettings.js
-// Local-first provider settings storage. Old sync values are copied into local
-// storage on read, but future writes stay local so API keys do not sync.
+// Local-only provider settings storage so API keys do not sync.
 
 const PROVIDER_SETTINGS_KEY = 'providerSettings';
 
@@ -31,13 +30,6 @@ export async function loadProviderSettings() {
   const localData = await chrome.storage.local.get([PROVIDER_SETTINGS_KEY]);
   if (localData[PROVIDER_SETTINGS_KEY]) {
     return normalizeProviderSettings(localData[PROVIDER_SETTINGS_KEY]);
-  }
-
-  const syncData = await chrome.storage.sync.get([PROVIDER_SETTINGS_KEY]);
-  if (syncData[PROVIDER_SETTINGS_KEY]) {
-    const migrated = normalizeProviderSettings(syncData[PROVIDER_SETTINGS_KEY]);
-    await chrome.storage.local.set({ [PROVIDER_SETTINGS_KEY]: migrated });
-    return migrated;
   }
 
   return normalizeProviderSettings(null);

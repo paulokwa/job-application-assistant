@@ -1,6 +1,5 @@
 // modules/profile.js
-// Multi-profile storage. Private profile content is stored local-first.
-// Older sync keys are copied into local storage on read, but future writes stay local.
+// Multi-profile storage. Private profile content is stored local-only.
 
 import { normalizeResumeContent } from './schema.js';
 
@@ -15,29 +14,13 @@ function makeId()       { return 'p' + Date.now(); }
 
 async function migrateIfNeeded() {
   const localData = await chrome.storage.local.get([INDEX_KEY, ACTIVE_KEY, LEGACY_KEY]);
-  if (localData[INDEX_KEY]) return; // already migrated to local
-
-  const syncData = await chrome.storage.sync.get([INDEX_KEY, ACTIVE_KEY, LEGACY_KEY]);
-  const syncProfiles = Array.isArray(syncData[INDEX_KEY]) ? syncData[INDEX_KEY] : null;
-  if (syncProfiles?.length) {
-    const profileKeys = syncProfiles.map(p => profileKey(p.id));
-    const profileData = await chrome.storage.sync.get(profileKeys);
-    const payload = {
-      [INDEX_KEY]: syncProfiles,
-      [ACTIVE_KEY]: syncData[ACTIVE_KEY] || syncProfiles[0]?.id || null,
-    };
-    for (const key of profileKeys) {
-      if (profileData[key] !== undefined) payload[key] = profileData[key];
-    }
-    await chrome.storage.local.set(payload);
-    return;
-  }
+  if (localData[INDEX_KEY]) return;
 
   const id = makeId();
   await chrome.storage.local.set({
     [INDEX_KEY]:  [{ id, name: 'General' }],
     [ACTIVE_KEY]: id,
-    [profileKey(id)]: localData[LEGACY_KEY] || syncData[LEGACY_KEY] || {},
+    [profileKey(id)]: localData[LEGACY_KEY] || {},
   });
 }
 
@@ -45,12 +28,6 @@ async function loadStoredProfile(id) {
   const key = profileKey(id);
   const localData = await chrome.storage.local.get(key);
   if (localData[key] !== undefined) return localData[key];
-
-  const syncData = await chrome.storage.sync.get(key);
-  if (syncData[key] !== undefined) {
-    await chrome.storage.local.set({ [key]: syncData[key] });
-    return syncData[key];
-  }
 
   return {};
 }

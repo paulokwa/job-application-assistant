@@ -60,14 +60,6 @@ Goal: review the accumulated post-v2 candidate work and decide what should ship 
 
 Important: do not package or submit v3.0 until the user explicitly confirms the release scope. Re-review the direct PDF download `debugger` permission before any v3 package is prepared.
 
-### 2. Storage Cleanup After Migration Confidence
-
-Suggested branch: `maintenance/cleanup-old-sync-storage`
-
-Goal: eventually remove old sync copies of provider settings and profile data after the local-first migration has proven safe.
-
-Important: do not do this immediately. Wait until the local migration has been used successfully in a released version.
-
 ## Later Autofill Improvements
 
 Autofill remains a broad future bucket, but no immediate autofill implementation task is selected. Keep changes targeted, deterministic, and review-before-fill; follow `TROUBLESHOOTING.md` entry 16 before modifying `modules/autofillMatcher.js`.
@@ -120,6 +112,17 @@ Preferred behavior:
 Treat it as a link collector first, not guaranteed full job-description extraction.
 
 ## Completed Roadmap Items
+
+### Storage Cleanup After Migration Confidence
+
+Status: **Complete on `main`**.
+
+Completed scope:
+
+- Provider settings and profile data now use local-only reads/writes.
+- Legacy `chrome.storage.sync` fallback migration for provider/profile data was removed.
+- This cleanup targeted private provider/profile data only.
+- Other intentional `chrome.storage.sync` usage for low-sensitivity settings/history was left untouched.
 
 ### Fit Check Search-Results Detector Refinement
 
@@ -251,7 +254,6 @@ Guardrails (permanent):
 ## Suggested Order For Active Work
 
 1. v3 Release Readiness Review
-2. `maintenance/cleanup-old-sync-storage` after released migration confidence
 
 ## Autofill Known Limitations / Future Improvements
 

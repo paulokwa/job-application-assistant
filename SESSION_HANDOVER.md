@@ -17,7 +17,7 @@ Status:
 - [DONE] v2.0 accepted by Google.
 - [WAITING] User to confirm next v3 candidate priority and v3.0 release scope.
 
-Next planned work: v3 release readiness review or deferred storage cleanup after released migration confidence - user to confirm priority and v3.0 release scope.
+Next planned work: v3 release readiness review - user to confirm priority and v3.0 release scope.
 
 ## v3 Candidate Work In Progress
 
@@ -130,12 +130,16 @@ Next planned work: v3 release readiness review or deferred storage cleanup after
   - Added GitHub, GitHub Profile, and GitHub URL signals to the existing portfolio matcher.
   - Added `tests/autofill-multi-education.html` and fixed the stale threshold comment in `tests/autofill-multi-employment.html`.
   - No `content.js`, dashboard, settings, manifest, or autofill fill-logic changes.
+- [DONE] Storage cleanup after migration confidence (2026-05-27):
+  - Provider settings and profile data now use local-only reads/writes.
+  - Removed legacy `chrome.storage.sync` fallback migration for provider/profile data.
+  - Other intentional `chrome.storage.sync` usage for low-sensitivity settings/history was left untouched.
 
 ## Current Main Branch State
 
 Latest known `main` commit (2026-05-27):
 
-`d9cd644` - `feat: improve autofill graduation year and GitHub matching`
+`3ba57d7` - `docs: refresh roadmap and handover after v3 candidate work`
 
 Working tree had doc-only roadmap/handover updates when this handover was refreshed.
 
@@ -146,6 +150,7 @@ Working tree had doc-only roadmap/handover updates when this handover was refres
 - Do not rebuild Fit Analysis.
 - Do not send saved-job Fit Analysis advisory context to `content.js`; it is session/dashboard/drafting context only.
 - Do not redo privacy/storage migration.
+- Do not re-add legacy sync fallback migration for provider settings or profile data; private provider/profile storage is local-only.
 - Do not redo storage quota guards.
 - Do not redo the session scan payload cap.
 - Do not rewrite roadmap docs unless the user asks.
