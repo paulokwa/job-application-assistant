@@ -303,6 +303,82 @@ export function generateMockFollowUpMessage(jobData, profile) {
   }, null, 2);
 }
 
+export function generateMockApplicationAnswers(jobData, profile) {
+  const jobTitle = jobData?.jobTitle || jobData?.title || 'this role';
+  const company = jobData?.company || 'this organization';
+  const skills = asArray(profile?.skills).slice(0, 3);
+  const summary = firstText(
+    profile?.summary,
+    profile?.summaries?.find(s => s?.text)?.text,
+    ''
+  );
+  const firstRole = profile?.experience?.[0];
+  const roleText = firstRole?.jobTitle && firstRole?.employer
+    ? `${firstRole.jobTitle} at ${firstRole.employer}`
+    : null;
+
+  const interestAnswer = `I am drawn to ${jobTitle} at ${company} because it aligns with my professional background and goals.${
+    summary ? ` ${summary.slice(0, 120).trimEnd()}${summary.length > 120 ? '...' : ''}` : ''
+  } [Demo mode] Review this answer — it is based only on the profile data currently saved.`;
+
+  const experienceAnswer = roleText
+    ? `My background includes experience as ${roleText}.${
+        skills.length ? ` I have worked with ${skills.join(', ')}.` : ''
+      } [Demo mode] Review this answer and add specific examples from your own experience before using it.`
+    : `[Demo mode] Add your work experience to the profile to generate a relevant answer here.`;
+
+  const selfAnswer = summary
+    ? `${summary.slice(0, 200).trimEnd()}${summary.length > 200 ? '...' : ''} [Demo mode] This is drawn from your profile summary — edit as needed.`
+    : `[Demo mode] Add a professional summary to your profile to generate a "Tell us about yourself" answer.`;
+
+  return JSON.stringify({
+    answers: [
+      {
+        question: 'Why are you interested in this role?',
+        answer: interestAnswer,
+        needsUserInput: false,
+        inputNeeded: null,
+        warnings: ['[Demo mode] Review before using — this is a simulated answer based on your saved profile data.'],
+      },
+      {
+        question: 'What relevant experience do you have?',
+        answer: experienceAnswer,
+        needsUserInput: false,
+        inputNeeded: null,
+        warnings: ['[Demo mode] Review and add specific verified examples before copying.'],
+      },
+      {
+        question: 'Why are you a good fit?',
+        answer: null,
+        needsUserInput: true,
+        inputNeeded: 'To draft a "good fit" answer safely, add specific achievements, metrics, or examples from your experience that directly match this role. The profile does not contain enough verified evidence to draft this without risking invented claims.',
+        warnings: [],
+      },
+      {
+        question: 'Tell us about yourself.',
+        answer: selfAnswer,
+        needsUserInput: false,
+        inputNeeded: null,
+        warnings: ['[Demo mode] Review before using — this is drawn from your profile summary.'],
+      },
+      {
+        question: 'Is there anything else you want us to know?',
+        answer: null,
+        needsUserInput: true,
+        inputNeeded: 'This question is best answered in your own words. Add any relevant detail — awards, volunteering, unique context, or anything not covered in your resume — then copy the answer.',
+        warnings: [],
+      },
+    ],
+    notes: [
+      'Review all answers before copying. Nothing is submitted automatically.',
+      'Answers marked "Needs your input" have editable fields — type your own answer, then copy.',
+    ],
+    warnings: [
+      '[Demo mode] This is a simulated response — no real AI was called.',
+    ],
+  }, null, 2);
+}
+
 export function mockReviseDraft(currentDraft, request, docType) {
   let parsed;
   try {

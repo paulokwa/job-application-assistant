@@ -5,6 +5,7 @@ import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } 
 import { prepareApplicationEmail } from '../modules/emailDrafting.js';
 import { generateRecruiterMessage } from '../modules/recruiterMessage.js';
 import { generateFollowUpMessage } from '../modules/followUpMessage.js';
+import { generateApplicationAnswers, PRESET_QUESTIONS } from '../modules/applicationAnswers.js';
 import { detectJobPage } from '../modules/jobPageDetector.js';
 import { extractProfileKeywords, extractJobKeywords, scoreMatch } from '../modules/fitCheck.js';
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
@@ -41,6 +42,7 @@ const SAVED_JOBS_MESSAGE_TYPES = new Set([
   'JPDA_ANALYZE_FIT_REQUESTED',
   'JPDA_RECRUITER_MESSAGE_REQUESTED',
   'JPDA_FOLLOW_UP_MESSAGE_REQUESTED',
+  'JPDA_APPLICATION_ANSWERS_REQUESTED',
 ]);
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
@@ -107,6 +109,9 @@ let currentRecruiterRequestId = 0;
 let currentFollowUpController = null;
 let currentFollowUpJob = null;
 let currentFollowUpRequestId = 0;
+let currentAppAnswersController = null;
+let currentAppAnswersJob = null;
+let currentAppAnswersRequestId = 0;
 let generationStatusTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
@@ -289,6 +294,18 @@ const dom = {
   followUpWarningsList:    $('follow-up-warnings-list'),
   followUpNotesGroup:      $('follow-up-notes-group'),
   followUpNotesList:       $('follow-up-notes-list'),
+
+  // Application answers
+  appAnswersView:          $('application-answers-view'),
+  btnCloseAppAnswers:      $('btn-close-app-answers'),
+  btnRegenAppAnswers:      $('btn-regen-app-answers'),
+  appAnswersPanelLoading:  $('app-answers-panel-loading'),
+  appAnswersPanelError:    $('app-answers-panel-error'),
+  appAnswersPanelErrorMsg: $('app-answers-panel-error-msg'),
+  btnAppAnswersErrorRetry: $('btn-app-answers-error-retry'),
+  appAnswersPanelResult:   $('app-answers-panel-result'),
+  appAnswersContextBanner: $('app-answers-context-banner'),
+  appAnswersList:          $('app-answers-list'),
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -1295,6 +1312,10 @@ function bindEvents() {
     }
     if (e.data?.type === 'JPDA_FOLLOW_UP_MESSAGE_REQUESTED') {
       openFollowUpMessageFromSavedJob(e.data.id);
+      return;
+    }
+    if (e.data?.type === 'JPDA_APPLICATION_ANSWERS_REQUESTED') {
+      openApplicationAnswersFromSavedJob(e.data.id);
     }
   });
 
@@ -1412,6 +1433,9 @@ function bindEvents() {
   dom.btnFollowUpErrorRetry.addEventListener('click', runFollowUpMessageGeneration);
   dom.btnCopyFollowUpSubject.addEventListener('click', () => copyEmailField(dom.followUpSubjectDisplay.value, 'Subject copied'));
   dom.btnCopyFollowUpBody.addEventListener('click', () => copyEmailField(dom.followUpBodyDisplay.value, 'Message copied'));
+  dom.btnCloseAppAnswers.addEventListener('click', closeApplicationAnswers);
+  dom.btnRegenAppAnswers.addEventListener('click', runApplicationAnswersGeneration);
+  dom.btnAppAnswersErrorRetry.addEventListener('click', runApplicationAnswersGeneration);
 
   // Error Retry
   dom.btnErrorRetry.addEventListener('click', () => {
@@ -3634,6 +3658,190 @@ function renderFollowUpPanel(result) {
   } else {
     dom.followUpNotesGroup.classList.add('hidden');
   }
+}
+
+// Application answers
+
+async function openApplicationAnswersFromSavedJob(id) {
+  if (!id) return;
+
+  const requestId = ++currentAppAnswersRequestId;
+  dom.jobsView.classList.remove('visible');
+  dom.appAnswersView.classList.add('visible');
+  currentAppAnswersJob = null;
+  setAppAnswersState('loading');
+
+  try {
+    currentAppAnswersJob = await loadSavedJobForAnswers(id);
+    if (requestId !== currentAppAnswersRequestId) return;
+    await runApplicationAnswersGeneration();
+  } catch (err) {
+    if (requestId !== currentAppAnswersRequestId) return;
+    setAppAnswersState('error', err?.message || 'Saved job could not be loaded.');
+  }
+}
+
+function closeApplicationAnswers() {
+  currentAppAnswersRequestId += 1;
+  dom.appAnswersView.classList.remove('visible');
+  currentAppAnswersJob = null;
+  if (currentAppAnswersController) {
+    currentAppAnswersController.abort();
+    currentAppAnswersController = null;
+  }
+}
+
+async function loadSavedJobForAnswers(id) {
+  const data = await chrome.storage.local.get(SAVED_JOBS_KEY);
+  const savedJobs = Array.isArray(data[SAVED_JOBS_KEY]) ? data[SAVED_JOBS_KEY] : [];
+  const job = savedJobs.find(item => item.id === id);
+  if (!job) throw new Error('Saved job not found.');
+
+  return {
+    id: job.id,
+    jobTitle: job.title || '',
+    company: job.company || '',
+    sourceUrl: job.sourceUrl || '',
+    description: job.cleanDescription || job.rawContent || '',
+  };
+}
+
+async function runApplicationAnswersGeneration() {
+  if (!currentAppAnswersJob) {
+    setAppAnswersState('error', 'Saved job could not be loaded.');
+    return;
+  }
+
+  state.settings = await loadSettings();
+  state.profile = await loadProfile();
+
+  if (!state.settings?.provider) {
+    setAppAnswersState('error', 'No AI provider configured. Open Settings to set one up.');
+    return;
+  }
+
+  if (currentAppAnswersController) currentAppAnswersController.abort();
+  const controller = new AbortController();
+  currentAppAnswersController = controller;
+
+  setAppAnswersState('loading');
+
+  try {
+    const raw = await generateApplicationAnswers(
+      currentAppAnswersJob,
+      state.profile,
+      state.settings,
+      controller.signal,
+      state.sourceResumeText
+    );
+    const parsed = tryParseJson(raw);
+    if (!parsed) {
+      setAppAnswersState('error', 'AI returned an unreadable response. Try regenerating.');
+      return;
+    }
+
+    renderAnswersPanel(normalizeAnswersResult(parsed));
+    setAppAnswersState('result');
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+    setAppAnswersState('error', mapError(err).message);
+  } finally {
+    if (currentAppAnswersController === controller) currentAppAnswersController = null;
+  }
+}
+
+function setAppAnswersState(which, errorMsg) {
+  dom.appAnswersPanelLoading.classList.toggle('hidden', which !== 'loading');
+  dom.appAnswersPanelError.classList.toggle('hidden', which !== 'error');
+  dom.appAnswersPanelResult.classList.toggle('hidden', which !== 'result');
+  dom.btnRegenAppAnswers.disabled = which === 'loading';
+  if (which === 'error' && errorMsg) dom.appAnswersPanelErrorMsg.textContent = errorMsg;
+}
+
+function normalizeAnswersResult(parsed) {
+  const toArr = v => Array.isArray(v)
+    ? v.filter(s => s != null).map(String).map(s => s.trim()).filter(Boolean)
+    : (v ? [String(v).trim()].filter(Boolean) : []);
+  const toStr = v => (typeof v === 'string' && v.trim()) ? v.trim() : null;
+
+  const rawAnswers = Array.isArray(parsed.answers) ? parsed.answers : [];
+
+  const answers = PRESET_QUESTIONS.map((question, i) => {
+    const found = rawAnswers[i] || rawAnswers.find(a => String(a?.question || '').includes(question.slice(0, 20))) || {};
+    const needsUserInput = Boolean(found.needsUserInput);
+    return {
+      question,
+      answer: needsUserInput ? null : (toStr(found.answer) || null),
+      needsUserInput,
+      inputNeeded: toStr(found.inputNeeded),
+      warnings: toArr(found.warnings),
+    };
+  });
+
+  return {
+    answers,
+    notes: toArr(parsed.notes),
+    warnings: toArr(parsed.warnings),
+  };
+}
+
+function renderAnswersPanel(result) {
+  dom.appAnswersContextBanner.textContent = 'Review each answer before copying. Nothing is submitted automatically.';
+
+  const cards = result.answers.map(item => {
+    const warningHtml = item.warnings.length
+      ? `<ul class="app-answers-card-warnings">${item.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`
+      : '';
+
+    if (item.needsUserInput) {
+      const needsText = item.inputNeeded
+        ? escapeHtml(item.inputNeeded)
+        : 'Add your own answer below, then copy it.';
+      return `
+        <div class="app-answers-card">
+          <div class="app-answers-question">${escapeHtml(item.question)}</div>
+          <div class="app-answers-needs-input">Needs your input: ${needsText}</div>
+          <textarea class="app-answers-textarea" aria-label="${escapeHtml('Your answer: ' + item.question)}" placeholder="Type your answer here…"></textarea>
+          ${warningHtml}
+          <div class="app-answers-card-footer">
+            <button class="btn-copy app-answers-copy-btn" type="button">Copy answer</button>
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="app-answers-card">
+        <div class="app-answers-question">${escapeHtml(item.question)}</div>
+        <textarea class="app-answers-textarea" readonly aria-label="${escapeHtml('Suggested answer: ' + item.question)}">${escapeHtml(item.answer || '')}</textarea>
+        ${warningHtml}
+        <div class="app-answers-card-footer">
+          <button class="btn-copy app-answers-copy-btn" type="button">Copy answer</button>
+        </div>
+      </div>`;
+  });
+
+  if (result.warnings.length) {
+    const warningBlock = `<div class="app-answers-top-warnings email-section email-section--warning">
+      <ul class="email-list email-list--warning">${result.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
+    </div>`;
+    cards.unshift(warningBlock);
+  }
+
+  if (result.notes.length) {
+    const notesBlock = `<div class="app-answers-top-notes email-section">
+      <ul class="email-list">${result.notes.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+    </div>`;
+    cards.push(notesBlock);
+  }
+
+  dom.appAnswersList.innerHTML = cards.join('');
+
+  dom.appAnswersList.querySelectorAll('.app-answers-copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const textarea = btn.closest('.app-answers-card')?.querySelector('.app-answers-textarea');
+      if (textarea) copyEmailField(textarea.value, 'Answer copied');
+    });
+  });
 }
 
 // ── ATS Check ─────────────────────────────────────────────────────────────

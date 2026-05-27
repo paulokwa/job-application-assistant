@@ -62,7 +62,6 @@ Goal: let a saved job become a launchpad for application materials.
 
 Remaining possible scope:
 
-- Generate short application answers
 - Suggest follow-up date/reminder text
 
 Product rule: the app prepares materials, but the user reviews and stays in control.
@@ -141,6 +140,17 @@ Completed scope:
 - Saved Jobs can launch resume-only generation using an existing saved job.
 - Saved Jobs can launch cover-letter-only generation using an existing saved job.
 - Existing Load into generator behavior remains available.
+
+### Application Pack Actions — Short Application Answers
+
+Status: **Complete on `main`** (2026-05-26).
+
+Completed scope:
+
+- Saved Jobs can launch a "Short answers" overlay that drafts answers to 5 preset common application questions: Why interested, Relevant experience, Why a good fit, Tell us about yourself, Anything else.
+- Each answer card shows the question, a suggested answer (or an amber notice for answers the AI cannot safely draft), and a copy button.
+- When an answer needs user input, the field is editable and starts empty — the user types their own answer and copies it. No AI-generated text is shown that could be mistaken for verified truth.
+- Guardrails: no invented examples, metrics, credentials, or experience; no salary, work authorization, or demographic answers; no form filling; no auto-submit.
 
 ### Application Pack Actions — Follow-Up Message
 

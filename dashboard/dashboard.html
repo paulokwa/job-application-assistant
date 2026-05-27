@@ -729,6 +729,34 @@
     </div>
   </div><!-- /follow-up-message-view -->
 
+  <!-- Application Answers Overlay -->
+  <div id="application-answers-view" class="settings-overlay" role="dialog" aria-label="Short Application Answers" aria-modal="true">
+    <div class="overlay-header">
+      <button id="btn-close-app-answers" class="back-btn" type="button" aria-label="Close application answers">
+        <span aria-hidden="true">←</span> Close
+      </button>
+      <span class="overlay-title">Short Application Answers</span>
+      <button id="btn-regen-app-answers" class="btn-scan app-answers-regen-btn" type="button">Regenerate</button>
+    </div>
+
+    <div class="overlay-content app-answers-panel-scroll">
+      <div id="app-answers-panel-loading" class="email-panel-loading hidden" role="status" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Preparing application answers...</span>
+      </div>
+
+      <div id="app-answers-panel-error" class="email-panel-error hidden" role="alert">
+        <div id="app-answers-panel-error-msg" class="email-panel-error-msg"></div>
+        <button id="btn-app-answers-error-retry" class="btn-secondary btn-sm" type="button">Retry</button>
+      </div>
+
+      <div id="app-answers-panel-result" class="hidden">
+        <div id="app-answers-context-banner" class="app-answers-context-banner" role="status"></div>
+        <div id="app-answers-list"></div>
+      </div>
+    </div>
+  </div><!-- /application-answers-view -->
+
   <script type="module" src="dashboard.js"></script>
 
 </body>
