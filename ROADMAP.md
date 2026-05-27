@@ -54,19 +54,7 @@ v3.0 planning can continue, but do not package or submit v3.0 until the user exp
 
 ## Active Roadmap Ideas
 
-### 1. Application Pack Actions — remaining scope
-
-Suggested branch: `feature/application-pack-actions`
-
-Goal: let a saved job become a launchpad for application materials.
-
-Remaining possible scope:
-
-- Suggest follow-up date/reminder text
-
-Product rule: the app prepares materials, but the user reviews and stays in control.
-
-### 2. Batch/Manual Multi-Job Intake
+### 1. Batch/Manual Multi-Job Intake
 
 Suggested branch: `feature/batch-job-intake`
 
@@ -140,6 +128,17 @@ Completed scope:
 - Saved Jobs can launch resume-only generation using an existing saved job.
 - Saved Jobs can launch cover-letter-only generation using an existing saved job.
 - Existing Load into generator behavior remains available.
+
+### Application Pack Actions — Reminder Text
+
+Status: **Complete on `main`** (2026-05-26).
+
+Completed scope:
+
+- Saved Jobs can generate a suggested follow-up timing note, a target date, a reminder title, and a reminder body — all based on the saved job status and the user's local date.
+- Deterministic and rule-based: no AI call, no new permissions, no calendar integration, no scheduling.
+- Status-aware logic: applied (7-day follow-up), ready to apply (1-day apply reminder), saved/needs review (3-day review reminder), rejected (no reminder suggested).
+- Copy buttons for reminder title and text. Nothing is scheduled automatically.
 
 ### Application Pack Actions — Short Application Answers
 

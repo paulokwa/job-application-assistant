@@ -757,6 +757,49 @@
     </div>
   </div><!-- /application-answers-view -->
 
+  <!-- Reminder Text Overlay -->
+  <div id="reminder-text-view" class="settings-overlay" role="dialog" aria-label="Reminder Text" aria-modal="true">
+    <div class="overlay-header">
+      <button id="btn-close-reminder-text" class="back-btn" type="button" aria-label="Close reminder text">
+        <span aria-hidden="true">←</span> Close
+      </button>
+      <span class="overlay-title">Reminder Text</span>
+    </div>
+
+    <div class="overlay-content reminder-text-panel-scroll">
+      <div id="reminder-panel-error" class="email-panel-error hidden" role="alert">
+        <div id="reminder-panel-error-msg" class="email-panel-error-msg"></div>
+      </div>
+
+      <div id="reminder-panel-result" class="hidden">
+        <p id="reminder-timing-note" class="reminder-timing-note"></p>
+
+        <div id="reminder-date-group" class="email-field-group hidden">
+          <div class="email-field-label">Suggested date</div>
+          <div id="reminder-date-display" class="reminder-date-display"></div>
+        </div>
+
+        <div class="email-field-group">
+          <div class="email-field-label-row">
+            <span class="email-field-label">Reminder title</span>
+            <button id="btn-copy-reminder-title" class="btn-copy" type="button">Copy</button>
+          </div>
+          <input id="reminder-title-display" type="text" class="email-field-input" readonly aria-label="Reminder title" />
+        </div>
+
+        <div class="email-field-group">
+          <div class="email-field-label-row">
+            <span class="email-field-label">Reminder text</span>
+            <button id="btn-copy-reminder-body" class="btn-copy" type="button">Copy</button>
+          </div>
+          <textarea id="reminder-body-display" class="reminder-text-textarea" readonly aria-label="Reminder text"></textarea>
+        </div>
+
+        <p class="reminder-note">Copy the title and text into your preferred calendar, notes, or reminder app. Nothing is scheduled automatically.</p>
+      </div>
+    </div>
+  </div><!-- /reminder-text-view -->
+
   <script type="module" src="dashboard.js"></script>
 
 </body>

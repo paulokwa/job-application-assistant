@@ -333,6 +333,7 @@ function render(jobs) {
         <button class="action-btn" data-action="recruiter-message" type="button">Recruiter message</button>
         <button class="action-btn" data-action="follow-up-message" type="button">Follow-up message</button>
         <button class="action-btn" data-action="short-answers" type="button">Short answers</button>
+        <button class="action-btn" data-action="reminder-text" type="button">Reminder text</button>
         <button class="action-btn action-btn--primary" data-action="load" type="button">Load into generator</button>
         ${openButton}
         <button class="action-btn action-btn--danger" data-action="delete" type="button">Delete</button>
@@ -445,6 +446,10 @@ function requestApplicationAnswers(id) {
   window.parent?.postMessage({ type: 'JPDA_APPLICATION_ANSWERS_REQUESTED', id }, window.location.origin);
 }
 
+function requestReminderText(id) {
+  window.parent?.postMessage({ type: 'JPDA_REMINDER_TEXT_REQUESTED', id }, window.location.origin);
+}
+
 async function init() {
   const { theme } = await chrome.storage.local.get(['theme']);
   applyTheme(theme || 'system');
@@ -497,6 +502,10 @@ async function init() {
 
     if (btn.dataset.action === 'short-answers') {
       requestApplicationAnswers(id);
+    }
+
+    if (btn.dataset.action === 'reminder-text') {
+      requestReminderText(id);
     }
 
     if (btn.dataset.action === 'delete') {

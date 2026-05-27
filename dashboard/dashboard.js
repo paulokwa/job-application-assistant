@@ -43,6 +43,7 @@ const SAVED_JOBS_MESSAGE_TYPES = new Set([
   'JPDA_RECRUITER_MESSAGE_REQUESTED',
   'JPDA_FOLLOW_UP_MESSAGE_REQUESTED',
   'JPDA_APPLICATION_ANSWERS_REQUESTED',
+  'JPDA_REMINDER_TEXT_REQUESTED',
 ]);
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
@@ -112,6 +113,7 @@ let currentFollowUpRequestId = 0;
 let currentAppAnswersController = null;
 let currentAppAnswersJob = null;
 let currentAppAnswersRequestId = 0;
+let currentReminderRequestId = 0;
 let generationStatusTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
@@ -306,6 +308,20 @@ const dom = {
   appAnswersPanelResult:   $('app-answers-panel-result'),
   appAnswersContextBanner: $('app-answers-context-banner'),
   appAnswersList:          $('app-answers-list'),
+
+  // Reminder text
+  reminderTextView:       $('reminder-text-view'),
+  btnCloseReminderText:   $('btn-close-reminder-text'),
+  reminderPanelError:     $('reminder-panel-error'),
+  reminderPanelErrorMsg:  $('reminder-panel-error-msg'),
+  reminderPanelResult:    $('reminder-panel-result'),
+  reminderTimingNote:     $('reminder-timing-note'),
+  reminderDateGroup:      $('reminder-date-group'),
+  reminderDateDisplay:    $('reminder-date-display'),
+  reminderTitleDisplay:   $('reminder-title-display'),
+  btnCopyReminderTitle:   $('btn-copy-reminder-title'),
+  reminderBodyDisplay:    $('reminder-body-display'),
+  btnCopyReminderBody:    $('btn-copy-reminder-body'),
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -1316,6 +1332,10 @@ function bindEvents() {
     }
     if (e.data?.type === 'JPDA_APPLICATION_ANSWERS_REQUESTED') {
       openApplicationAnswersFromSavedJob(e.data.id);
+      return;
+    }
+    if (e.data?.type === 'JPDA_REMINDER_TEXT_REQUESTED') {
+      openReminderTextFromSavedJob(e.data.id);
     }
   });
 
@@ -1436,6 +1456,9 @@ function bindEvents() {
   dom.btnCloseAppAnswers.addEventListener('click', closeApplicationAnswers);
   dom.btnRegenAppAnswers.addEventListener('click', runApplicationAnswersGeneration);
   dom.btnAppAnswersErrorRetry.addEventListener('click', runApplicationAnswersGeneration);
+  dom.btnCloseReminderText.addEventListener('click', closeReminderText);
+  dom.btnCopyReminderTitle.addEventListener('click', () => copyEmailField(dom.reminderTitleDisplay.value, 'Reminder title copied'));
+  dom.btnCopyReminderBody.addEventListener('click', () => copyEmailField(dom.reminderBodyDisplay.value, 'Reminder text copied'));
 
   // Error Retry
   dom.btnErrorRetry.addEventListener('click', () => {
@@ -3842,6 +3865,114 @@ function renderAnswersPanel(result) {
       if (textarea) copyEmailField(textarea.value, 'Answer copied');
     });
   });
+}
+
+// Reminder text
+
+async function openReminderTextFromSavedJob(id) {
+  if (!id) return;
+
+  const requestId = ++currentReminderRequestId;
+  dom.jobsView.classList.remove('visible');
+  dom.reminderTextView.classList.add('visible');
+  dom.reminderPanelError.classList.add('hidden');
+  dom.reminderPanelResult.classList.add('hidden');
+
+  try {
+    const job = await loadSavedJobForReminder(id);
+    if (requestId !== currentReminderRequestId) return;
+    renderReminderPanel(computeReminderResult(job));
+    dom.reminderPanelResult.classList.remove('hidden');
+  } catch (err) {
+    if (requestId !== currentReminderRequestId) return;
+    dom.reminderPanelErrorMsg.textContent = err?.message || 'Saved job could not be loaded.';
+    dom.reminderPanelError.classList.remove('hidden');
+  }
+}
+
+function closeReminderText() {
+  currentReminderRequestId += 1;
+  dom.reminderTextView.classList.remove('visible');
+}
+
+async function loadSavedJobForReminder(id) {
+  const data = await chrome.storage.local.get(SAVED_JOBS_KEY);
+  const savedJobs = Array.isArray(data[SAVED_JOBS_KEY]) ? data[SAVED_JOBS_KEY] : [];
+  const job = savedJobs.find(item => item.id === id);
+  if (!job) throw new Error('Saved job not found.');
+  return {
+    id: job.id,
+    jobTitle: job.title || '',
+    company: job.company || '',
+    status: job.status || 'saved',
+  };
+}
+
+function computeReminderResult(job) {
+  const status = job.status;
+  const title = job.jobTitle || 'this role';
+  const company = job.company || 'this organization';
+
+  function addDays(d, n) {
+    const result = new Date(d);
+    result.setDate(result.getDate() + n);
+    return result;
+  }
+
+  function formatDate(d) {
+    return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  const today = new Date();
+
+  if (status === 'applied') {
+    return {
+      timing: 'Follow up about 7 days after applying, unless the posting gave a different timeline.',
+      suggestedDate: formatDate(addDays(today, 7)),
+      reminderTitle: `Follow up on ${title} at ${company}`,
+      reminderText: `Check in politely about the hiring timeline or next steps for the ${title} role at ${company}.`,
+    };
+  }
+
+  if (status === 'ready_to_apply') {
+    return {
+      timing: 'Apply within the next 1–2 days if you are still interested.',
+      suggestedDate: formatDate(addDays(today, 1)),
+      reminderTitle: `Apply for ${title} at ${company}`,
+      reminderText: `Review your resume and cover letter and submit the application for ${title} at ${company}.`,
+    };
+  }
+
+  if (status === 'rejected') {
+    return {
+      timing: 'No follow-up reminder recommended by default.',
+      suggestedDate: null,
+      reminderTitle: 'No reminder suggested',
+      reminderText: `You may archive this job or keep it for reference. Consider looking for similar roles.`,
+    };
+  }
+
+  // saved / needs_review / unknown
+  return {
+    timing: 'Review this saved job within 2–3 days.',
+    suggestedDate: formatDate(addDays(today, 3)),
+    reminderTitle: `Review saved job: ${title} at ${company}`,
+    reminderText: `Review the job posting, decide whether to apply, and prepare application materials if it still looks like a good fit.`,
+  };
+}
+
+function renderReminderPanel(result) {
+  dom.reminderTimingNote.textContent = result.timing;
+
+  if (result.suggestedDate) {
+    dom.reminderDateDisplay.textContent = result.suggestedDate;
+    dom.reminderDateGroup.classList.remove('hidden');
+  } else {
+    dom.reminderDateGroup.classList.add('hidden');
+  }
+
+  dom.reminderTitleDisplay.value = result.reminderTitle;
+  dom.reminderBodyDisplay.value = result.reminderText;
 }
 
 // ── ATS Check ─────────────────────────────────────────────────────────────
