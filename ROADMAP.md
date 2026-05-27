@@ -12,10 +12,12 @@ Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by 
 
 - Saved Jobs workflow
 - Fit Analysis for Saved Jobs
+- Saved Jobs workspace upgrades: stats bar, recently-updated sorting, saved-job resume/cover-letter launch, and Fit Analysis advisory context for saved-job generation
 - Privacy/storage readiness fixes
 - Safe URL opening
 - Clear session cleanup
 - Storage quota guards
+- Session scan payload cap for large temporary scan text
 - Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
 - Post-v2 / v3 candidate work including Fit Check improvements, direct PDF download, and Application Email Assistant
 
@@ -194,10 +196,10 @@ Completed scope:
 
 1. ~~`release/v2.0-prep`~~ — complete; v2.0 submitted on 2026-05-22 and accepted by Google
 2. ~~`feature/assisted-form-fill`~~ — MVP complete on `main` (see above)
-3. `feature/job-dashboard-stats` — low-risk, visible Saved Jobs improvement
-4. `fix/session-scan-payload-cap` — low-risk maintenance guard
-5. `feature/application-pack-actions`
-6. `feature/use-fit-analysis-in-generation`
+3. ~~`feature/job-dashboard-stats`~~ - complete
+4. ~~`fix/session-scan-payload-cap`~~ - complete
+5. ~~`feature/application-pack-actions`~~ - Phase 1 complete
+6. ~~`feature/use-fit-analysis-in-generation`~~ - complete
 7. `feature/batch-job-intake`
 8. `feature/job-url-import`
 

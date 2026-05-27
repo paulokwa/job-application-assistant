@@ -17,7 +17,7 @@ Status:
 - [DONE] v2.0 accepted by Google.
 - [WAITING] User to confirm next v3 candidate priority and v3.0 release scope.
 
-Next planned work: v3 candidate review, Fit Check manual smoke testing, Application Pack, Job Dashboard Stats, Session Scan Payload Cap, or v3 polish - user to confirm priority.
+Next planned work: v3 candidate review, Fit Check manual smoke testing, Application Pack later phases, batch/manual multi-job intake, job URL import, or v3 polish - user to confirm priority and release scope.
 
 ## v3 Candidate Work In Progress
 
@@ -92,6 +92,12 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
   - `fdbc1fe` - `feat: add profile selector to Fit Check card for multi-profile users`
   - `55cd8ec` - `feat: add best-profile comparison to Fit Check card`
   - `13a94e7` - `fix: whitelist Fit Check AI review card payload`
+- [DONE] Saved Jobs workspace upgrades (2026-05-26):
+  - `de17007` - `feat: add saved jobs stats bar` - compact Saved Jobs stats row showing total, strong matches, good matches, and developing/unscored jobs.
+  - `90e4582` - `fix: support recently updated saved jobs sort` - Recently updated sort uses `updatedAt || createdAt`, newest first.
+  - `0c12ce8` - `fix: cap large session scan payloads` - caps large temporary session scan text before `chrome.storage.session` writes while preserving scan metadata.
+  - `a746e95` - `feat: launch resume and cover letter generation from saved jobs` - saved job cards can launch resume-only or cover-letter-only generation; existing Load into generator remains unchanged.
+  - `a26f3b4` - `feat: use fit analysis context for saved job generation` - saved-job resume/cover-letter generation can pass `suggestedAngle`, `strongMatches`, and `possibleGaps` as advisory context. Possible gaps are caution areas only. No output schema changes and no content script changes.
 - [DONE] Phase 2 Workday autofill improvements (`modules/autofillMatcher.js`, `settings/settings.js`):
   - `toMonthYear()` helper - converts freeform date strings to MM/YYYY; returns '' for unconvertible values so empty-fill guard fires.
   - `toMonth()` / `toYear()` helpers - extract two-digit month or four-digit year from freeform strings.
@@ -111,16 +117,19 @@ Next planned work: v3 candidate review, Fit Check manual smoke testing, Applicat
 
 Latest known `main` commit (2026-05-26):
 
-`8fd3770` - `feat: add Application Email Assistant feature`
+`a26f3b4` - `feat: use fit analysis context for saved job generation`
 
-Working tree was clean when this handover was updated.
+Working tree had doc-only roadmap/handover updates when this handover was refreshed.
 
 ## Do Not Repeat
 
 - Do not rebuild Saved Jobs.
+- Do not redo Saved Jobs stats, recently-updated sorting, saved-job resume/cover-letter launch, or saved-job Fit Analysis advisory context for generation.
 - Do not rebuild Fit Analysis.
+- Do not send saved-job Fit Analysis advisory context to `content.js`; it is session/dashboard/drafting context only.
 - Do not redo privacy/storage migration.
 - Do not redo storage quota guards.
+- Do not redo the session scan payload cap.
 - Do not rewrite roadmap docs unless the user asks.
 - Do not rebuild Fit Check Phases 1-3; current `main` already has Basic Fit Check, auto/context-menu support, better scoring, multi-profile selector, best-profile row, and manual AI review.
 - Do not send Fit Check AI internals to `content.js`; keep the card payload whitelisted and do not expose `suggestedAngle`, provider settings, API keys, raw profile data, or job text to the content script.
