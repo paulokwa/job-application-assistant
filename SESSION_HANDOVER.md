@@ -19,7 +19,9 @@ Status:
 
 Next planned work: v3 release readiness review - user to confirm priority and v3.0 release scope.
 
-## v3 Candidate Work In Progress
+## v3 Features Added Since v2.0
+
+All items in this section are complete on `main` as of 2026-05-27. Kept here for implementation reference and guardrail notes.
 
 - Application Email Assistant added on `main` (2026-05-26):
   - New "Prepare application email" button in the Export PDF card — enabled whenever a job description is loaded, no generated resume/cover letter required.
@@ -143,9 +145,9 @@ Next planned work: v3 release readiness review - user to confirm priority and v3
 
 Latest known `main` commit (2026-05-27):
 
-`5289447` - `fix: apply filename pattern to print export titles`
+`e2314f3` - `refactor: remove direct PDF download before v3`
 
-Working tree had doc-only roadmap/handover updates when this handover was refreshed.
+Working tree is clean.
 
 ## Do Not Repeat
 
