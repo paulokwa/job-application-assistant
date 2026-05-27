@@ -54,7 +54,31 @@ v3.0 planning can continue, but do not package or submit v3.0 until the user exp
 
 ## Active Roadmap Ideas
 
-### 1. Batch/Manual Multi-Job Intake
+### 1. Fit Check follow-up — search-results detector refinement
+
+Goal: refine detector behavior for job-search results pages vs single job postings.
+
+This is the only remaining Fit Check follow-up currently listed as incomplete.
+
+### 2. Autofill improvements
+
+Suggested branch: `feature/autofill-improvements`
+
+See `## Autofill Known Limitations / Future Improvements` for scope.
+
+### 3. Storage Cleanup After Migration Confidence
+
+Suggested branch: `maintenance/cleanup-old-sync-storage`
+
+Goal: eventually remove old sync copies of provider settings and profile data after the local-first migration has proven safe.
+
+Important: do not do this immediately. Wait until the local migration has been used successfully in a released version.
+
+## Later Intake Experiments
+
+Deferred for now because the primary workflow is one job at a time. Revisit if users ask for bulk intake or URL-based importing.
+
+### Batch/Manual Multi-Job Intake
 
 Suggested branch: `feature/batch-job-intake`
 
@@ -68,7 +92,7 @@ Possible intake methods:
 
 Recommended first version: manual multi-job paste using separators or multiple cards.
 
-### 2. Job URL Import
+### Job URL Import
 
 Suggested branch: `feature/job-url-import`
 
@@ -83,7 +107,7 @@ Preferred behavior:
 
 Important: do not promise universal extraction from every job board.
 
-### 3. Search Results Page Link Scan
+### Search Results Page Link Scan
 
 Suggested branch: `feature/job-link-scan`
 
@@ -96,26 +120,6 @@ Preferred behavior:
 - User selects which to save/import.
 
 Treat it as a link collector first, not guaranteed full job-description extraction.
-
-### 4. Storage Cleanup After Migration Confidence
-
-Suggested branch: `maintenance/cleanup-old-sync-storage`
-
-Goal: eventually remove old sync copies of provider settings and profile data after the local-first migration has proven safe.
-
-Important: do not do this immediately. Wait until the local migration has been used successfully in a released version.
-
-### 5. Autofill improvements
-
-Suggested branch: `feature/autofill-improvements`
-
-See `## Autofill Known Limitations / Future Improvements` for scope.
-
-### 6. Fit Check follow-up — search-results detector refinement
-
-Goal: refine detector behavior for job-search results pages vs single job postings.
-
-This is the only remaining Fit Check follow-up currently listed as incomplete.
 
 ## Completed Roadmap Items
 
@@ -223,12 +227,9 @@ Guardrails (permanent):
 
 ## Suggested Order For Active Work
 
-1. `feature/batch-job-intake`
-2. `feature/job-url-import`
-3. `feature/job-link-scan`
-4. `maintenance/cleanup-old-sync-storage`
-5. `feature/autofill-improvements`
-6. Fit Check detector refinement (no branch yet)
+1. Fit Check detector refinement (no branch yet)
+2. `feature/autofill-improvements`
+3. `maintenance/cleanup-old-sync-storage`
 
 ## Autofill Known Limitations / Future Improvements
 
