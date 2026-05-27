@@ -2,6 +2,10 @@
 
 This document captures release prep notes and future roadmap ideas. It is planning only and does not commit any feature to a specific release.
 
+## Roadmap Maintenance Rule
+
+Only active, undone roadmap items should use numbered headings or numbered order lists. Completed work must be moved to an unnumbered completed/history section so future agents do not mistake finished items for pending work.
+
 ## Current Status
 
 Version 1.0 is live on the Chrome Web Store.
@@ -48,22 +52,20 @@ v3.0 planning can continue, but do not package or submit v3.0 until the user exp
 - Clear prevents old scanned job from reappearing.
 - No obvious console errors in dashboard/settings/jobs/history.
 
-## Future Roadmap Ideas
+## Active Roadmap Ideas
 
-### 1. Application Pack Actions
-
-Status: **Phase 1 complete on `main`** (2026-05-26).
+### 1. Application Pack Actions — remaining scope
 
 Suggested branch: `feature/application-pack-actions`
 
 Goal: let a saved job become a launchpad for application materials.
 
-Phase 1 completed scope:
+Completed Phase 1 scope:
 
 - Generate tailored resume from saved job
 - Generate cover letter from saved job
 
-Later scope:
+Remaining possible scope:
 
 - Generate recruiter message
 - Generate short application answers
@@ -72,27 +74,7 @@ Later scope:
 
 Product rule: the app prepares materials, but the user reviews and stays in control.
 
-### 2. Use Fit Analysis As Generation Context
-
-Status: **Complete on `main`** (2026-05-26).
-
-Suggested branch: `feature/use-fit-analysis-in-generation`
-
-Goal: when a saved job has Fit Analysis, generation can optionally use:
-
-- `suggestedAngle`
-- `strongMatches`
-- `possibleGaps`
-
-Important:
-
-- Do not invent qualifications.
-- Treat possible gaps as caution areas, not things to fake.
-- Keep generated content grounded in the profile/source resume.
-
-- [DONE] Saved-job resume and cover-letter generation can use existing Fit Analysis as advisory context: suggested angle, strong matches, and possible gaps. Possible gaps are treated as caution areas only.
-
-### 3. Batch/Manual Multi-Job Intake
+### 2. Batch/Manual Multi-Job Intake
 
 Suggested branch: `feature/batch-job-intake`
 
@@ -106,7 +88,7 @@ Possible intake methods:
 
 Recommended first version: manual multi-job paste using separators or multiple cards.
 
-### 4. Job URL Import
+### 3. Job URL Import
 
 Suggested branch: `feature/job-url-import`
 
@@ -121,7 +103,7 @@ Preferred behavior:
 
 Important: do not promise universal extraction from every job board.
 
-### 5. Search Results Page Link Scan
+### 4. Search Results Page Link Scan
 
 Suggested branch: `feature/job-link-scan`
 
@@ -135,7 +117,70 @@ Preferred behavior:
 
 Treat it as a link collector first, not guaranteed full job-description extraction.
 
-### 6. Application Form Autofill
+### 5. Storage Cleanup After Migration Confidence
+
+Suggested branch: `maintenance/cleanup-old-sync-storage`
+
+Goal: eventually remove old sync copies of provider settings and profile data after the local-first migration has proven safe.
+
+Important: do not do this immediately. Wait until the local migration has been used successfully in a released version.
+
+### 6. Autofill improvements
+
+Suggested branch: `feature/autofill-improvements`
+
+See `## Autofill Known Limitations / Future Improvements` for scope.
+
+### 7. Fit Check follow-up — search-results detector refinement
+
+Goal: refine detector behavior for job-search results pages vs single job postings.
+
+This is the only remaining Fit Check follow-up currently listed as incomplete.
+
+## Completed Roadmap Items
+
+### Application Pack Actions — Phase 1
+
+Status: **Phase 1 complete on `main`** (2026-05-26).
+
+Completed scope:
+
+- Saved Jobs can launch resume-only generation using an existing saved job.
+- Saved Jobs can launch cover-letter-only generation using an existing saved job.
+- Existing Load into generator behavior remains available.
+
+### Use Fit Analysis As Generation Context
+
+Status: **Complete on `main`** (2026-05-26).
+
+Completed scope:
+
+- Saved-job resume and cover-letter generation can use existing Fit Analysis as advisory context: suggested angle, strong matches, and possible gaps.
+- Possible gaps are treated as caution areas only.
+- Generated content must remain grounded in the profile/source resume.
+
+### Job Dashboard Stats
+
+Status: **Complete on `main`** (2026-05-26).
+
+Completed scope:
+
+- Total saved jobs
+- Strong matches (fit score >= 75)
+- Good matches (fit score 50-74)
+- Developing (fit score < 50 or unscored)
+
+### Session Scan Payload Cap
+
+Status: **Complete on `main`** (2026-05-26).
+
+Completed scope:
+
+- Context-menu scan payloads cap large text fields before session storage writes.
+- Full-page dashboard handoff caps the temporary job description payload before session storage writes.
+- Small scan metadata such as title, company, URL, source title, source type, and tab ID stays intact.
+
+### Application Form Autofill MVP
 
 Status: **MVP complete on `main`** (Phases 1–5).
 
@@ -153,59 +198,14 @@ Guardrails (permanent):
 - User manually submits the application.
 - No automatic submission, ever.
 
-See `## Autofill Known Limitations / Future Improvements` for next steps.
+## Suggested Order For Active Work
 
-### 7. Job Dashboard Stats
-
-Status: **Complete on `main`** (2026-05-26).
-
-Suggested branch: `feature/job-dashboard-stats`
-
-Goal: make Saved Jobs feel more like an active job-search workspace.
-
-Completed scope:
-
-- Total saved jobs
-- Strong matches (fit score >= 75)
-- Good matches (fit score 50-74)
-- Developing (fit score < 50 or unscored)
-
-### 8. Storage Cleanup After Migration Confidence
-
-Suggested branch: `maintenance/cleanup-old-sync-storage`
-
-Goal: eventually remove old sync copies of provider settings and profile data after the local-first migration has proven safe.
-
-Important: do not do this immediately. Wait until the local migration has been used successfully in a released version.
-
-### 9. Session Scan Payload Cap
-
-Status: **Complete on `main`** (2026-05-26).
-
-Suggested branch: `fix/session-scan-payload-cap`
-
-Goal: cap very large temporary scan payloads before writing to `chrome.storage.session`.
-
-Completed scope:
-
-- Context-menu scan payloads cap large text fields before session storage writes.
-- Full-page dashboard handoff caps the temporary job description payload before session storage writes.
-- Small scan metadata such as title, company, URL, source title, source type, and tab ID stays intact.
-
-## Suggested Order After v2.0 Acceptance
-
-1. ~~`release/v2.0-prep`~~ — complete; v2.0 submitted on 2026-05-22 and accepted by Google
-2. ~~`feature/assisted-form-fill`~~ — MVP complete on `main` (see above)
-3. ~~`feature/job-dashboard-stats`~~ - complete
-4. ~~`fix/session-scan-payload-cap`~~ - complete
-5. ~~`feature/application-pack-actions`~~ - Phase 1 complete
-6. ~~`feature/use-fit-analysis-in-generation`~~ - complete
-7. `feature/batch-job-intake`
-8. `feature/job-url-import`
-
-### Autofill improvements (suggested branch: `feature/autofill-improvements`)
-
-See `## Autofill Known Limitations / Future Improvements` for scope.
+1. `feature/application-pack-actions` — continue with recruiter message as the next small Application Pack item
+2. `feature/batch-job-intake`
+3. `feature/job-url-import`
+4. `feature/job-link-scan`
+5. `maintenance/cleanup-old-sync-storage`
+6. `feature/autofill-improvements`
 
 ## Autofill Known Limitations / Future Improvements
 
