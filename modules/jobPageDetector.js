@@ -122,11 +122,14 @@ const METADATA_FIELDS = [
 const SEARCH_RESULT_PATHS = [
   '/jobs/search',
   '/job-search',
+  '/careers/search',
   '/find/jobs',
   '/jobs/find',
+  '/jobs/list',
   '/job-results',
   '/search-jobs',
   '/jobs/collection',
+  '/job-listings',
 ];
 
 // Query parameters that indicate a search on consumer job-board domains.
@@ -148,7 +151,7 @@ const SEARCH_PARAM_DOMAINS = [
 
 // Path substrings that strongly suggest a single job posting on a search-param domain,
 // preventing the query-param check from blocking real postings.
-const SINGLE_POSTING_PATH_PATTERNS = /\/(view|viewjob|job|position|posting|details|apply|jd)\b/;
+const SINGLE_POSTING_PATH_PATTERNS = /\/(view|viewjob|job\/|position|posting|details|apply|jd)\b/;
 
 // Title patterns that suggest search results pages (used only on known job-board domains).
 const SEARCH_TITLE_PATTERNS = [
@@ -157,17 +160,30 @@ const SEARCH_TITLE_PATTERNS = [
   /\bjob\s+results\b/i,
 ];
 
+const SEARCH_TEXT_PATTERNS = [
+  'save this search',
+  'set up job alert',
+  'create job alert',
+  'email me jobs',
+  'sort by relevance',
+  'sorted by relevance',
+  'refine your search',
+];
+
 /**
  * Returns true if the page looks like a job search/listing results page
  * rather than a single job posting. Conservative — only flags unambiguous signals.
  */
-function isLikelySearchResultsPage({ url = '', title = '' }) {
+function isLikelySearchResultsPage({ url = '', title = '', text = '' }) {
   const urlLower = url.toLowerCase();
 
   // 1. Path-level signals — unambiguous search result paths
   for (const path of SEARCH_RESULT_PATHS) {
     if (urlLower.includes(path)) return true;
   }
+
+  // Glassdoor search URLs use /Job/...jobs-SRCH..., while single postings use /job-listing/...
+  if (urlLower.includes('glassdoor.com') && /\/job\/.*jobs-srch/i.test(urlLower)) return true;
 
   // 2. Query-param signals — only on known consumer job-board domains
   const onSearchParamDomain = SEARCH_PARAM_DOMAINS.some(d => urlLower.includes(d));
@@ -192,6 +208,11 @@ function isLikelySearchResultsPage({ url = '', title = '' }) {
     if (SEARCH_TITLE_PATTERNS.some(re => re.test(titleLower))) return true;
   }
 
+  if (text) {
+    const textLower = text.toLowerCase();
+    if (SEARCH_TEXT_PATTERNS.some(pattern => textLower.includes(pattern))) return true;
+  }
+
   return false;
 }
 
@@ -213,7 +234,7 @@ const APPLICATION_PHRASES = [
 
 /**
  * detectJobPage({ url, title, text, structuredData })
- * Returns { isLikelyJobPosting: boolean, confidence: number, reasons: string[] }
+ * Returns { isLikelyJobPosting: boolean, isLikelySearchPage: boolean, confidence: number, reasons: string[] }
  *
  * Scoring (additive, capped at 100):
  *   Structured JobPosting schema → 90 (short-circuit)
@@ -228,9 +249,10 @@ export function detectJobPage({ url = '', title = '', text = '', structuredData 
   const reasons = [];
 
   // 0. Early exit: obvious search/listing result pages — checked before positive signals
-  if (isLikelySearchResultsPage({ url, title })) {
+  if (isLikelySearchResultsPage({ url, title, text })) {
     return {
       isLikelyJobPosting: false,
+      isLikelySearchPage: true,
       confidence: 0,
       reasons: ['Page appears to be a job search results listing'],
     };
@@ -240,6 +262,7 @@ export function detectJobPage({ url = '', title = '', text = '', structuredData 
   if (structuredData && structuredData.includes('"JobPosting"')) {
     return {
       isLikelyJobPosting: true,
+      isLikelySearchPage: false,
       confidence: 90,
       reasons: ['Page contains JobPosting structured data (JSON-LD)'],
     };
@@ -310,6 +333,7 @@ export function detectJobPage({ url = '', title = '', text = '', structuredData 
 
   return {
     isLikelyJobPosting: confidence >= 40,
+    isLikelySearchPage: false,
     confidence,
     reasons,
   };

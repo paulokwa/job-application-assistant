@@ -880,9 +880,13 @@ async function runFitCheck(scanResponse, tab) {
   const url = tab.url || '';
   const structuredData = scanResponse.structuredData || '';
 
-  const { isLikelyJobPosting } = detectJobPage({ url, title, text, structuredData });
+  const { isLikelyJobPosting, isLikelySearchPage } = detectJobPage({ url, title, text, structuredData });
 
   if (!isLikelyJobPosting) {
+    if (isLikelySearchPage) {
+      showToast('Fit Check skipped — this looks like a search results or listing page.');
+      return;
+    }
     showToast('Fit Check skipped — this page does not look like a job posting.');
     return;
   }
