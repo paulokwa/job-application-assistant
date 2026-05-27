@@ -63,7 +63,6 @@ Goal: let a saved job become a launchpad for application materials.
 Remaining possible scope:
 
 - Generate short application answers
-- Generate follow-up message
 - Suggest follow-up date/reminder text
 
 Product rule: the app prepares materials, but the user reviews and stays in control.
@@ -142,6 +141,17 @@ Completed scope:
 - Saved Jobs can launch resume-only generation using an existing saved job.
 - Saved Jobs can launch cover-letter-only generation using an existing saved job.
 - Existing Load into generator behavior remains available.
+
+### Application Pack Actions — Follow-Up Message
+
+Status: **Complete on `main`** (2026-05-26).
+
+Completed scope:
+
+- Saved Jobs can launch a status-aware follow-up message from an existing saved job.
+- Dashboard shows a review overlay with optional subject, message body, warnings/notes, copy actions, regenerate, and close.
+- Status-aware behavior: only `applied` status may reference a submitted application; `rejected` generates a gracious post-outcome note; all other statuses generate general interest follow-up without claiming application.
+- Guardrails: does not claim an interview, phone screen, referral, mutual connection, prior contact, or recruiter invitation under any status. Nothing is sent automatically.
 
 ### Application Pack Actions - Recruiter Message
 

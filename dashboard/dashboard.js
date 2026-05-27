@@ -4,6 +4,7 @@ import { extractJobFields } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
 import { prepareApplicationEmail } from '../modules/emailDrafting.js';
 import { generateRecruiterMessage } from '../modules/recruiterMessage.js';
+import { generateFollowUpMessage } from '../modules/followUpMessage.js';
 import { detectJobPage } from '../modules/jobPageDetector.js';
 import { extractProfileKeywords, extractJobKeywords, scoreMatch } from '../modules/fitCheck.js';
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
@@ -39,6 +40,7 @@ const SAVED_JOBS_MESSAGE_TYPES = new Set([
   'JPDA_SAVED_JOB_GENERATE_REQUESTED',
   'JPDA_ANALYZE_FIT_REQUESTED',
   'JPDA_RECRUITER_MESSAGE_REQUESTED',
+  'JPDA_FOLLOW_UP_MESSAGE_REQUESTED',
 ]);
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
@@ -102,6 +104,9 @@ let currentEmailController = null;
 let currentRecruiterController = null;
 let currentRecruiterJob = null;
 let currentRecruiterRequestId = 0;
+let currentFollowUpController = null;
+let currentFollowUpJob = null;
+let currentFollowUpRequestId = 0;
 let generationStatusTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
@@ -264,6 +269,26 @@ const dom = {
   recruiterWarningsList:    $('recruiter-warnings-list'),
   recruiterNotesGroup:      $('recruiter-notes-group'),
   recruiterNotesList:       $('recruiter-notes-list'),
+
+  // Follow-up message
+  followUpMessageView:     $('follow-up-message-view'),
+  btnCloseFollowUpMessage: $('btn-close-follow-up-message'),
+  btnRegenFollowUpMessage: $('btn-regen-follow-up-message'),
+  followUpPanelLoading:    $('follow-up-panel-loading'),
+  followUpPanelError:      $('follow-up-panel-error'),
+  followUpPanelErrorMsg:   $('follow-up-panel-error-msg'),
+  btnFollowUpErrorRetry:   $('btn-follow-up-error-retry'),
+  followUpPanelResult:     $('follow-up-panel-result'),
+  followUpContextBanner:   $('follow-up-context-banner'),
+  followUpSubjectGroup:    $('follow-up-subject-group'),
+  followUpSubjectDisplay:  $('follow-up-subject-display'),
+  btnCopyFollowUpSubject:  $('btn-copy-follow-up-subject'),
+  followUpBodyDisplay:     $('follow-up-body-display'),
+  btnCopyFollowUpBody:     $('btn-copy-follow-up-body'),
+  followUpWarningsGroup:   $('follow-up-warnings-group'),
+  followUpWarningsList:    $('follow-up-warnings-list'),
+  followUpNotesGroup:      $('follow-up-notes-group'),
+  followUpNotesList:       $('follow-up-notes-list'),
 };
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -1266,6 +1291,10 @@ function bindEvents() {
     }
     if (e.data?.type === 'JPDA_RECRUITER_MESSAGE_REQUESTED') {
       openRecruiterMessageFromSavedJob(e.data.id);
+      return;
+    }
+    if (e.data?.type === 'JPDA_FOLLOW_UP_MESSAGE_REQUESTED') {
+      openFollowUpMessageFromSavedJob(e.data.id);
     }
   });
 
@@ -1378,6 +1407,11 @@ function bindEvents() {
   dom.btnRecruiterErrorRetry.addEventListener('click', runRecruiterMessageGeneration);
   dom.btnCopyRecruiterSubject.addEventListener('click', () => copyEmailField(dom.recruiterSubjectDisplay.value, 'Subject copied'));
   dom.btnCopyRecruiterBody.addEventListener('click', () => copyEmailField(dom.recruiterBodyDisplay.value, 'Message copied'));
+  dom.btnCloseFollowUpMessage.addEventListener('click', closeFollowUpMessage);
+  dom.btnRegenFollowUpMessage.addEventListener('click', runFollowUpMessageGeneration);
+  dom.btnFollowUpErrorRetry.addEventListener('click', runFollowUpMessageGeneration);
+  dom.btnCopyFollowUpSubject.addEventListener('click', () => copyEmailField(dom.followUpSubjectDisplay.value, 'Subject copied'));
+  dom.btnCopyFollowUpBody.addEventListener('click', () => copyEmailField(dom.followUpBodyDisplay.value, 'Message copied'));
 
   // Error Retry
   dom.btnErrorRetry.addEventListener('click', () => {
@@ -3452,6 +3486,154 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// Follow-up message
+
+async function openFollowUpMessageFromSavedJob(id) {
+  if (!id) return;
+
+  const requestId = ++currentFollowUpRequestId;
+  dom.jobsView.classList.remove('visible');
+  dom.followUpMessageView.classList.add('visible');
+  currentFollowUpJob = null;
+  setFollowUpState('loading');
+
+  try {
+    currentFollowUpJob = await loadSavedJobForFollowUp(id);
+    if (requestId !== currentFollowUpRequestId) return;
+    await runFollowUpMessageGeneration();
+  } catch (err) {
+    if (requestId !== currentFollowUpRequestId) return;
+    setFollowUpState('error', err?.message || 'Saved job could not be loaded.');
+  }
+}
+
+function closeFollowUpMessage() {
+  currentFollowUpRequestId += 1;
+  dom.followUpMessageView.classList.remove('visible');
+  currentFollowUpJob = null;
+  if (currentFollowUpController) {
+    currentFollowUpController.abort();
+    currentFollowUpController = null;
+  }
+}
+
+async function loadSavedJobForFollowUp(id) {
+  const data = await chrome.storage.local.get(SAVED_JOBS_KEY);
+  const savedJobs = Array.isArray(data[SAVED_JOBS_KEY]) ? data[SAVED_JOBS_KEY] : [];
+  const job = savedJobs.find(item => item.id === id);
+  if (!job) throw new Error('Saved job not found.');
+
+  return {
+    id: job.id,
+    jobTitle: job.title || '',
+    company: job.company || '',
+    sourceUrl: job.sourceUrl || '',
+    description: job.cleanDescription || job.rawContent || '',
+    status: job.status || 'saved',
+  };
+}
+
+async function runFollowUpMessageGeneration() {
+  if (!currentFollowUpJob) {
+    setFollowUpState('error', 'Saved job could not be loaded.');
+    return;
+  }
+
+  state.settings = await loadSettings();
+  state.profile = await loadProfile();
+
+  if (!state.settings?.provider) {
+    setFollowUpState('error', 'No AI provider configured. Open Settings to set one up.');
+    return;
+  }
+
+  if (currentFollowUpController) currentFollowUpController.abort();
+  const controller = new AbortController();
+  currentFollowUpController = controller;
+
+  setFollowUpState('loading');
+
+  try {
+    const raw = await generateFollowUpMessage(
+      currentFollowUpJob,
+      state.profile,
+      state.settings,
+      controller.signal,
+      state.sourceResumeText
+    );
+    const parsed = tryParseJson(raw);
+    if (!parsed) {
+      setFollowUpState('error', 'AI returned an unreadable response. Try regenerating.');
+      return;
+    }
+
+    renderFollowUpPanel(normalizeFollowUpResult(parsed));
+    setFollowUpState('result');
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+    setFollowUpState('error', mapError(err).message);
+  } finally {
+    if (currentFollowUpController === controller) currentFollowUpController = null;
+  }
+}
+
+function setFollowUpState(which, errorMsg) {
+  dom.followUpPanelLoading.classList.toggle('hidden', which !== 'loading');
+  dom.followUpPanelError.classList.toggle('hidden', which !== 'error');
+  dom.followUpPanelResult.classList.toggle('hidden', which !== 'result');
+  dom.btnRegenFollowUpMessage.disabled = which === 'loading';
+  if (which === 'error' && errorMsg) dom.followUpPanelErrorMsg.textContent = errorMsg;
+}
+
+function normalizeFollowUpResult(parsed) {
+  const toArr = v => Array.isArray(v)
+    ? v.filter(s => s != null).map(String).map(s => s.trim()).filter(Boolean)
+    : (v ? [String(v).trim()].filter(Boolean) : []);
+  const toStr = v => (typeof v === 'string' && v.trim()) ? v.trim() : '';
+  return {
+    subject: toStr(parsed.subject),
+    messageBody: toStr(parsed.messageBody || parsed.body || parsed.message) || 'Hello,\n\nI wanted to follow up on my interest in this opportunity and would welcome the chance to connect.\n\nThank you.',
+    warnings: toArr(parsed.warnings),
+    notes: toArr(parsed.notes),
+  };
+}
+
+function followUpStatusLabel(status) {
+  if (status === 'applied') return 'Application follow-up draft. Review before copying. Nothing is sent automatically.';
+  if (status === 'rejected') return 'Post-outcome follow-up draft. Review before copying. Nothing is sent automatically.';
+  return 'Interest follow-up draft. Review before copying. Nothing is sent automatically.';
+}
+
+function renderFollowUpPanel(result) {
+  dom.followUpContextBanner.textContent = followUpStatusLabel(currentFollowUpJob?.status);
+
+  if (result.subject) {
+    dom.followUpSubjectDisplay.value = result.subject;
+    dom.followUpSubjectGroup.classList.remove('hidden');
+  } else {
+    dom.followUpSubjectDisplay.value = '';
+    dom.followUpSubjectGroup.classList.add('hidden');
+  }
+
+  dom.followUpBodyDisplay.value = result.messageBody;
+
+  if (result.warnings.length) {
+    dom.followUpWarningsList.innerHTML = result.warnings
+      .map(warning => `<li>${escapeHtml(warning)}</li>`).join('');
+    dom.followUpWarningsGroup.classList.remove('hidden');
+  } else {
+    dom.followUpWarningsGroup.classList.add('hidden');
+  }
+
+  if (result.notes.length) {
+    dom.followUpNotesList.innerHTML = result.notes
+      .map(note => `<li>${escapeHtml(note)}</li>`).join('');
+    dom.followUpNotesGroup.classList.remove('hidden');
+  } else {
+    dom.followUpNotesGroup.classList.add('hidden');
+  }
 }
 
 // ── ATS Check ─────────────────────────────────────────────────────────────

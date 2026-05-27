@@ -670,7 +670,64 @@
         </div>
       </div>
     </div>
-  </div>
+  </div><!-- /recruiter-message-view -->
+
+  <!-- Follow-Up Message Overlay -->
+  <div id="follow-up-message-view" class="settings-overlay" role="dialog" aria-label="Follow-Up Message" aria-modal="true">
+    <div class="overlay-header">
+      <button id="btn-close-follow-up-message" class="back-btn" type="button" aria-label="Close follow-up message">
+        <span aria-hidden="true">â†</span> Close
+      </button>
+      <span class="overlay-title">Follow-Up Message</span>
+      <button id="btn-regen-follow-up-message" class="btn-scan follow-up-msg-regen-btn" type="button">Regenerate</button>
+    </div>
+
+    <div class="overlay-content follow-up-msg-panel-scroll">
+      <div id="follow-up-panel-loading" class="email-panel-loading hidden" role="status" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Preparing follow-up message...</span>
+      </div>
+
+      <div id="follow-up-panel-error" class="email-panel-error hidden" role="alert">
+        <div id="follow-up-panel-error-msg" class="email-panel-error-msg"></div>
+        <button id="btn-follow-up-error-retry" class="btn-secondary btn-sm" type="button">Retry</button>
+      </div>
+
+      <div id="follow-up-panel-result" class="hidden">
+        <div id="follow-up-context-banner" class="follow-up-msg-context-banner" role="status"></div>
+
+        <div id="follow-up-subject-group" class="email-field-group hidden">
+          <div class="email-field-label">Subject</div>
+          <div class="email-field-row">
+            <input id="follow-up-subject-display" type="text" class="email-field-input" readonly aria-label="Follow-up message subject" />
+            <button id="btn-copy-follow-up-subject" class="btn-copy" type="button">Copy</button>
+          </div>
+        </div>
+
+        <div class="email-field-group">
+          <div class="email-field-label-row">
+            <span class="email-field-label">Message</span>
+            <button id="btn-copy-follow-up-body" class="btn-copy" type="button">Copy message</button>
+          </div>
+          <textarea id="follow-up-body-display" class="follow-up-msg-textarea" readonly aria-label="Follow-up message body"></textarea>
+        </div>
+
+        <div id="follow-up-warnings-group" class="email-section email-section--warning hidden">
+          <div class="email-section-header">
+            <span class="email-section-title">Warnings</span>
+          </div>
+          <ul id="follow-up-warnings-list" class="email-list email-list--warning"></ul>
+        </div>
+
+        <div id="follow-up-notes-group" class="email-section hidden">
+          <div class="email-section-header">
+            <span class="email-section-title">Notes</span>
+          </div>
+          <ul id="follow-up-notes-list" class="email-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div><!-- /follow-up-message-view -->
 
   <script type="module" src="dashboard.js"></script>
 

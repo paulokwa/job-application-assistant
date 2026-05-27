@@ -251,6 +251,58 @@ export function generateMockRecruiterMessage(jobData, profile) {
   }, null, 2);
 }
 
+export function generateMockFollowUpMessage(jobData, profile) {
+  const name = profile?.personalInfo?.fullName || '[Your Name]';
+  const jobTitle = jobData?.jobTitle || jobData?.title || 'the role';
+  const company = jobData?.company || 'your organization';
+  const status = jobData?.status || 'saved';
+  const skills = asArray(profile?.skills).slice(0, 2);
+  const strengthNote = skills.length
+    ? `My background in ${skills.join(' and ')} continues to feel like a strong fit.`
+    : 'I believe my background remains relevant to this opportunity.';
+
+  if (status === 'rejected') {
+    return JSON.stringify({
+      subject: `Thank you — ${jobTitle} at ${company}`,
+      messageBody: `Hello,\n\nThank you for considering me for the ${jobTitle} position at ${company}. I appreciate the time your team invested in reviewing my application. I have a genuine interest in the work you do and would welcome the chance to connect again if a fitting opportunity arises in the future.\n\nThank you,\n${name}`,
+      warnings: [
+        '[Demo mode] This is a simulated follow-up draft. Review all facts before sending.',
+        'Status is "rejected" — this draft thanks the team without asking them to reconsider.'
+      ],
+      notes: [
+        'Nothing is sent automatically. Copy the message only after review.'
+      ]
+    }, null, 2);
+  }
+
+  if (status === 'applied') {
+    return JSON.stringify({
+      subject: `Following up — ${jobTitle} at ${company}`,
+      messageBody: `Hello,\n\nI wanted to follow up on my application for the ${jobTitle} position at ${company}. ${strengthNote} I remain enthusiastic about this opportunity and would welcome any update on the timeline or next steps.\n\nThank you for your time,\n${name}`,
+      warnings: [
+        '[Demo mode] This is a simulated follow-up draft. Review all facts before sending.',
+        'Status is "applied" — this draft references your application. Verify you have formally applied before sending.'
+      ],
+      notes: [
+        'Nothing is sent automatically. Copy the message only after review.'
+      ]
+    }, null, 2);
+  }
+
+  // saved / needs_review / ready_to_apply — must not imply application was submitted
+  return JSON.stringify({
+    subject: `Interest in ${jobTitle} at ${company}`,
+    messageBody: `Hello,\n\nI wanted to follow up on my interest in the ${jobTitle} position at ${company}. ${strengthNote} I would welcome the chance to learn more about the role or the best path to connect further.\n\nThank you for your time,\n${name}`,
+    warnings: [
+      '[Demo mode] This is a simulated follow-up draft. Review all facts before sending.',
+      'This draft does not claim you applied — status is not "applied". If you have formally applied, update the job status before regenerating.'
+    ],
+    notes: [
+      'Nothing is sent automatically. Copy the message only after review.'
+    ]
+  }, null, 2);
+}
+
 export function mockReviseDraft(currentDraft, request, docType) {
   let parsed;
   try {
