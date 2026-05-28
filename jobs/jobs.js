@@ -324,19 +324,41 @@ function render(jobs) {
         </label>
       </div>
 
-      <div class="job-actions">
-        <button class="action-btn" data-action="analyze" type="button" ${isAnalyzing ? 'disabled' : ''}>
-          ${isAnalyzing ? 'Analyzing...' : job.fitAnalysis ? 'Re-analyze' : 'Analyze Fit'}
-        </button>
-        <button class="action-btn" data-action="generate-resume" type="button">Generate resume</button>
-        <button class="action-btn" data-action="generate-cover-letter" type="button">Generate cover letter</button>
-        <button class="action-btn" data-action="recruiter-message" type="button">Recruiter message</button>
-        <button class="action-btn" data-action="follow-up-message" type="button">Follow-up message</button>
-        <button class="action-btn" data-action="short-answers" type="button">Short answers</button>
-        <button class="action-btn" data-action="reminder-text" type="button">Reminder text</button>
-        <button class="action-btn action-btn--primary" data-action="load" type="button">Load into generator</button>
-        ${openButton}
-        <button class="action-btn action-btn--danger" data-action="delete" type="button">Delete</button>
+      <div class="job-actions" aria-label="Job actions">
+        <div class="job-primary-action">
+          <button class="action-btn action-btn--primary" data-action="load" type="button">Load into generator</button>
+        </div>
+
+        <div class="job-action-sections">
+          <section class="job-action-group" aria-label="Application materials">
+            <p class="job-action-group-title">Application materials</p>
+            <div class="job-action-group-buttons">
+              <button class="action-btn" data-action="generate-resume" type="button">Generate resume</button>
+              <button class="action-btn" data-action="generate-cover-letter" type="button">Generate cover letter</button>
+              <button class="action-btn" data-action="short-answers" type="button">Short answers</button>
+            </div>
+          </section>
+
+          <section class="job-action-group" aria-label="Messaging tools">
+            <p class="job-action-group-title">Messaging</p>
+            <div class="job-action-group-buttons">
+              <button class="action-btn" data-action="recruiter-message" type="button">Recruiter message</button>
+              <button class="action-btn" data-action="follow-up-message" type="button">Follow-up message</button>
+              <button class="action-btn" data-action="reminder-text" type="button">Reminder text</button>
+            </div>
+          </section>
+
+          <section class="job-action-group job-action-group--management" aria-label="Job management">
+            <p class="job-action-group-title">Job management</p>
+            <div class="job-action-group-buttons">
+              <button class="action-btn" data-action="analyze" type="button" ${isAnalyzing ? 'disabled' : ''}>
+                ${isAnalyzing ? 'Analyzing...' : job.fitAnalysis ? 'Re-analyze' : 'Analyze Fit'}
+              </button>
+              ${openButton}
+              <button class="action-btn action-btn--danger" data-action="delete" type="button">Delete</button>
+            </div>
+          </section>
+        </div>
       </div>
     `;
     list.appendChild(card);
