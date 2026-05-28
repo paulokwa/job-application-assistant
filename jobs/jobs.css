@@ -539,12 +539,6 @@ body {
   min-width: 0;
 }
 
-.job-primary-action {
-  display: flex;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
 .job-action-sections {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -611,11 +605,6 @@ body {
   border-color: var(--color-accent);
   background: var(--color-accent);
   color: var(--color-accent-on);
-}
-
-.job-primary-action .action-btn--primary {
-  padding: 7px 14px;
-  font-size: 12.5px;
 }
 
 .action-btn--primary:hover {
@@ -737,7 +726,6 @@ body {
     gap: 12px;
   }
 
-  .job-primary-action,
   .job-action-group-buttons {
     justify-content: stretch;
   }

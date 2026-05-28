@@ -325,10 +325,6 @@ function render(jobs) {
       </div>
 
       <div class="job-actions" aria-label="Job actions">
-        <div class="job-primary-action">
-          <button class="action-btn action-btn--primary" data-action="load" type="button">Load into generator</button>
-        </div>
-
         <div class="job-action-sections">
           <section class="job-action-group" aria-label="Application materials">
             <p class="job-action-group-title">Application materials</p>
@@ -351,6 +347,12 @@ function render(jobs) {
           <section class="job-action-group job-action-group--management" aria-label="Job management">
             <p class="job-action-group-title">Job management</p>
             <div class="job-action-group-buttons">
+              <button
+                class="action-btn"
+                data-action="load"
+                type="button"
+                title="Open this saved job in the main generator so you can review or edit it before generating documents."
+              >Review in Generator</button>
               <button class="action-btn" data-action="analyze" type="button" ${isAnalyzing ? 'disabled' : ''}>
                 ${isAnalyzing ? 'Analyzing...' : job.fitAnalysis ? 'Re-analyze' : 'Analyze Fit'}
               </button>

@@ -60,6 +60,20 @@ Goal: run the full v3 smoke test against the confirmed release scope before pack
 
 Important: do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission. Direct PDF Download has been removed/deferred for store-safety; keep the print-dialog Save as PDF path available.
 
+### 2. Tour Refresh And Saved Jobs Tour
+
+Suggested branch: `feature/saved-jobs-tour`
+
+Goal: review the existing dashboard/settings tours for drift after v3 UI changes, update any stale tour steps, and add a focused Saved Jobs page tour.
+
+Scope notes:
+
+- Check whether the existing dashboard feature tour still points to current controls and terminology.
+- Check whether Settings section tours still match current layout and copy.
+- Add a Saved Jobs tour that explains the saved job card, fit analysis, status/notes, grouped application-material actions, messaging actions, job management actions, and the "Review in Generator" workflow.
+- Keep the tour concise and task-focused; do not turn it into a full onboarding rewrite.
+- Verify keyboard navigation, Escape/skip behavior, small side-panel layout, and first-run/replay behavior.
+
 ## Later Autofill Improvements
 
 Autofill remains a broad future bucket, but no immediate autofill implementation task is selected. Keep changes targeted, deterministic, and review-before-fill; follow `TROUBLESHOOTING.md` entry 16 before modifying `modules/autofillMatcher.js`.
@@ -265,6 +279,7 @@ Guardrails (permanent):
 ## Suggested Order For Active Work
 
 1. v3 Smoke Test
+2. Tour Refresh And Saved Jobs Tour
 
 ## Autofill Known Limitations / Future Improvements
 
