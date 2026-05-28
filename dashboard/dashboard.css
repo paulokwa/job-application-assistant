@@ -533,6 +533,22 @@ body {
   border-color: oklch(from var(--color-accent) l c h / 0.28);
 }
 
+.job-info-review-action {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.job-info-review-action:hover {
+  opacity: 0.75;
+}
+
 /* ── Application Form card ──────────────────── */
 .autofill-helper {
   font-size: 12px;

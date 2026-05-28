@@ -652,9 +652,13 @@ async function handleFillPage() {
   }
 }
 
-function showJobInfoReviewNotice(message, tone = 'warning') {
+function showJobInfoReviewNotice(message, tone = 'warning', actionHtml = '') {
   if (!dom.jobInfoReview) return;
-  dom.jobInfoReview.textContent = message;
+  if (actionHtml) {
+    dom.jobInfoReview.innerHTML = `<span>${escHtml(message)}</span>${actionHtml}`;
+  } else {
+    dom.jobInfoReview.textContent = message;
+  }
   dom.jobInfoReview.dataset.tone = tone;
   dom.jobInfoReview.classList.remove('hidden');
 }
@@ -687,6 +691,25 @@ function jobInfoSuggestionBody(info) {
     '',
     'Apply these suggestions to the Job Info fields? Review them before saving or analyzing.',
   ].join('\n');
+}
+
+async function confirmAiJobInfoSuggestions(info) {
+  return showConfirmDialog(
+    'Apply AI field suggestions?',
+    jobInfoSuggestionBody(info),
+    'Apply'
+  );
+}
+
+function applyAiJobInfoSuggestions(info) {
+  if (info.jobTitle) {
+    dom.fieldTitle.value = info.jobTitle;
+    state.jobData.jobTitle = info.jobTitle;
+  }
+  if (info.company) {
+    dom.fieldCompany.value = info.company;
+    state.jobData.company = info.company;
+  }
 }
 
 async function runAiJobInfoExtraction() {
@@ -734,25 +757,13 @@ async function runAiJobInfoExtraction() {
       return;
     }
 
-    const applySuggestions = await showConfirmDialog(
-      'Apply AI field suggestions?',
-      jobInfoSuggestionBody(info),
-      'Apply'
-    );
+    const applySuggestions = await confirmAiJobInfoSuggestions(info);
     if (!applySuggestions) {
       showJobInfoReviewNotice('AI suggestions were not applied. Review Job Title and Employer before saving or analyzing.');
       return;
     }
 
-    if (info.jobTitle) {
-      dom.fieldTitle.value = info.jobTitle;
-      state.jobData.jobTitle = info.jobTitle;
-    }
-    if (info.company) {
-      dom.fieldCompany.value = info.company;
-      state.jobData.company = info.company;
-    }
-
+    applyAiJobInfoSuggestions(info);
     showJobInfoReviewNotice('AI filled Job Title and Employer. Review them before saving or analyzing.', 'info');
   } catch (err) {
     if (err?.name !== 'AbortError') {
@@ -1145,6 +1156,112 @@ async function scanCurrentPage() {
   }
 }
 
+async function scanJobPageAndMaybeSuggestFields() {
+  const btn = dom.btnScan;
+  btn.disabled = true;
+  btn.textContent = 'Scanning…';
+
+  try {
+    const tab = await getScanTargetTab();
+
+    if (!tab?.id) {
+      showToast('⚠️ No active tab found.');
+      return;
+    }
+
+    if (tab.url && isRestrictedUrl(tab.url)) {
+      showToast('⚠️ Cannot scan this page — open a job posting in a normal browser tab first.');
+      return;
+    }
+
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    } catch (injectErr) {
+      console.warn('[JPDA] Could not inject content script:', injectErr.message);
+      showToast('⚠️ Cannot scan this page — Chrome blocks scripts here (e.g. PDFs, restricted sites).');
+      return;
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'CAPTURE_CONTENT' });
+
+    if (!response) {
+      showToast('⚠️ No response from page. Try right-clicking and using the context menu instead.');
+      return;
+    }
+
+    if (response.error) {
+      showToast(`⚠️ ${response.error}`);
+      return;
+    }
+
+    applyExtractedData(response, tab.url || '', !!response.selectedText);
+
+    if (state.docSettings?.autoFitCheck !== false) {
+      runFitCheck(response, tab).catch(err => {
+        console.warn('[JPDA] Fit Check error:', err?.message || err);
+      });
+    }
+
+    const settings = await loadSettings();
+    if (!settings?.provider) {
+      showJobInfoReviewNotice(
+        'Job page scanned. AI is not connected, so some fields may need manual review.',
+        'warning',
+        ' <button type="button" class="job-info-review-action" data-action="open-ai-settings">Open AI settings</button>'
+      );
+      showToast('✦ Job page scanned');
+      return;
+    }
+
+    btn.textContent = 'Checking fields…';
+    const descText = dom.fieldDesc.value.trim();
+    const pageUrl  = dom.fieldUrl.value.trim();
+
+    try {
+      currentJobInfoController?.abort();
+      const controller = new AbortController();
+      currentJobInfoController = controller;
+
+      const info = await extractJobInfoWithAI(descText, pageUrl, settings, controller.signal);
+      if (currentJobInfoController === controller) currentJobInfoController = null;
+
+      state.currentJobMeta = {
+        ...(state.currentJobMeta || {}),
+        aiJobInfoAttemptedFor: descText,
+      };
+
+      if (!info.jobTitle && !info.company) {
+        showJobInfoReviewNotice('AI could not confidently find Job Title or Employer. Please review the fields manually.');
+      } else {
+        const apply = await confirmAiJobInfoSuggestions(info);
+        if (apply) {
+          applyAiJobInfoSuggestions(info);
+          showJobInfoReviewNotice(
+            'Job page scanned. AI suggested job details — please review before generating.',
+            'info'
+          );
+        }
+      }
+    } catch (aiErr) {
+      if (aiErr?.name !== 'AbortError') {
+        console.warn('[JPDA] AI job info step failed:', aiErr?.message || aiErr);
+        showJobInfoReviewNotice(
+          'Job page scanned, but AI cleanup failed. You can still edit the fields manually.',
+          'warning'
+        );
+      }
+    }
+
+    showToast('✦ Job page scanned');
+  } catch (err) {
+    console.warn('[JPDA] scanJobPageAndMaybeSuggestFields error:', err?.message || 'Unknown scan error');
+    showToast('⚠️ Could not scan the page. Try the context menu instead.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Scan job page';
+  }
+}
+
 async function scanFormFieldsOnPage() {
   const btn = dom.btnScanFormFields;
   btn.disabled = true;
@@ -1235,7 +1352,10 @@ function bindEvents() {
   });
 
   // Scan page
-  dom.btnScan.addEventListener('click', scanCurrentPage);
+  dom.btnScan.addEventListener('click', scanJobPageAndMaybeSuggestFields);
+  dom.jobInfoReview.addEventListener('click', e => {
+    if (e.target.dataset.action === 'open-ai-settings') openSettingsSection('provider');
+  });
   dom.btnSaveJob.addEventListener('click', saveCurrentJob);
 
   // New draft
