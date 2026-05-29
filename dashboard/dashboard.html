@@ -30,6 +30,7 @@
       </div>
       <button id="btn-open-profile" class="header-link-btn" type="button">My Profile</button>
       <button id="btn-open-full-page" class="header-link-btn" type="button" title="Open this workspace in a full browser tab">Full page</button>
+      <button id="btn-chat" class="icon-btn" title="Discuss this job with AI" aria-label="Open job discussion chat">Chat</button>
       <button id="btn-jobs" class="icon-btn" title="Saved jobs" aria-label="View saved jobs">Jobs</button>
       <button id="btn-history" class="icon-btn" title="Job history" aria-label="View job history">History</button>
       <button id="btn-tour" class="icon-btn header-tour-btn" title="Feature tour" aria-label="Start feature tour">?</button>
@@ -217,6 +218,7 @@
             <button id="btn-error-demo" class="btn-secondary btn-sm hidden">Use Demo Mode</button>
           </div>
         </div>
+        <button id="btn-discuss-job" class="btn-discuss-job" type="button" title="Discuss this job application strategy with AI">💬 Discuss this job</button>
       </section>
 
       <p id="output-placeholder" class="output-placeholder hidden">Generate a resume or cover letter to unlock preview, refine, ATS check, export, and email tools.</p>
@@ -793,6 +795,58 @@
       </div>
     </div>
   </div><!-- /reminder-text-view -->
+
+  <!-- ── Job Discussion Chat Overlay ── -->
+  <div id="job-chat-view" class="settings-overlay" role="dialog" aria-label="Job Discussion Chat" aria-modal="true">
+    <div class="overlay-header">
+      <button id="btn-close-job-chat" class="back-btn" type="button" aria-label="Close job chat">
+        <span aria-hidden="true">←</span> Close
+      </button>
+      <div class="job-chat-header-info">
+        <span class="overlay-title">Job Chat</span>
+        <span id="job-chat-job-label" class="job-chat-job-label"></span>
+      </div>
+      <button id="btn-clear-job-chat" class="btn-scan" type="button" title="Start a new conversation">New Chat</button>
+    </div>
+
+    <div id="job-chat-scroll" class="job-chat-scroll">
+
+      <!-- No-job empty state -->
+      <div id="job-chat-empty" class="job-chat-empty">
+        Scan or load a job first to chat about your application strategy.
+      </div>
+
+      <!-- Context note (shown when job is loaded) -->
+      <div id="job-chat-context-note" class="job-chat-context-note hidden" role="status">
+        AI has access to your selected profile, job description, and Fit Check results for this session.
+      </div>
+
+      <!-- Starter chips (shown when job loaded, no messages yet) -->
+      <div id="job-chat-chips" class="job-chat-chips hidden" aria-label="Suggested questions">
+        <span class="job-chat-chips-label">Suggested questions:</span>
+        <button class="job-chat-chip" type="button" data-prompt="Should I apply?">Should I apply?</button>
+        <button class="job-chat-chip" type="button" data-prompt="What should I emphasize?">What should I emphasize?</button>
+        <button class="job-chat-chip" type="button" data-prompt="What are my biggest gaps?">What are my biggest gaps?</button>
+        <button class="job-chat-chip" type="button" data-prompt="How should I angle my resume?">How should I angle my resume?</button>
+        <button class="job-chat-chip" type="button" data-prompt="What should I avoid overstating?">What should I avoid overstating?</button>
+      </div>
+
+      <!-- Message list -->
+      <div id="job-chat-messages" class="job-chat-messages" aria-live="polite" aria-relevant="additions"></div>
+
+    </div><!-- /job-chat-scroll -->
+
+    <!-- Input footer -->
+    <div class="job-chat-footer">
+      <textarea id="job-chat-input" class="job-chat-textarea" rows="2"
+        placeholder="Ask about this job — strategy, gaps, resume angle…"
+        aria-label="Chat message" disabled></textarea>
+      <div class="job-chat-footer-row">
+        <span class="job-chat-hint">Shift+Enter for new line</span>
+        <button id="btn-job-chat-send" class="btn-primary btn-sm" type="button" disabled>Send</button>
+      </div>
+    </div>
+  </div><!-- /job-chat-view -->
 
   <script type="module" src="dashboard.js"></script>
 

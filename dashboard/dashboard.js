@@ -25,6 +25,7 @@ import {
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { buildFilename } from '../modules/template.js';
 import { mapError } from '../modules/errorMapper.js';
+import { sendJobChatMessage } from '../modules/jobChat.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 // Support/Ko-fi URL — used by the header button.
@@ -98,9 +99,11 @@ const state = {
   autofillFields:  [],
   autofillMatches: [],
   lastScanData: null,
+  jobChat: { messages: [] },
 };
 
 let currentAbortController = null;
+let currentJobChatController = null;
 let currentFitAnalysisController = null;
 let currentJobInfoController = null;
 let currentAiMatchController = null;
@@ -209,6 +212,7 @@ const dom = {
   btnTour:            $('btn-tour'),
   btnScan:            $('btn-scan-page'),
   btnForceFitCheck:   $('btn-force-fit-check'),
+  btnDiscussJob:      $('btn-discuss-job'),
   btnAiJobInfo:       $('btn-ai-job-info'),
   btnScanFormFields:  $('btn-scan-form-fields'),
   btnReviewAutofill:  $('btn-review-autofill'),
@@ -323,7 +327,185 @@ const dom = {
 
   rightCol:            $('right-col'),
   outputPlaceholder:   $('output-placeholder'),
+
+  // Job Discussion Chat
+  btnChat:             $('btn-chat'),
+  jobChatView:         $('job-chat-view'),
+  btnCloseJobChat:     $('btn-close-job-chat'),
+  btnClearJobChat:     $('btn-clear-job-chat'),
+  jobChatJobLabel:     $('job-chat-job-label'),
+  jobChatEmpty:        $('job-chat-empty'),
+  jobChatContextNote:  $('job-chat-context-note'),
+  jobChatChips:        $('job-chat-chips'),
+  jobChatScroll:       $('job-chat-scroll'),
+  jobChatMessages:     $('job-chat-messages'),
+  jobChatInput:        $('job-chat-input'),
+  btnJobChatSend:      $('btn-job-chat-send'),
 };
+
+// ── Job Discussion Chat ───────────────────────────────────────────────────
+
+function buildJobChatContext() {
+  const { jobData, profile, lastFitCheck, drafts } = state;
+  const activeProfileId = dom.profileSwitcher.dataset.profileId || '';
+  const profileMeta = state.profileIndex.find(p => p.id === activeProfileId);
+  const profileName = profileMeta?.name || 'General';
+
+  let fitScore = null;
+  let matchedKeywords = [];
+  let missingKeywords = [];
+  let aiReview = null;
+  if (lastFitCheck) {
+    const ps = lastFitCheck.allProfileScores?.find(s => s.id === activeProfileId)
+             ?? lastFitCheck.allProfileScores?.[0];
+    if (ps) fitScore = ps.score;
+    matchedKeywords = lastFitCheck.matched  || [];
+    missingKeywords = lastFitCheck.unmatched || [];
+    aiReview = lastFitCheck.lastAiMatch?.result ?? null;
+  }
+
+  return {
+    jobTitle:        jobData.jobTitle  || '',
+    company:         jobData.company   || '',
+    sourceUrl:       jobData.sourceUrl || '',
+    description:     jobData.description || '',
+    profileName,
+    profile:         profile || null,
+    fitScore,
+    matchedKeywords,
+    missingKeywords,
+    aiReview,
+    hasResumeDraft:  Boolean(drafts.resume),
+    hasCLDraft:      Boolean(drafts['cover-letter']),
+  };
+}
+
+function hasJobChatContext() {
+  return Boolean(state.jobData.jobTitle || state.jobData.description);
+}
+
+function openJobChat() {
+  dom.jobChatView.classList.add('visible');
+  renderJobChatOverlay();
+  if (hasJobChatContext()) {
+    // Delay so the overlay slide-in animation completes before focusing
+    setTimeout(() => dom.jobChatInput.focus(), 220);
+  }
+}
+
+function closeJobChat() {
+  dom.jobChatView.classList.remove('visible');
+  currentJobChatController?.abort();
+  currentJobChatController = null;
+}
+
+function renderJobChatOverlay() {
+  const hasContext  = hasJobChatContext();
+  const hasMessages = state.jobChat.messages.length > 0;
+
+  // Header job label
+  const label = [state.jobData.jobTitle, state.jobData.company].filter(Boolean).join(' — ');
+  dom.jobChatJobLabel.textContent = label;
+
+  dom.jobChatEmpty.classList.toggle('hidden', hasContext);
+
+  if (hasContext) {
+    const hasFitCheck = Boolean(state.lastFitCheck);
+    const hasAiReview = Boolean(state.lastFitCheck?.lastAiMatch?.result);
+    const parts = ['profile', 'job description'];
+    if (hasFitCheck) parts.push('Fit Check results');
+    if (hasAiReview) parts.push('AI review');
+    const suffix = hasFitCheck && !hasAiReview ? ' · AI review not run yet' : '';
+    dom.jobChatContextNote.textContent = `AI has access to: ${parts.join(', ')}.${suffix}`;
+  }
+  dom.jobChatContextNote.classList.toggle('hidden', !hasContext);
+  dom.jobChatChips.classList.toggle('hidden', !hasContext || hasMessages);
+
+  dom.jobChatInput.disabled       = !hasContext;
+  dom.btnJobChatSend.disabled     = !hasContext || !dom.jobChatInput.value.trim();
+
+  renderChatMessages();
+}
+
+function renderChatMessages() {
+  dom.jobChatMessages.innerHTML = '';
+  for (const msg of state.jobChat.messages) {
+    appendChatBubble(msg.role, msg.content);
+  }
+  scrollChatToBottom();
+}
+
+function appendChatBubble(role, content, pending = false) {
+  const el = document.createElement('div');
+  el.className = [
+    'job-chat-msg',
+    pending          ? 'job-chat-msg--thinking'  :
+    role === 'user'  ? 'job-chat-msg--user'       :
+                       'job-chat-msg--assistant',
+  ].join(' ');
+  el.textContent = pending ? '…' : content;
+  dom.jobChatMessages.appendChild(el);
+  return el;
+}
+
+function scrollChatToBottom() {
+  dom.jobChatScroll.scrollTop = dom.jobChatScroll.scrollHeight;
+}
+
+async function sendJobChatTurn(text) {
+  const msg = text.trim();
+  if (!msg || !hasJobChatContext()) return;
+  if (currentJobChatController) return;
+
+  dom.jobChatInput.value = '';
+  dom.btnJobChatSend.disabled = true;
+  dom.jobChatChips.classList.add('hidden');
+
+  // Add user bubble
+  state.jobChat.messages.push({ role: 'user', content: msg });
+  appendChatBubble('user', msg);
+
+  // Pending AI bubble
+  const pendingEl = appendChatBubble('assistant', '', true);
+  scrollChatToBottom();
+
+  const context          = buildJobChatContext();
+  const historyBeforeMsg = state.jobChat.messages.slice(0, -1);
+
+  currentJobChatController = new AbortController();
+  try {
+    const reply = await sendJobChatMessage(
+      context,
+      historyBeforeMsg,
+      msg,
+      state.settings,
+      currentJobChatController.signal
+    );
+    state.jobChat.messages.push({ role: 'assistant', content: reply });
+    pendingEl.textContent  = reply;
+    pendingEl.className    = 'job-chat-msg job-chat-msg--assistant';
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      pendingEl.remove();
+      state.jobChat.messages.pop(); // remove the user message whose reply was aborted
+    } else {
+      pendingEl.textContent = mapError(e).message;
+      pendingEl.className   = 'job-chat-msg job-chat-msg--assistant job-chat-msg--error';
+    }
+  } finally {
+    currentJobChatController = null;
+    dom.btnJobChatSend.disabled = !dom.jobChatInput.value.trim();
+    scrollChatToBottom();
+  }
+}
+
+function clearJobChat() {
+  state.jobChat.messages = [];
+  currentJobChatController?.abort();
+  currentJobChatController = null;
+  dom.jobChatInput.value = '';
+  renderJobChatOverlay();
+}
 
 // ── Output panel visibility ───────────────────────────────────────────────
 function hasGeneratedOutput() {
@@ -975,8 +1157,8 @@ async function runFitCheck(scanResponse, tab, { force = false } = {}) {
     ({ score, matched, unmatched } = scoreMatch(profileKeywords, jobKeywords));
   }
 
-  // Store job keywords, profile scores, and job text snapshot so re-renders and AI review can reuse them.
-  state.lastFitCheck = { jobKeywords, tab, allProfileScores, jobText: text, jobTitle: state.jobData.jobTitle || '', jobCompany: state.jobData.company || '', lastAiMatch: null };
+  // Store job keywords, matched/unmatched lists, profile scores, and job text so re-renders and chat can reuse them.
+  state.lastFitCheck = { jobKeywords, matched, unmatched, tab, allProfileScores, jobText: text, jobTitle: state.jobData.jobTitle || '', jobCompany: state.jobData.company || '', lastAiMatch: null };
 
   const profiles = isMultiProfile ? state.profileIndex : [];
   const bestProfile = allProfileScores.length > 0 ? allProfileScores[0] : null;
@@ -1431,6 +1613,26 @@ function bindEvents() {
 
   // Theme toggle
   dom.btnTheme.addEventListener('click', toggleTheme);
+
+  // Job Discussion Chat
+  dom.btnChat.addEventListener('click', openJobChat);
+  dom.btnDiscussJob.addEventListener('click', openJobChat);
+  dom.btnCloseJobChat.addEventListener('click', closeJobChat);
+  dom.btnClearJobChat.addEventListener('click', clearJobChat);
+  dom.btnJobChatSend.addEventListener('click', () => sendJobChatTurn(dom.jobChatInput.value));
+  dom.jobChatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendJobChatTurn(dom.jobChatInput.value);
+    }
+  });
+  dom.jobChatInput.addEventListener('input', () => {
+    dom.btnJobChatSend.disabled = !dom.jobChatInput.value.trim() || Boolean(currentJobChatController);
+  });
+  dom.jobChatChips.addEventListener('click', e => {
+    const prompt = e.target.dataset.prompt;
+    if (prompt) sendJobChatTurn(prompt);
+  });
 
   // History
   dom.btnHistory.addEventListener('click', () => dom.historyView.classList.add('visible'));
@@ -2862,6 +3064,7 @@ async function clearSession() {
   dom.sourceIndicator.textContent = '';
   dom.btnForceFitCheck.classList.add('hidden');
   dom.genStatus.classList.add('hidden');
+  clearJobChat();
   dom.genStatus.classList.remove('gen-status--complete');
 
   dom.draftResumeEmpty.classList.remove('hidden');
