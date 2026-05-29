@@ -318,7 +318,21 @@ const dom = {
   btnCopyReminderTitle:   $('btn-copy-reminder-title'),
   reminderBodyDisplay:    $('reminder-body-display'),
   btnCopyReminderBody:    $('btn-copy-reminder-body'),
+
+  rightCol:            $('right-col'),
+  outputPlaceholder:   $('output-placeholder'),
 };
+
+// ── Output panel visibility ───────────────────────────────────────────────
+function hasGeneratedOutput() {
+  return Boolean(state.drafts.resume || state.drafts['cover-letter']);
+}
+
+function updateOutputPanelVisibility() {
+  const hasOutput = hasGeneratedOutput();
+  dom.rightCol.hidden = !hasOutput;
+  dom.outputPlaceholder.classList.toggle('hidden', hasOutput);
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────
 async function init() {
@@ -351,6 +365,8 @@ async function init() {
   } else {
     switchTab('resume');
   }
+
+  updateOutputPanelVisibility();
 
   // Load session data (may overwrite job fields if a new job page was captured)
   loadSession();
@@ -1854,6 +1870,7 @@ async function runGeneration(mode) {
   } finally {
     currentAbortController = null;
     setGenerating(false);
+    updateOutputPanelVisibility();
   }
 }
 
@@ -2796,6 +2813,7 @@ async function clearDraft(tab) {
   }
 
   refreshExportButtons();
+  updateOutputPanelVisibility();
   showToast(`${tab === 'resume' ? 'Resume' : 'Cover letter'} draft cleared.`);
 }
 
@@ -2848,6 +2866,7 @@ async function clearSession() {
 
   refreshExportButtons();
   switchTab('resume');
+  updateOutputPanelVisibility();
   showToast('Draft cleared.');
 }
 

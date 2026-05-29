@@ -445,6 +445,24 @@ body {
   scrollbar-gutter: stable;
 }
 
+#right-col[hidden] {
+  display: none !important;
+}
+
+#app-main:has(#right-col[hidden]) {
+  grid-template-columns: 1fr;
+}
+
+.output-placeholder {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-ink-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
 /* ══════════════════════════════════════════════
    CARDS
    ══════════════════════════════════════════════ */
@@ -1721,9 +1739,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 .gen-status--complete {
-  position: sticky;
-  bottom: 8px;
-  z-index: 3;
   align-items: flex-start;
   padding: 9px 10px;
   background: var(--color-success-subtle);
