@@ -60,7 +60,19 @@ Goal: run the full v3 smoke test against the confirmed release scope before pack
 
 Important: do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission. Direct PDF Download has been removed/deferred for store-safety; keep the print-dialog Save as PDF path available.
 
-### 2. Tour Refresh And Saved Jobs Tour
+### 2. Job Discussion Chat Follow-Ups
+
+The V1 chat is live on `main`. These are the next natural improvements.
+
+- Hide or disable "Discuss this job" until a job is scanned or loaded, so it does not appear on an empty workspace.
+- Add a "Discuss this job" button to the content-script Fit Check card on the job page, so the user can jump into chat directly after seeing their score.
+- Consider native multi-turn provider messages (passing the full message array to the API) instead of encoding history in one large user prompt. Works now but degrades for very long conversations.
+- Consider optional session persistence for chat history so the conversation survives the panel being closed and reopened.
+- Add suggested actions from chat replies — e.g. "Use this angle in Resume Refine" or "Use this angle in Cover Letter Refine". This would make the chat a strategy bridge into generation rather than a standalone advisor.
+
+The last item is the most significant: chat becomes the coordination layer that pushes intent back into Refine and generation. Worth a dedicated design pass before implementing.
+
+### 3. Tour Refresh And Saved Jobs Tour
 
 Suggested branch: `feature/saved-jobs-tour`
 
@@ -279,7 +291,8 @@ Guardrails (permanent):
 ## Suggested Order For Active Work
 
 1. v3 Smoke Test
-2. Tour Refresh And Saved Jobs Tour
+2. Job Discussion Chat Follow-Ups
+3. Tour Refresh And Saved Jobs Tour
 
 ## Autofill Known Limitations / Future Improvements
 
