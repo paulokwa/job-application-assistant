@@ -48,6 +48,9 @@ const KNOWN_ATS_HOSTS = [
   'jazzhr.com',
   'breezy.hr',
   'recruitingbypaychex.com',
+  // Canadian government job board
+  'jobbank.gc.ca',
+  'emploisfp-psjobs.cfp-psc.gc.ca',
 ];
 
 // Phrases that commonly appear as section headings in job postings.

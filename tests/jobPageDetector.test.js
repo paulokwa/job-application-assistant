@@ -166,4 +166,30 @@ check(
   }
 );
 
+check(
+  'Job Bank Canada single posting',
+  {
+    url: 'https://www.jobbank.gc.ca/jobsearch/jobposting/49587453?source=searchresults',
+    title: 'Administrator, data - Banque Laurentienne du Canada',
+    text: postingText,
+  },
+  {
+    isLikelyJobPosting: true,
+    isLikelySearchPage: false,
+  }
+);
+
+check(
+  'Job Bank Canada search results page',
+  {
+    url: 'https://www.jobbank.gc.ca/jobsearch/jobsearch?searchstring=data+administrator&locationstring=Montreal',
+    title: 'Job search results — Job Bank',
+    text: 'Refine your search. Sort by relevance.',
+  },
+  {
+    isLikelyJobPosting: false,
+    isLikelySearchPage: true,
+  }
+);
+
 console.log('jobPageDetector checks passed');

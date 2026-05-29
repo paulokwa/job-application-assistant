@@ -97,6 +97,7 @@ const state = {
   },
   autofillFields:  [],
   autofillMatches: [],
+  lastScanData: null,
 };
 
 let currentAbortController = null;
@@ -207,6 +208,7 @@ const dom = {
   btnSaveJob:         $('btn-save-job'),
   btnTour:            $('btn-tour'),
   btnScan:            $('btn-scan-page'),
+  btnForceFitCheck:   $('btn-force-fit-check'),
   btnAiJobInfo:       $('btn-ai-job-info'),
   btnScanFormFields:  $('btn-scan-form-fields'),
   btnReviewAutofill:  $('btn-review-autofill'),
@@ -895,8 +897,10 @@ function isRestrictedUrl(url) {
 // Detects whether the page looks like a job posting, then scores the active
 // profile against the job text. Injects a Shadow DOM card into the job page.
 
-async function runFitCheck(scanResponse, tab) {
+async function runFitCheck(scanResponse, tab, { force = false } = {}) {
   if (!tab?.id) return;
+
+  state.lastScanData = { scanResponse, tab };
 
   const text = scanResponse.pageText || '';
   const title = scanResponse.title || tab.title || '';
@@ -905,14 +909,17 @@ async function runFitCheck(scanResponse, tab) {
 
   const { isLikelyJobPosting, isLikelySearchPage } = detectJobPage({ url, title, text, structuredData });
 
-  if (!isLikelyJobPosting) {
+  if (!isLikelyJobPosting && !force) {
     if (isLikelySearchPage) {
       showToast('Fit Check skipped — this looks like a search results or listing page.');
       return;
     }
-    showToast('Fit Check skipped — this page does not look like a job posting.');
+    // Not detected as a job page — surface the manual button instead of a confusing toast
+    dom.btnForceFitCheck.classList.remove('hidden');
     return;
   }
+
+  dom.btnForceFitCheck.classList.add('hidden');
 
   const jobKeywords = extractJobKeywords(text);
   const activeProfileId = dom.profileSwitcher.dataset.profileId || '';
@@ -1369,6 +1376,10 @@ function bindEvents() {
 
   // Scan page
   dom.btnScan.addEventListener('click', scanJobPageAndMaybeSuggestFields);
+  dom.btnForceFitCheck.addEventListener('click', () => {
+    if (!state.lastScanData) return;
+    runFitCheck(state.lastScanData.scanResponse, state.lastScanData.tab, { force: true });
+  });
   dom.jobInfoReview.addEventListener('click', e => {
     if (e.target.dataset.action === 'open-ai-settings') openSettingsSection('provider');
   });
@@ -2849,6 +2860,7 @@ async function clearSession() {
   dom.fieldDesc.value = '';
   dom.selectionNotice.classList.add('hidden');
   dom.sourceIndicator.textContent = '';
+  dom.btnForceFitCheck.classList.add('hidden');
   dom.genStatus.classList.add('hidden');
   dom.genStatus.classList.remove('gen-status--complete');
 
