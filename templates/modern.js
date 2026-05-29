@@ -123,8 +123,9 @@ export function render(data) {
           ${ personalInfo.email ? `<div>${personalInfo.email}</div>` : '' }
           ${ personalInfo.phone ? `<div>${personalInfo.phone}</div>` : '' }
           ${ personalInfo.cityProvince ? `<div>${personalInfo.cityProvince}</div>` : '' }
-          ${ personalInfo.linkedin ? `<div>LinkedIn</div>` : '' }
-          ${ personalInfo.portfolio ? `<div>Portfolio</div>` : '' }
+          ${ personalInfo.linkedin ? `<div>${personalInfo.linkedin}</div>` : '' }
+          ${ personalInfo.portfolio ? `<div>${personalInfo.portfolio}</div>` : '' }
+          ${ personalInfo.website ? `<div>${personalInfo.website}</div>` : '' }
         </div>
       </header>
 
