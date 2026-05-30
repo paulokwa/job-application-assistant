@@ -13,6 +13,7 @@ import {
 import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
 import { validateOllamaEndpoint } from '../modules/url.js';
+import { esc } from '../modules/html.js';
 
 // ── State ─────────────────────────────────────────────────────────────────
 let profile = null;
@@ -1103,8 +1104,8 @@ function addSummaryEntry(data = {}) {
   row.className = 'summary-entry';
   row.style.marginBottom = '12px';
   row.innerHTML = `
-    <input type="text" class="summary-label-input" value="${escHtml(data.label || 'Summary')}" placeholder="Style (e.g. Modern)" style="width:140px; font-weight:600" /> 
-    <textarea class="summary-text-input" rows="3" style="flex:1" placeholder="Paste summary text here...">${escHtml(data.text || '')}</textarea> 
+    <input type="text" class="summary-label-input" value="${esc(data.label || 'Summary')}" placeholder="Style (e.g. Modern)" style="width:140px; font-weight:600" />
+    <textarea class="summary-text-input" rows="3" style="flex:1" placeholder="Paste summary text here...">${esc(data.text || '')}</textarea>
     <button onclick="this.parentElement.remove()" class="btn-remove">✕</button>
   `;
   container.appendChild(row);
@@ -1122,15 +1123,15 @@ function addExperienceEntry(data = {}) {
 
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between; margin-bottom:8px">
-      <input type="text" class="exp-title" value="${escHtml(roleTitle)}" placeholder="Job Title" style="font-weight:bold" />
+      <input type="text" class="exp-title" value="${esc(roleTitle)}" placeholder="Job Title" style="font-weight:bold" />
       <button onclick="this.closest('.exp-entry').remove()" class="btn-remove">✕</button>
     </div>
     <div class="form-grid-2">
-      <input type="text" class="exp-company" value="${escHtml(employer)}" placeholder="Company" />
-      <input type="text" class="exp-dates" value="${escHtml(dates)}" placeholder="Dates" />
+      <input type="text" class="exp-company" value="${esc(employer)}" placeholder="Company" />
+      <input type="text" class="exp-dates" value="${esc(dates)}" placeholder="Dates" />
     </div>
-    <input type="text" class="exp-location" value="${escHtml(location)}" placeholder="Location (e.g. Halifax, NS)" style="margin-top:8px" />
-    <textarea class="exp-bullets" rows="3" placeholder="Bullets" style="margin-top:8px">${escHtml(bullets)}</textarea>
+    <input type="text" class="exp-location" value="${esc(location)}" placeholder="Location (e.g. Halifax, NS)" style="margin-top:8px" />
+    <textarea class="exp-bullets" rows="3" placeholder="Bullets" style="margin-top:8px">${esc(bullets)}</textarea>
   `;
   $('experience-list').appendChild(div);
 }
@@ -1145,12 +1146,12 @@ function addEducationEntry(data = {}) {
 
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between">
-      <input type="text" class="edu-degree" value="${escHtml(degree)}" placeholder="Degree" style="font-weight:bold" />
+      <input type="text" class="edu-degree" value="${esc(degree)}" placeholder="Degree" style="font-weight:bold" />
       <button onclick="this.closest('.edu-entry').remove()" class="btn-remove">✕</button>
     </div>
     <div class="form-grid-2">
-      <input type="text" class="edu-school" value="${escHtml(school)}" placeholder="School" />
-      <input type="text" class="edu-dates" value="${escHtml(dates)}" placeholder="Dates (e.g. 2020 - 2022)" />
+      <input type="text" class="edu-school" value="${esc(school)}" placeholder="School" />
+      <input type="text" class="edu-dates" value="${esc(dates)}" placeholder="Dates (e.g. 2020 - 2022)" />
     </div>
   `;
   $('education-list').appendChild(div);
@@ -1162,10 +1163,10 @@ function addCertEntry(data = {}) {
   div.style.marginBottom = '12px';
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between">
-      <input type="text" class="cert-name" value="${escHtml(data.name)}" placeholder="Cert Name" style="font-weight:bold" />
+      <input type="text" class="cert-name" value="${esc(data.name)}" placeholder="Cert Name" style="font-weight:bold" />
       <button onclick="this.closest('.cert-entry').remove()" class="btn-remove">✕</button>
     </div>
-    <input type="text" class="cert-issuer" value="${escHtml(data.issuer)}" placeholder="Issuer" />
+    <input type="text" class="cert-issuer" value="${esc(data.issuer)}" placeholder="Issuer" />
   `;
   $('certifications-list').appendChild(div);
 }
@@ -1177,10 +1178,10 @@ function addCustomSectionEntry(data = {}) {
 
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between; gap:8px">
-      <input type="text" class="custom-section-label" value="${escHtml(data.label || data.name || data.title || '')}" placeholder="Section label" style="font-weight:bold" />
+      <input type="text" class="custom-section-label" value="${esc(data.label || data.name || data.title || '')}" placeholder="Section label" style="font-weight:bold" />
       <button onclick="this.closest('.custom-section-entry').remove()" class="btn-remove">✕</button>
     </div>
-    <textarea class="custom-section-text" rows="3" placeholder="Details the AI can use when relevant">${escHtml(data.text || data.value || data.content || '')}</textarea>
+    <textarea class="custom-section-text" rows="3" placeholder="Details the AI can use when relevant">${esc(data.text || data.value || data.content || '')}</textarea>
   `;
   $('custom-sections-list').appendChild(div);
 }
@@ -1275,10 +1276,6 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show'); t.classList.remove('hidden');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-function escHtml(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── API Key Mask ──────────────────────────────────────────────────────────
@@ -1390,7 +1387,7 @@ function showConfirmDialog(title, body, confirmLabel = 'Confirm') {
 function showLockWarningModal(lockedNames) {
   return new Promise(resolve => {
     const list = $('lock-warning-list');
-    list.innerHTML = lockedNames.map(n => `<li>${escHtml(n)}</li>`).join('');
+    list.innerHTML = lockedNames.map(n => `<li>${esc(n)}</li>`).join('');
     $('lock-warning-overlay').classList.remove('hidden');
     $('btn-lock-warning-cancel').focus();
 
@@ -1752,8 +1749,8 @@ function renderProfilesList(profiles, activeId) {
     row.innerHTML = `
       <div class="profile-row-left">
         <div class="profile-row-name-wrap">
-          <span class="profile-row-name">${escHtml(p.name)}</span>
-          ${p.sourceResumeName ? `<span class="profile-row-file" title="${escHtml(p.sourceResumeName)}">📄 ${escHtml(p.sourceResumeName)}</span>` : ''}
+          <span class="profile-row-name">${esc(p.name)}</span>
+          ${p.sourceResumeName ? `<span class="profile-row-file" title="${esc(p.sourceResumeName)}">📄 ${esc(p.sourceResumeName)}</span>` : ''}
         </div>
         ${isActive ? '<span class="profile-row-badge">Active</span>' : ''}
       </div>
