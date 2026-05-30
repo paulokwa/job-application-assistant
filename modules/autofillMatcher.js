@@ -18,6 +18,7 @@
  * @property {string} nearbyText
  * @property {string[]} options
  * @property {string} currentValue
+ * @property {string} atsPlatform
  * @property {boolean} isVisible
  * @property {boolean} isDisabled
  * @property {boolean} isReadOnly
@@ -686,10 +687,22 @@ function regroupEducationMatches(matches, profile) {
   const sorted = [...eduMatches].sort((a, b) => a.field.fieldIndex - b.field.fieldIndex);
 
   const clusters = [];
+  const isWorkday = sorted.some(m => m.field.atsPlatform === 'workday');
   let current = [sorted[0]];
   for (let i = 1; i < sorted.length; i++) {
     const gap = sorted[i].field.fieldIndex - sorted[i - 1].field.fieldIndex;
-    if (gap > EDUCATION_GAP_THRESHOLD) {
+    const fieldType = fieldTypeFromKey(sorted[i].profileKey);
+    const currentTypes = new Set(current.map(m => fieldTypeFromKey(m.profileKey)));
+
+    // Workday places Education 2 immediately after Education 1, so the generic
+    // field-index gap is not enough to identify a new section. A repeated school
+    // anchor is the stable section boundary on Workday's dense education layout.
+    const startsDenseWorkdaySection =
+      isWorkday &&
+      fieldType === 'institution' &&
+      currentTypes.has('institution');
+
+    if (gap > EDUCATION_GAP_THRESHOLD || startsDenseWorkdaySection) {
       clusters.push(current);
       current = [sorted[i]];
     } else {

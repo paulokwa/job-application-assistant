@@ -443,9 +443,16 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     return '';
   }
 
+  function getAtsPlatform() {
+    return /(\.|^)(myworkdayjobs\.com|myworkday\.com)$/i.test(location.hostname)
+      ? 'workday'
+      : '';
+  }
+
   function collectFormFields() {
     const elements = document.querySelectorAll('input, select, textarea');
     const fields = [];
+    const atsPlatform = getAtsPlatform();
 
     elements.forEach((el, index) => {
       const tagName = el.tagName.toLowerCase();
@@ -486,6 +493,7 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
         nearbyText,
         options,
         currentValue: el.value || '',
+        atsPlatform,
         isVisible:    true,
         isDisabled:   el.disabled,
         isReadOnly:   el.readOnly || false,
