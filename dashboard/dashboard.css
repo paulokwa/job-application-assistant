@@ -3084,6 +3084,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border-color: var(--color-accent);
 }
 
+.job-chat-action-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent);
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.55; }
