@@ -1,6 +1,8 @@
 // modules/provider.js
 // Unified AI provider abstraction — OpenAI, Gemini, Ollama, Mock.
 
+import { validateOllamaEndpoint } from './url.js';
+
 
 
 
@@ -163,7 +165,8 @@ async function callOpenRouter(systemPrompt, userPrompt, apiKey, model, signal) {
 // ── Ollama (local) ────────────────────────────────────────────────────────
 
 async function callOllama(systemPrompt, userPrompt, endpoint, model, signal) {
-  const url = endpoint.replace(/\/$/, '') + '/api/chat';
+  const safeBase = validateOllamaEndpoint(endpoint);
+  const url = safeBase + '/api/chat';
   const wantsJson = expectsJsonObject(systemPrompt, userPrompt);
   const body = {
     model,
@@ -190,7 +193,7 @@ async function callOllama(systemPrompt, userPrompt, endpoint, model, signal) {
   if (!response.ok) {
     const detail = await readOllamaError(response);
     const suffix = detail ? ` ${detail}` : ` ${response.statusText}`;
-    throw new Error(`Ollama error ${response.status}:${suffix}. Is Ollama running at ${endpoint}?`);
+    throw new Error(`Ollama error ${response.status}:${suffix}. Is Ollama running at ${safeBase}?`);
   }
 
   const data = await response.json();

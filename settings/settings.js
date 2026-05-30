@@ -12,6 +12,7 @@ import {
 } from '../modules/storageLimits.js';
 import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
+import { validateOllamaEndpoint } from '../modules/url.js';
 
 // ── State ─────────────────────────────────────────────────────────────────
 let profile = null;
@@ -424,12 +425,13 @@ async function detectOllamaModels() {
   status.textContent = 'Checking Ollama...';
 
   try {
-    const response = await fetch(`${endpoint}/api/tags`);
+    const safeBase = validateOllamaEndpoint(endpoint);
+    const response = await fetch(`${safeBase}/api/tags`);
     if (response.status === 403) {
       throw new Error('Ollama blocked the request. Check OLLAMA_ORIGINS and restart Ollama.');
     }
     if (!response.ok) {
-      throw new Error(`Ollama returned ${response.status}. Make sure it is running at ${endpoint}.`);
+      throw new Error(`Ollama returned ${response.status}. Make sure it is running at ${safeBase}.`);
     }
 
     const data = await response.json();
