@@ -739,7 +739,7 @@ function renderAutofillReview() {
 
 function updateFillPageButton() {
   const count = dom.autofillReviewBody.querySelectorAll('.autofill-row-check:checked').length;
-  dom.btnFillPage.textContent = count > 0 ? `Fill page (${count})` : 'Fill page';
+  dom.btnFillPage.textContent = count > 0 ? `Fill selected (${count})` : 'Fill selected';
   dom.btnFillPage.disabled    = count === 0;
 }
 
@@ -4476,12 +4476,12 @@ function toParagraphs(value) {
 const TOUR_STEPS = [
   {
     target: '#card-job-info',
-    title: 'Step 1 - Job Info',
+    title: 'Job Info',
     body: 'Start here. Fill in the job title and employer. If you scan a page or use the context menu, these fields can fill from the job posting automatically.',
   },
   {
     target: '#card-job-desc',
-    title: 'Step 2 - Job Description',
+    title: 'Job Description',
     body: 'Paste the full job posting here. The more detail the AI has, the more precisely it tailors your documents to this specific role.',
   },
   {
@@ -4491,7 +4491,7 @@ const TOUR_STEPS = [
   },
   {
     target: '#card-generate',
-    title: 'Step 3 - Generate',
+    title: 'Generate',
     body: 'Choose cover letter length and tone, then generate a tailored resume, cover letter, or both. A Stop button appears while the AI is working.',
   },
   {
