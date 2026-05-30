@@ -2070,6 +2070,15 @@ async function persistCurrentJobContextForFullPage() {
 }
 
 function bindAppearanceControls() {
+  const appearanceControls = document.getElementById('appearance-controls');
+  if (appearanceControls) {
+    document.addEventListener('click', e => {
+      if (!appearanceControls.open) return;
+      if (appearanceControls.contains(e.target)) return;
+      appearanceControls.open = false;
+    });
+  }
+
   dom.templateOptions.forEach(opt => {
     opt.addEventListener('click', async () => {
       const nextTemplate = opt.dataset.template;
