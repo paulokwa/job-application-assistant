@@ -5,11 +5,180 @@
 if (typeof window.__jpdaContentInjected === 'undefined') {
   window.__jpdaContentInjected = true;
 
+  // ── Job detail container detection ──────────────────────────────────────
+  // Scores visible DOM containers to find the most likely selected job detail
+  // panel on split-view job boards (CareerBeacon, Indeed, etc.).
+  // Returns { el, score, reason } when a confident candidate is found,
+  // or null to trigger full-page fallback.
+
+  function findBestJobDetailContainer(doc) {
+    // Content patterns that appear in job detail panels
+    const POSITIVE_PATTERNS = [
+      /apply\s*(now|for\s+this)/i,
+      /responsibilities/i,
+      /qualifications/i,
+      /requirements/i,
+      /about\s+(the\s+)?(role|position|job)/i,
+      /job\s+description/i,
+      /key\s+responsibilities/i,
+      /what\s+you('ll|\s+will)\s+(do|bring)/i,
+      /employee\s+benefits/i,
+      /employment\s+type/i,
+      /full[- ]?time/i,
+      /part[- ]?time/i,
+      /compensation/i,
+      /we\s+(are|'re)\s+looking/i,
+      /minimum\s+qualifications/i,
+      /preferred\s+qualifications/i,
+    ];
+
+    // Content patterns that appear in search result lists and sidebars
+    const NEGATIVE_PATTERNS = [
+      /sort\s+by/i,
+      /filter\s+by/i,
+      /refine\s+(your\s+)?search/i,
+      /\d+\s+jobs?\s+(found|near|available|matching)/i,
+      /save\s+this\s+search/i,
+      /set\s+up\s+(a\s+)?job\s+alert/i,
+      /create\s+(a\s+)?job\s+alert/i,
+      /email\s+me\s+jobs/i,
+      /next\s+page/i,
+      /showing\s+\d+[\s–\-]+\d+\s+of\s+\d+/i,
+    ];
+
+    // id/class names that strongly suggest a job detail region
+    const POSITIVE_ID_CLASS =
+      /job[_-]?(detail|description|content|posting|view)|posting[_-]?(detail|content)|position[_-]?detail|job[_-]?info/i;
+
+    // id/class names that strongly suggest navigation / list / sidebar
+    const NEGATIVE_ID_CLASS =
+      /\bsidebar\b|side[_-]bar|\bnav\b|filter|search[_-]?(result|list)|job[_-]?list|jobs[_-]?list|result[_-]?list/i;
+
+    const candidateSet = new Set();
+
+    // Semantic selectors — prioritised first pass
+    const SEMANTIC_SELECTORS = [
+      'main',
+      '[role="main"]',
+      'article',
+      '[id*="job-detail"]', '[id*="jobdetail"]', '[id*="job_detail"]',
+      '[id*="posting"]',
+      '[id*="job-description"]', '[id*="job_description"]',
+      '[id*="job-content"]',   '[id*="job_content"]',
+      '[class*="job-detail"]', '[class*="jobDetail"]',
+      '[class*="job-description"]', '[class*="jobDescription"]',
+      '[class*="posting-detail"]', '[class*="postingDetail"]',
+    ];
+    for (const sel of SEMANTIC_SELECTORS) {
+      try { doc.querySelectorAll(sel).forEach(el => candidateSet.add(el)); } catch (_) {}
+    }
+
+    // Block-level elements that are visible and large enough to be a detail panel
+    try {
+      doc.querySelectorAll('div, section').forEach(el => {
+        try {
+          const r = el.getBoundingClientRect();
+          if (r.width >= 280 && r.height >= 200 && r.top < window.innerHeight * 2 && r.bottom > 0) {
+            candidateSet.add(el);
+          }
+        } catch (_) {}
+      });
+    } catch (_) {}
+
+    const fullBodyLen = (doc.body?.innerText || '').length || 1;
+
+    let bestEl    = null;
+    let bestScore = -Infinity;
+    let bestReason = 'no_candidates';
+
+    for (const el of candidateSet) {
+      if (el === doc.body || el === doc.documentElement) continue;
+
+      let text;
+      try { text = el.innerText || ''; } catch (_) { continue; }
+
+      const textLen = text.length;
+      if (textLen < 200) continue;
+
+      let score = 0;
+      const reasons = [];
+
+      // ── Structural / semantic signals ──────────────────────────────────
+      const tag = el.tagName?.toLowerCase();
+      if (tag === 'main' || tag === 'article') { score += 20; reasons.push('semantic_el'); }
+      if (el.getAttribute('role') === 'main')  { score += 20; reasons.push('role_main'); }
+
+      const idClass = ((el.id || '') + ' ' + (el.className || '')).toLowerCase();
+      if (POSITIVE_ID_CLASS.test(idClass)) { score += 25; reasons.push('pos_id_class'); }
+      if (NEGATIVE_ID_CLASS.test(idClass)) { score -= 25; reasons.push('neg_id_class'); }
+
+      // ── Content signals ────────────────────────────────────────────────
+      let posHits = 0;
+      for (const re of POSITIVE_PATTERNS) { if (re.test(text)) posHits++; }
+      score += posHits * 8;
+      if (posHits > 0) reasons.push(`pos:${posHits}`);
+
+      let negHits = 0;
+      for (const re of NEGATIVE_PATTERNS) { if (re.test(text)) negHits++; }
+      score -= negHits * 15;
+      if (negHits > 0) reasons.push(`neg:${negHits}`);
+
+      // ── Structural line-ratio heuristic ───────────────────────────────
+      // Many short lines = job list noise; long lines = prose description
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length > 0) {
+        const shortRatio = lines.filter(l => l.length < 60).length / lines.length;
+        const longLines  = lines.filter(l => l.length > 100).length;
+
+        if (shortRatio > 0.75) { score -= 20; reasons.push('high_short_ratio'); }
+        const longBonus = Math.min(longLines * 3, 30);
+        score += longBonus;
+        if (longLines > 3) reasons.push(`long_lines:${longLines}`);
+      }
+
+      // ── Coverage penalty — only when combined with noise ───────────────
+      // Do NOT reject broad candidates on simple single-job pages (no noise).
+      const coverage = textLen / fullBodyLen;
+      if (coverage > 0.9 && negHits > 0) { score -= 15; reasons.push('broad_with_noise'); }
+
+      // ── Viewport position — weak bonus only ───────────────────────────
+      // Right/center position suggests a detail panel on split-view boards.
+      // Not required — centered or full-width single-job pages still pass.
+      try {
+        const r = el.getBoundingClientRect();
+        if (r.left > window.innerWidth * 0.2) { score += 8; reasons.push('right_pos'); }
+      } catch (_) {}
+
+      if (score > bestScore) {
+        bestScore  = score;
+        bestEl     = el;
+        bestReason = reasons.join(',') || 'scored';
+      }
+    }
+
+    // Only use the container when it has cleared the confidence threshold.
+    // Score < 20 falls back to full-page scan.
+    if (bestEl && bestScore >= 20) {
+      return { el: bestEl, score: bestScore, reason: bestReason };
+    }
+    return null;
+  }
+
+  // ── Message listener ──────────────────────────────────────────────────────
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'CAPTURE_CONTENT') {
       try {
         const selectedText = window.getSelection().toString().trim();
-        const pageText = document.body.innerText || '';
+
+        // Prefer the most focused job detail container over the full page dump.
+        // selectedText from the user's text selection still wins downstream in
+        // dashboard logic — this only affects the pageText fallback path.
+        const detailResult = findBestJobDetailContainer(document);
+        const pageText = detailResult
+          ? (detailResult.el.innerText || '')
+          : (document.body.innerText || '');
+
         const title = document.title || '';
         const url = location.href;
 
@@ -25,6 +194,10 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           url: url,
           usedSelection: selectedText.length > 0,
           structuredData: structuredData,
+          // Diagnostic metadata — not displayed in V1 UI but useful for debugging.
+          usedDetailContainer: Boolean(detailResult),
+          detailContainerScore: detailResult?.score ?? null,
+          detailContainerReason: detailResult?.reason ?? null,
         });
       } catch (error) {
         sendResponse({ error: 'Failed to extract content.' });
