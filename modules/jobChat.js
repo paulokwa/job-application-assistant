@@ -7,6 +7,8 @@ import { callAI } from './provider.js';
 import { profileToPromptText } from './profile.js';
 import { generateMockJobChatReply } from './mock.js';
 
+const MAX_CHAT_HISTORY_MESSAGES = 20; // last 10 turns (user + assistant per pair)
+
 const SYSTEM_PROMPT = [
   'You are an application strategy advisor helping a job seeker decide how to approach a specific job posting.',
   'You have been given the candidate\'s saved profile, the job description, and (if available) Fit Check results.',
@@ -94,9 +96,10 @@ function buildUserPrompt(context, messages, newMessage) {
   if (drafts.length) lines.push(`Draft status: ${drafts.join(' and ')} already generated.`, '');
 
   // ── Conversation history ─────────────────────────────────────────────────
-  if (messages.length > 0) {
+  const recentMessages = messages.slice(-MAX_CHAT_HISTORY_MESSAGES);
+  if (recentMessages.length > 0) {
     lines.push('=== CONVERSATION SO FAR ===');
-    for (const m of messages) {
+    for (const m of recentMessages) {
       lines.push(`${m.role === 'user' ? 'Candidate' : 'Advisor'}: ${m.content}`);
     }
     lines.push('=== END CONVERSATION ===', '');
