@@ -23,6 +23,7 @@ All post-v2 candidate work is complete on `main`. Key features added since v2.0:
 
 - **Print export**: print-dialog flow for Resume Only, Cover Letter Only, Resume + Cover Letter, and Merged Document. Print-window document title is set from the configured filename pattern so Chrome's Save as PDF dialog suggests the user's preferred filename.
 - **Fit Check improvements**: local keyword scoring after scan; Auto Fit Check toggle (Settings → Documents); context-menu scan support; phrase matching and normalization; multi-profile selector with temporary switching; best-scoring profile row; manual AI review (explicit click only; requires configured provider). Card payload to `content.js` is whitelisted — no API keys, no raw profile data, no job text sent to content script.
+- **Job Discussion Chat follow-ups**: chat entry points are gated until job context exists; stale chat history clears on job changes; the Fit Check card can open Job Chat when the dashboard side panel is alive; assistant replies can prefill Resume/Cover Letter Refine as positioning guidance only. Chat refine actions do not auto-apply changes or generate automatically.
 - **Fit Check search-results detector**: skips search/listing pages; handles Glassdoor SRCH pages; `isLikelySearchPage` in return values; toast distinguishes search pages from non-job pages.
 - **Saved Jobs workspace**: stats bar; recently-updated sort; resume-only and cover-letter-only generation from saved jobs; Fit Analysis advisory context for saved-job generation.
 - **Application Pack Actions** (all on Saved Jobs): recruiter message drafts, follow-up message drafts, follow-up reminder text, short application answer drafts, application email drafts. All review-first; nothing is sent, scheduled, attached, submitted, or form-filled automatically.
@@ -78,7 +79,15 @@ All post-v2 candidate work is complete on `main`. Key features added since v2.0:
 - Best scoring profile row appears for multi-profile users.
 - Scanning a new page resets any cached Fit Check AI result.
 - Dismissing the Fit Check card while AI is running does not cause uncaught errors.
+- Fit Check card shows Discuss this job; clicking it opens Job Chat only when the dashboard is alive and the tab/job context still matches.
 - Confirm `suggestedAngle`, provider settings, API keys, raw profile data, and job text are not sent to `content.js`.
+
+**Job Discussion Chat**
+- Fresh dashboard with no job: Chat entry points are disabled/hidden until a job is scanned or loaded.
+- Scanning or loading a different job clears previous Job Chat messages.
+- Assistant replies show Use in Resume Refine and Use in Cover Letter Refine actions; user messages and pending/error replies do not.
+- Chat-to-Refine actions prefill the Refine textarea, switch to the target document tab, and require the user to click Apply Changes manually.
+- Chat-to-Refine actions treat chat guidance as positioning/emphasis guidance only and do not generate automatically.
 
 **Autofill**
 - Open a form page (test fixture or live ATS form), click Scan form fields — review overlay appears with matched and skipped fields, confidence badges, and pre-checked high-confidence rows.

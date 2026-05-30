@@ -60,18 +60,6 @@ Goal: run the full v3 smoke test against the confirmed release scope before pack
 
 Important: do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission. Direct PDF Download has been removed/deferred for store-safety; keep the print-dialog Save as PDF path available.
 
-### 2. Job Discussion Chat Follow-Ups
-
-The V1 chat is live on `main`. These are the next natural improvements.
-
-- Hide or disable "Discuss this job" until a job is scanned or loaded, so it does not appear on an empty workspace.
-- Add a "Discuss this job" button to the content-script Fit Check card on the job page, so the user can jump into chat directly after seeing their score.
-- Consider native multi-turn provider messages (passing the full message array to the API) instead of encoding history in one large user prompt. Works now but degrades for very long conversations.
-- Consider optional session persistence for chat history so the conversation survives the panel being closed and reopened.
-- Add suggested actions from chat replies — e.g. "Use this angle in Resume Refine" or "Use this angle in Cover Letter Refine". This would make the chat a strategy bridge into generation rather than a standalone advisor.
-
-The last item is the most significant: chat becomes the coordination layer that pushes intent back into Refine and generation. Worth a dedicated design pass before implementing.
-
 ## Later Autofill Improvements
 
 Autofill remains a broad future bucket, but no immediate autofill implementation task is selected. Keep changes targeted, deterministic, and review-before-fill; follow `TROUBLESHOOTING.md` entry 16 before modifying `modules/autofillMatcher.js`.
@@ -124,6 +112,29 @@ Preferred behavior:
 Treat it as a link collector first, not guaranteed full job-description extraction.
 
 ## Completed Roadmap Items
+
+### Job Discussion Chat Follow-Ups
+
+Status: **Complete on `main`** (2026-05-30).
+
+Completed scope:
+
+- "Discuss this job" dashboard entry points are gated until a job is scanned, loaded, or otherwise has chat context.
+- Job Chat history clears when the job context changes, preventing conversation carryover between different jobs.
+- The content-script Fit Check card now includes a "Discuss this job" button that opens Job Chat when the dashboard side panel is alive.
+- Assistant Job Chat replies now include "Use in Resume Refine" and "Use in Cover Letter Refine" actions.
+- Chat refine action buttons have keyboard-visible focus styling.
+
+Safety note:
+
+- The V1 approach keeps chat actions safe by pre-filling Refine only. It does not auto-apply changes, does not generate automatically, and treats chat guidance as positioning/emphasis guidance rather than new factual profile data.
+
+Deferred:
+
+- Native multi-turn provider messages instead of encoding chat history in one user prompt.
+- Optional session persistence for chat history.
+- Closed-side-panel routing from the Fit Check card.
+- Structured JSON action suggestions from chat replies.
 
 ### Tour Refresh And Saved Jobs Tour
 
@@ -288,7 +299,6 @@ Guardrails (permanent):
 ## Suggested Order For Active Work
 
 1. v3 Smoke Test
-2. Job Discussion Chat Follow-Ups
 
 ## Autofill Known Limitations / Future Improvements
 

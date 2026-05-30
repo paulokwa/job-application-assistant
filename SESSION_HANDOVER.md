@@ -23,7 +23,7 @@ Next planned work: run the full v3 smoke test. Do not package or submit until sm
 
 ## v3 Features Added Since v2.0
 
-All items in this section are complete on `main` as of 2026-05-27. Kept here for implementation reference and guardrail notes.
+All items in this section are complete on `main` as of 2026-05-30. Kept here for implementation reference and guardrail notes.
 
 - Application Email Assistant added on `main` (2026-05-26):
   - New "Prepare application email" button in the Export PDF card — enabled whenever a job description is loaded, no generated resume/cover letter required.
@@ -56,6 +56,13 @@ All items in this section are complete on `main` as of 2026-05-27. Kept here for
   - Manual AI review button on the Fit Check card, shown only when an AI provider is configured.
   - Fit Check AI review runs only after explicit user click/retry, uses `analyzeFit()` in `dashboard.js`, caps job text at 4000 chars, passes `sourceResumeText` as an empty string, uses `transferable` inference mode, caches the card-facing result by profile, aborts in-flight AI on Fit Check profile changes, and does not write `activeProfileId`.
   - Fit Check AI review payload to `content.js` is whitelisted so `suggestedAngle`, provider settings, API keys, raw profile data, and job text do not reach the content script.
+- Job Discussion Chat follow-ups completed on `main` (2026-05-30):
+  - Dashboard Job Chat entry points are gated until job context exists.
+  - Job Chat history clears when the job context changes.
+  - The Fit Check card includes a "Discuss this job" button that opens Job Chat when the dashboard side panel is alive; closed-side-panel routing is deferred.
+  - Assistant Job Chat replies can be sent to Resume Refine or Cover Letter Refine as positioning/emphasis guidance only.
+  - Chat-to-Refine actions prefill the existing Refine textarea only; they do not auto-apply changes or generate automatically.
+  - Native multi-turn provider messages, optional chat history persistence, closed-side-panel routing, and structured JSON action suggestions remain deferred.
 
 ## Completed Since v1.0 Submission
 
@@ -142,14 +149,21 @@ All items in this section are complete on `main` as of 2026-05-27. Kept here for
   - Removed `debugger` and `downloads` permissions from `manifest.json`.
   - Kept Print / Save as PDF export.
   - Print export keeps filename preference support through print-window document titles.
+- [DONE] Job Discussion Chat follow-ups (2026-05-30):
+  - Gated Job Chat entry points until job context exists.
+  - Cleared stale Job Chat history when job context changes.
+  - Added a "Discuss this job" button to the on-page Fit Check card.
+  - Added "Use in Resume Refine" and "Use in Cover Letter Refine" actions on assistant chat replies.
+  - Added keyboard focus styling for chat refine action buttons.
+  - V1 chat refine actions prefill Refine only, do not auto-apply or generate, and treat chat guidance as positioning/emphasis guidance rather than new factual profile data.
 
 ## Current Main Branch State
 
-Latest known `main` commit (2026-05-27):
+Latest known `main` commit (2026-05-30):
 
-`297b45c` - `docs: update v3 release checklist after direct PDF removal`
+`b0c63c1` - `chore: add focus style for chat refine actions`
 
-Working tree has the v3 manifest/docs prep changes until committed.
+Working tree may have documentation updates until committed.
 
 ## Do Not Repeat
 
@@ -162,6 +176,8 @@ Working tree has the v3 manifest/docs prep changes until committed.
 - Do not redo storage quota guards.
 - Do not redo the session scan payload cap.
 - Do not rewrite roadmap docs unless the user asks.
+- Do not redo Job Discussion Chat follow-ups: entry gating, stale chat clearing, Fit Check card chat open, chat-to-Refine actions, and focus styling are complete.
+- Do not add native multi-turn provider messages, chat history persistence, closed-side-panel Fit Check routing, or structured JSON chat actions unless explicitly selected as new scope.
 - Do not rebuild Fit Check Phases 1-3; current `main` already has Basic Fit Check, auto/context-menu support, better scoring, multi-profile selector, best-profile row, and manual AI review.
 - Do not redo Fit Check search/listing detector refinement; current `main` already skips common search/listing pages, handles Glassdoor SRCH pages, returns `isLikelySearchPage`, and has lightweight detector checks.
 - Do not send Fit Check AI internals to `content.js`; keep the card payload whitelisted and do not expose `suggestedAngle`, provider settings, API keys, raw profile data, or job text to the content script.
