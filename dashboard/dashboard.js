@@ -26,6 +26,7 @@ import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/
 import { buildFilename } from '../modules/template.js';
 import { mapError } from '../modules/errorMapper.js';
 import { sendJobChatMessage } from '../modules/jobChat.js';
+import { esc } from '../modules/html.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 // Support/Ko-fi URL — used by the header button.
@@ -631,22 +632,14 @@ function updateAutofillStatus(fields, summary) {
 
 // ── Autofill review overlay ────────────────────────────────────────────────
 
-function escHtml(s) {
-  return (s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function fieldDisplayName(field) {
   return field.labelText || field.ariaLabel || field.placeholder || field.name || field.id || `Field ${field.fieldIndex + 1}`;
 }
 
 function renderMatchRow(match, defaultChecked) {
-  const name       = escHtml(fieldDisplayName(match.field));
-  const value      = escHtml(match.profileValue);
-  const source     = escHtml(match.profileKey);
+  const name       = esc(fieldDisplayName(match.field));
+  const value      = esc(match.profileValue);
+  const source     = esc(match.profileKey);
   const badgeClass = match.confidence === 'high' ? 'high' : 'medium';
   const badgeText  = match.confidence === 'high' ? 'High' : 'Medium';
   const checked    = defaultChecked ? ' checked' : '';
@@ -665,8 +658,8 @@ function renderMatchRow(match, defaultChecked) {
 }
 
 function renderSkippedRow(field) {
-  const name   = escHtml(fieldDisplayName(field));
-  const reason = escHtml(field.skipReason || 'Skipped');
+  const name   = esc(fieldDisplayName(field));
+  const reason = esc(field.skipReason || 'Skipped');
   return `
     <div class="autofill-skipped-row">
       <span class="autofill-skip-icon" aria-hidden="true">⊘</span>
@@ -707,7 +700,7 @@ function renderAutofillReview() {
         const allPreChecked = group.matches.every(m => m.confidence === 'high');
         const toggleLabel   = allPreChecked ? 'Deselect all' : 'Select all';
         html += `<div class="autofill-review-section">
-          <h3 class="autofill-review-section-title">${escHtml(group.label)} <span class="autofill-section-count">${group.matches.length}</span><button type="button" class="autofill-group-toggle">${toggleLabel}</button></h3>
+          <h3 class="autofill-review-section-title">${esc(group.label)} <span class="autofill-section-count">${group.matches.length}</span><button type="button" class="autofill-group-toggle">${toggleLabel}</button></h3>
           <div class="autofill-match-list">${group.matches.map(m => renderMatchRow(m, m.confidence === 'high')).join('')}</div>
         </div>`;
       }
@@ -855,7 +848,7 @@ async function handleFillPage() {
 function showJobInfoReviewNotice(message, tone = 'warning', actionHtml = '') {
   if (!dom.jobInfoReview) return;
   if (actionHtml) {
-    dom.jobInfoReview.innerHTML = `<span>${escHtml(message)}</span>${actionHtml}`;
+    dom.jobInfoReview.innerHTML = `<span>${esc(message)}</span>${actionHtml}`;
   } else {
     dom.jobInfoReview.textContent = message;
   }
@@ -3480,7 +3473,7 @@ function renderEmailPanel(result, options = {}) {
   // Required checklist
   if (result.requiredItems.length) {
     dom.emailChecklist.innerHTML = result.requiredItems
-      .map(item => `<li>${escapeHtml(item)}</li>`).join('');
+      .map(item => `<li>${esc(item)}</li>`).join('');
     dom.emailChecklistGroup.classList.remove('hidden');
   } else {
     dom.emailChecklistGroup.classList.add('hidden');
@@ -3490,13 +3483,13 @@ function renderEmailPanel(result, options = {}) {
   if (result.screeningQuestions.length) {
     dom.emailQuestionsList.innerHTML = result.screeningQuestions.map(q => {
       const answer = q.suggestedAnswer
-        ? `<div class="email-question-answer">${escapeHtml(q.suggestedAnswer)}</div>`
+        ? `<div class="email-question-answer">${esc(q.suggestedAnswer)}</div>`
         : `<div class="email-question-answer">[Please confirm: fill in your answer]</div>`;
       const badge = q.needsUserConfirmation
         ? `<span class="email-confirm-badge">Needs your confirmation</span>`
         : '';
       return `<div class="email-question-card">
-        <div class="email-question-text">${escapeHtml(q.question)}</div>
+        <div class="email-question-text">${esc(q.question)}</div>
         ${answer}
         ${badge}
       </div>`;
@@ -3509,7 +3502,7 @@ function renderEmailPanel(result, options = {}) {
   // Attachments
   if (result.attachmentsReminder.length) {
     dom.emailAttachmentsList.innerHTML = result.attachmentsReminder
-      .map(item => `<li>${escapeHtml(item)}</li>`).join('');
+      .map(item => `<li>${esc(item)}</li>`).join('');
     dom.emailAttachmentsGroup.classList.remove('hidden');
   } else {
     dom.emailAttachmentsGroup.classList.add('hidden');
@@ -3518,7 +3511,7 @@ function renderEmailPanel(result, options = {}) {
   // Warnings
   if (result.warnings.length) {
     dom.emailWarningsList.innerHTML = result.warnings
-      .map(w => `<li>${escapeHtml(w)}</li>`).join('');
+      .map(w => `<li>${esc(w)}</li>`).join('');
     dom.emailWarningsGroup.classList.remove('hidden');
   } else {
     dom.emailWarningsGroup.classList.add('hidden');
@@ -3676,7 +3669,7 @@ function renderRecruiterPanel(result) {
 
   if (result.warnings.length) {
     dom.recruiterWarningsList.innerHTML = result.warnings
-      .map(warning => `<li>${escapeHtml(warning)}</li>`).join('');
+      .map(warning => `<li>${esc(warning)}</li>`).join('');
     dom.recruiterWarningsGroup.classList.remove('hidden');
   } else {
     dom.recruiterWarningsGroup.classList.add('hidden');
@@ -3684,19 +3677,11 @@ function renderRecruiterPanel(result) {
 
   if (result.notes.length) {
     dom.recruiterNotesList.innerHTML = result.notes
-      .map(note => `<li>${escapeHtml(note)}</li>`).join('');
+      .map(note => `<li>${esc(note)}</li>`).join('');
     dom.recruiterNotesGroup.classList.remove('hidden');
   } else {
     dom.recruiterNotesGroup.classList.add('hidden');
   }
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 // Follow-up message
@@ -3832,7 +3817,7 @@ function renderFollowUpPanel(result) {
 
   if (result.warnings.length) {
     dom.followUpWarningsList.innerHTML = result.warnings
-      .map(warning => `<li>${escapeHtml(warning)}</li>`).join('');
+      .map(warning => `<li>${esc(warning)}</li>`).join('');
     dom.followUpWarningsGroup.classList.remove('hidden');
   } else {
     dom.followUpWarningsGroup.classList.add('hidden');
@@ -3840,7 +3825,7 @@ function renderFollowUpPanel(result) {
 
   if (result.notes.length) {
     dom.followUpNotesList.innerHTML = result.notes
-      .map(note => `<li>${escapeHtml(note)}</li>`).join('');
+      .map(note => `<li>${esc(note)}</li>`).join('');
     dom.followUpNotesGroup.classList.remove('hidden');
   } else {
     dom.followUpNotesGroup.classList.add('hidden');
@@ -3977,18 +3962,18 @@ function renderAnswersPanel(result) {
 
   const cards = result.answers.map(item => {
     const warningHtml = item.warnings.length
-      ? `<ul class="app-answers-card-warnings">${item.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>`
+      ? `<ul class="app-answers-card-warnings">${item.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>`
       : '';
 
     if (item.needsUserInput) {
       const needsText = item.inputNeeded
-        ? escapeHtml(item.inputNeeded)
+        ? esc(item.inputNeeded)
         : 'Add your own answer below, then copy it.';
       return `
         <div class="app-answers-card">
-          <div class="app-answers-question">${escapeHtml(item.question)}</div>
+          <div class="app-answers-question">${esc(item.question)}</div>
           <div class="app-answers-needs-input">Needs your input: ${needsText}</div>
-          <textarea class="app-answers-textarea" aria-label="${escapeHtml('Your answer: ' + item.question)}" placeholder="Type your answer here…"></textarea>
+          <textarea class="app-answers-textarea" aria-label="${esc('Your answer: ' + item.question)}" placeholder="Type your answer here…"></textarea>
           ${warningHtml}
           <div class="app-answers-card-footer">
             <button class="btn-copy app-answers-copy-btn" type="button">Copy answer</button>
@@ -3998,8 +3983,8 @@ function renderAnswersPanel(result) {
 
     return `
       <div class="app-answers-card">
-        <div class="app-answers-question">${escapeHtml(item.question)}</div>
-        <textarea class="app-answers-textarea" readonly aria-label="${escapeHtml('Suggested answer: ' + item.question)}">${escapeHtml(item.answer || '')}</textarea>
+        <div class="app-answers-question">${esc(item.question)}</div>
+        <textarea class="app-answers-textarea" readonly aria-label="${esc('Suggested answer: ' + item.question)}">${esc(item.answer || '')}</textarea>
         ${warningHtml}
         <div class="app-answers-card-footer">
           <button class="btn-copy app-answers-copy-btn" type="button">Copy answer</button>
@@ -4009,14 +3994,14 @@ function renderAnswersPanel(result) {
 
   if (result.warnings.length) {
     const warningBlock = `<div class="app-answers-top-warnings email-section email-section--warning">
-      <ul class="email-list email-list--warning">${result.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
+      <ul class="email-list email-list--warning">${result.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>
     </div>`;
     cards.unshift(warningBlock);
   }
 
   if (result.notes.length) {
     const notesBlock = `<div class="app-answers-top-notes email-section">
-      <ul class="email-list">${result.notes.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+      <ul class="email-list">${result.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
     </div>`;
     cards.push(notesBlock);
   }

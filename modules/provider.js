@@ -83,6 +83,10 @@ async function callOpenAI(systemPrompt, userPrompt, apiKey, model, signal) {
 async function callGemini(systemPrompt, userPrompt, apiKey, model, signal) {
   if (!apiKey) throw new Error('Gemini API key is not set. Please configure it in Settings.');
 
+  if (!model || !/^[a-zA-Z0-9\-._/]+$/.test(model)) {
+    throw new Error(`Invalid Gemini model name: "${model}". Please check your model settings.`);
+  }
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
