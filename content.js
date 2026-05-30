@@ -841,6 +841,23 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           text-underline-offset: 2px;
         }
         .btn-ai-retry:hover { color: #b91c1c; }
+        .chat-row {
+          margin-top: 12px;
+          display: flex;
+        }
+        .btn-chat {
+          width: 100%;
+          font-size: 12px;
+          font-family: inherit;
+          font-weight: 700;
+          color: #ffffff;
+          background: #111827;
+          border: none;
+          border-radius: 7px;
+          cursor: pointer;
+          padding: 7px 10px;
+        }
+        .btn-chat:hover { background: #374151; }
         .divider { height: 1px; background: #f3f4f6; margin: 12px 0 10px; }
         .disclaimer {
           font-size: 11px;
@@ -864,6 +881,9 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
         ${unmatchedSection}
         ${bestProfileSection}
         ${aiSection}
+        <div class="chat-row">
+          <button class="btn-chat" id="fc-btn-chat">Discuss this job</button>
+        </div>
         <div class="divider"></div>
         <div class="disclaimer">Keyword overlap is a signal, not a verdict. You may still be a strong fit even with a low score.</div>
       </div>
@@ -919,6 +939,18 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           chrome.runtime.sendMessage({
             type: 'RUN_FIT_CHECK_AI',
             profileId: activeProfileId,
+            tabId,
+          });
+        } catch (_) {}
+      });
+    }
+
+    const btnChat = shadow.getElementById('fc-btn-chat');
+    if (btnChat) {
+      btnChat.addEventListener('click', () => {
+        try {
+          chrome.runtime.sendMessage({
+            type: 'OPEN_JOB_CHAT_FROM_FIT_CHECK',
             tabId,
           });
         } catch (_) {}

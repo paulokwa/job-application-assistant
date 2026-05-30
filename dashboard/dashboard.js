@@ -664,6 +664,14 @@ async function init() {
       if (!profileId || tabId !== state.lastFitCheck?.tab?.id) return;
       runFitCheckAI(profileId).catch(() => {});
     }
+    if (message.type === 'OPEN_JOB_CHAT_FROM_FIT_CHECK') {
+      const { tabId } = message;
+      if (!tabId || tabId !== state.lastFitCheck?.tab?.id) return;
+      if (!hasJobChatContext()) return;
+      syncJobChatToCurrentJob();
+      refreshJobChatEntryPoints();
+      openJobChat();
+    }
   });
 
   // Keep onboarding visible on app launch until the user saves AI Provider settings.
