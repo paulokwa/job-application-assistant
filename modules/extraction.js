@@ -3,6 +3,8 @@
 // Also handles DOCX text extraction for profile auto-fill.
 
 const OLLAMA_RESUME_TEXT_LIMIT = 9000;
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_UPLOAD_ERROR = 'This file is too large to process. Please upload a PDF or DOCX under 10 MB.';
 
 /**
  * Attempts to extract structured job fields from raw text.
@@ -255,6 +257,10 @@ function prepareResumeTextForProfileExtraction(resumeText = '', settings = {}) {
  * Simple implementation for profile auto-fill.
  */
 export async function extractTextFromDocx(arrayBuffer) {
+  if (arrayBuffer.byteLength > MAX_UPLOAD_BYTES) {
+    throw new Error(MAX_UPLOAD_ERROR);
+  }
+
   // We use PizZip from the global scope if available (loaded in settings/dashboard)
   const PizZipLib = (typeof PizZip !== 'undefined') ? PizZip : window.PizZip;
   if (!PizZipLib) {
@@ -304,6 +310,10 @@ export function fileToArrayBuffer(file) {
  * @returns {Promise<string>}
  */
 export async function extractTextFromPdf(file) {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error(MAX_UPLOAD_ERROR);
+  }
+
   const ab = await file.arrayBuffer();
   const bytes = new Uint8Array(ab);
 
