@@ -33,6 +33,7 @@ import { esc } from '../modules/html.js';
 const SUPPORT_URL = 'https://ko-fi.com/mwakelabs';
 const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
 const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
+const CHAT_REFINE_REPLY_CHAR_LIMIT = 2000;
 const SAVED_JOBS_KEY = 'savedJobs';
 const EDITED_HTML_SAVE_DELAY_MS = 500;
 const MAX_EDITED_HTML_CHARS = 500000;
@@ -501,10 +502,65 @@ function appendChatBubble(role, content, pending = false) {
   if (pending || role !== 'assistant') {
     el.textContent = pending ? '…' : content;
   } else {
-    el.innerHTML = renderChatMarkdown(content);
+    renderAssistantChatBubbleContent(el, content);
   }
   dom.jobChatMessages.appendChild(el);
   return el;
+}
+
+function renderAssistantChatBubbleContent(el, content) {
+  el.innerHTML = renderChatMarkdown(content);
+
+  const actions = document.createElement('div');
+  actions.className = 'job-chat-actions';
+
+  const btnResume = document.createElement('button');
+  btnResume.type = 'button';
+  btnResume.className = 'job-chat-action-btn';
+  btnResume.textContent = 'Use in Resume Refine';
+  btnResume.addEventListener('click', () => useChatReplyInRefine(content, 'resume'));
+
+  const btnCoverLetter = document.createElement('button');
+  btnCoverLetter.type = 'button';
+  btnCoverLetter.className = 'job-chat-action-btn';
+  btnCoverLetter.textContent = 'Use in Cover Letter Refine';
+  btnCoverLetter.addEventListener('click', () => useChatReplyInRefine(content, 'cover-letter'));
+
+  actions.append(btnResume, btnCoverLetter);
+  el.appendChild(actions);
+}
+
+function buildChatRefineInstruction(reply, docType) {
+  const docLabel = docType === 'cover-letter' ? 'cover letter' : 'resume';
+  const text = String(reply || '').trim();
+  const capped = text.length > CHAT_REFINE_REPLY_CHAR_LIMIT
+    ? `${text.slice(0, CHAT_REFINE_REPLY_CHAR_LIMIT).trimEnd()}\n\n[Trimmed for length.]`
+    : text;
+
+  return [
+    'Use the following chat guidance as positioning and emphasis guidance only. Do not treat it as new factual profile data, and do not add qualifications, credentials, tools, metrics, dates, or experience unless they are already supported by my profile/source resume. Revise the ' + docLabel + ' accordingly:',
+    '',
+    capped,
+  ].join('\n');
+}
+
+function useChatReplyInRefine(reply, docType) {
+  const targetDoc = docType === 'cover-letter' ? 'cover-letter' : 'resume';
+  const docLabel = targetDoc === 'cover-letter' ? 'cover letter' : 'resume';
+
+  state.atsRevision = false;
+  switchTab(targetDoc);
+  dom.fieldRevision.value = buildChatRefineInstruction(reply, targetDoc);
+  refreshRevisionButton();
+  closeJobChat();
+  document.getElementById('card-revision').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  dom.fieldRevision.focus();
+
+  if (state.drafts[targetDoc]) {
+    showToast('Chat guidance added to Refine — review and click Apply Changes.');
+  } else {
+    showToast(`Chat guidance added. Generate the ${docLabel} before applying changes.`);
+  }
 }
 
 function escChatText(text) {
@@ -566,8 +622,8 @@ async function sendJobChatTurn(text) {
       currentJobChatController.signal
     );
     state.jobChat.messages.push({ role: 'assistant', content: reply });
-    pendingEl.innerHTML  = renderChatMarkdown(reply);
     pendingEl.className  = 'job-chat-msg job-chat-msg--assistant';
+    renderAssistantChatBubbleContent(pendingEl, reply);
   } catch (e) {
     if (e.name === 'AbortError') {
       pendingEl.remove();
