@@ -388,6 +388,21 @@ function hasJobChatContext() {
   return Boolean(state.jobData.jobTitle || state.jobData.description);
 }
 
+function refreshJobChatEntryPoints() {
+  const hasContext = hasJobChatContext();
+
+  dom.btnChat.disabled = !hasContext;
+  dom.btnChat.title = hasContext
+    ? 'Discuss this job with AI'
+    : 'Scan or load a job first';
+
+  dom.btnDiscussJob.disabled = !hasContext;
+  dom.btnDiscussJob.title = hasContext
+    ? 'Discuss this job'
+    : 'Scan or load a job first';
+  dom.btnDiscussJob.classList.toggle('hidden', !hasContext);
+}
+
 function openJobChat() {
   dom.jobChatView.classList.add('visible');
   renderJobChatOverlay();
@@ -577,6 +592,7 @@ async function init() {
 
   bindEvents();
   refreshAutofillCard();
+  refreshJobChatEntryPoints();
 
   // Restore any previously generated draft before loading session data
   if (localData.savedDraft) {
@@ -937,6 +953,7 @@ function applyAiJobInfoSuggestions(info) {
     dom.fieldCompany.value = info.company;
     state.jobData.company = info.company;
   }
+  refreshJobChatEntryPoints();
 }
 
 async function runAiJobInfoExtraction() {
@@ -1046,6 +1063,7 @@ function applyExtractedData(raw, url, usedSelection) {
     rawContent: raw.pageText || raw.selectedText || text,
     aiJobInfoAttemptedFor: '',
   };
+  refreshJobChatEntryPoints();
 
   if (!raw.loadedFromSavedJob && sourceType !== 'manual_entry') {
     maybeShowScannedJobInfoReview(fields, jobTitle, company);
@@ -1863,6 +1881,7 @@ function bindEvents() {
     state.jobData.jobTitle = dom.fieldTitle.value;
     markManualEntryIfEmpty();
     refreshJobInfoReviewNotice();
+    refreshJobChatEntryPoints();
   });
   dom.fieldCompany.addEventListener('input', () => {
     state.jobData.company = dom.fieldCompany.value;
@@ -1877,6 +1896,7 @@ function bindEvents() {
     state.jobData.description = dom.fieldDesc.value;
     markManualEntryIfEmpty();
     state.currentJobMeta.aiJobInfoAttemptedFor = '';
+    refreshJobChatEntryPoints();
   });
 }
 
@@ -3029,6 +3049,7 @@ function restoreSavedDraft(saved) {
   }
 
   switchTab(state.drafts.resume ? 'resume' : 'cover-letter');
+  refreshJobChatEntryPoints();
 }
 
 async function clearDraft(tab) {
@@ -3063,6 +3084,7 @@ async function clearDraft(tab) {
   }
 
   refreshExportButtons();
+  refreshJobChatEntryPoints();
   updateOutputPanelVisibility();
   showToast(`${tab === 'resume' ? 'Resume' : 'Cover letter'} draft cleared.`);
 }
@@ -3119,6 +3141,7 @@ async function clearSession() {
   refreshExportButtons();
   switchTab('resume');
   updateOutputPanelVisibility();
+  refreshJobChatEntryPoints();
   showToast('Draft cleared.');
 }
 
