@@ -100,7 +100,7 @@ const state = {
   autofillFields:  [],
   autofillMatches: [],
   lastScanData: null,
-  jobChat: { messages: [] },
+  jobChat: { messages: [], jobSignature: '' },
 };
 
 let currentAbortController = null;
@@ -386,6 +386,42 @@ function buildJobChatContext() {
 
 function hasJobChatContext() {
   return Boolean(state.jobData.jobTitle || state.jobData.description);
+}
+
+function normalizeJobChatSignaturePart(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function buildJobChatSignature(jobData = state.jobData) {
+  const sourceUrl = normalizeJobChatSignaturePart(jobData.sourceUrl);
+  const description = normalizeJobChatSignaturePart(jobData.description);
+  const jobTitle = normalizeJobChatSignaturePart(jobData.jobTitle);
+  const company = normalizeJobChatSignaturePart(jobData.company);
+
+  if (!jobTitle && !description) return '';
+
+  if (sourceUrl || description) {
+    const firstSlice = description.slice(0, 120);
+    const lastSlice = description.slice(-120);
+    return `url:${sourceUrl}|desc:${description.length}:${firstSlice}:${lastSlice}`;
+  }
+
+  if (jobTitle || company) {
+    return `manual:${jobTitle}|${company}`;
+  }
+
+  return '';
+}
+
+function syncJobChatToCurrentJob() {
+  const previousSignature = state.jobChat.jobSignature || '';
+  const nextSignature = buildJobChatSignature();
+
+  if ((previousSignature && previousSignature !== nextSignature) || !nextSignature) {
+    clearJobChat();
+  }
+
+  state.jobChat.jobSignature = nextSignature;
 }
 
 function refreshJobChatEntryPoints() {
@@ -953,6 +989,7 @@ function applyAiJobInfoSuggestions(info) {
     dom.fieldCompany.value = info.company;
     state.jobData.company = info.company;
   }
+  syncJobChatToCurrentJob();
   refreshJobChatEntryPoints();
 }
 
@@ -1063,6 +1100,7 @@ function applyExtractedData(raw, url, usedSelection) {
     rawContent: raw.pageText || raw.selectedText || text,
     aiJobInfoAttemptedFor: '',
   };
+  syncJobChatToCurrentJob();
   refreshJobChatEntryPoints();
 
   if (!raw.loadedFromSavedJob && sourceType !== 'manual_entry') {
@@ -1881,21 +1919,25 @@ function bindEvents() {
     state.jobData.jobTitle = dom.fieldTitle.value;
     markManualEntryIfEmpty();
     refreshJobInfoReviewNotice();
+    syncJobChatToCurrentJob();
     refreshJobChatEntryPoints();
   });
   dom.fieldCompany.addEventListener('input', () => {
     state.jobData.company = dom.fieldCompany.value;
     markManualEntryIfEmpty();
     refreshJobInfoReviewNotice();
+    syncJobChatToCurrentJob();
   });
   dom.fieldUrl.addEventListener('input', () => {
     state.jobData.sourceUrl = dom.fieldUrl.value;
     markManualEntryIfEmpty();
+    syncJobChatToCurrentJob();
   });
   dom.fieldDesc.addEventListener('input', () => {
     state.jobData.description = dom.fieldDesc.value;
     markManualEntryIfEmpty();
     state.currentJobMeta.aiJobInfoAttemptedFor = '';
+    syncJobChatToCurrentJob();
     refreshJobChatEntryPoints();
   });
 }
@@ -3049,6 +3091,7 @@ function restoreSavedDraft(saved) {
   }
 
   switchTab(state.drafts.resume ? 'resume' : 'cover-letter');
+  syncJobChatToCurrentJob();
   refreshJobChatEntryPoints();
 }
 
@@ -3123,7 +3166,7 @@ async function clearSession() {
   dom.sourceIndicator.textContent = '';
   dom.btnForceFitCheck.classList.add('hidden');
   dom.genStatus.classList.add('hidden');
-  clearJobChat();
+  syncJobChatToCurrentJob();
   dom.genStatus.classList.remove('gen-status--complete');
 
   dom.draftResumeEmpty.classList.remove('hidden');
