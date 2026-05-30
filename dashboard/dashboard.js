@@ -145,6 +145,7 @@ const dom = {
   btnErrorRetry:      $('btn-error-retry'),
   btnErrorSettings:   $('btn-error-settings'),
   btnErrorDemo:       $('btn-error-demo'),
+  btnPrivacySettings: $('btn-privacy-settings'),
   
   tabBtns:            document.querySelectorAll('.tab-btn'),
   tabPanels:          document.querySelectorAll('.tab-panel'),
@@ -1808,6 +1809,9 @@ function bindEvents() {
     const section = dom.btnErrorSettings.dataset.section || 'provider';
     openSettingsSection(section);
   });
+
+  // Privacy note → Open Settings (provider section)
+  dom.btnPrivacySettings.addEventListener('click', () => openSettingsSection('provider'));
 
   dom.btnErrorDemo.addEventListener('click', async () => {
     await activateDemoMode();

@@ -1796,6 +1796,30 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-size: 12px;
 }
 
+.gen-privacy-note {
+  font-size: 11px;
+  color: var(--color-ink-3);
+  line-height: 1.4;
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.gen-privacy-settings-btn {
+  background: none;
+  border: none;
+  color: var(--color-ink-2);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.gen-privacy-settings-btn:hover {
+  color: var(--color-ink);
+}
+
 /* ══════════════════════════════════════════════
    EXPORT CARD
    ══════════════════════════════════════════════ */
