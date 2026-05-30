@@ -434,6 +434,28 @@ body {
   flex-wrap: wrap;
 }
 
+.job-fit-badge {
+  font-weight: 600 !important;
+}
+
+.job-fit-badge--strong {
+  color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent-subtle) !important;
+}
+
+.job-fit-badge--good {
+  color: var(--color-success) !important;
+  border-color: var(--color-success-subtle) !important;
+  background: var(--color-success-subtle) !important;
+}
+
+.job-fit-badge--developing {
+  color: var(--color-warning) !important;
+  border-color: var(--color-warning-subtle) !important;
+  background: var(--color-warning-subtle) !important;
+}
+
 .fit-label {
   color: var(--color-ink);
   font-family: var(--font-display);

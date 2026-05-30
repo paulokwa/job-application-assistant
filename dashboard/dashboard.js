@@ -120,6 +120,7 @@ let currentAppAnswersJob = null;
 let currentAppAnswersRequestId = 0;
 let currentReminderRequestId = 0;
 let generationStatusTimers = [];
+let jobChatPatienceTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────
@@ -203,6 +204,7 @@ const dom = {
   btnCloseHistory:    $('btn-close-history'),
   jobsView:           $('jobs-view'),
   btnCloseJobs:       $('btn-close-jobs'),
+  btnJobsTourOverlay: $('btn-jobs-tour-overlay'),
   btnSupport:         $('btn-support'),
   btnSettings:        $('btn-settings'),
   mockBanner:         $('mock-mode-banner'),
@@ -445,9 +447,36 @@ function appendChatBubble(role, content, pending = false) {
     role === 'user'  ? 'job-chat-msg--user'       :
                        'job-chat-msg--assistant',
   ].join(' ');
-  el.textContent = pending ? '…' : content;
+  if (pending || role !== 'assistant') {
+    el.textContent = pending ? '…' : content;
+  } else {
+    el.innerHTML = renderChatMarkdown(content);
+  }
   dom.jobChatMessages.appendChild(el);
   return el;
+}
+
+function escChatText(text) {
+  return String(text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function applyInlineChatMd(s) {
+  return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function renderChatMarkdown(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .split(/\n{2,}/)
+    .map(para =>
+      para.split('\n').map(line => {
+        const hMatch = line.match(/^#{1,3}\s+(.+)$/);
+        if (hMatch) return `<span class="chat-md-h">${applyInlineChatMd(escChatText(hMatch[1]))}</span>`;
+        return applyInlineChatMd(escChatText(line));
+      }).join('<br>')
+    )
+    .join('<br><br>');
 }
 
 function scrollChatToBottom() {
@@ -460,7 +489,8 @@ async function sendJobChatTurn(text) {
   if (currentJobChatController) return;
 
   dom.jobChatInput.value = '';
-  dom.btnJobChatSend.disabled = true;
+  dom.btnJobChatSend.textContent = '■ Stop';
+  dom.btnJobChatSend.disabled = false;
   dom.jobChatChips.classList.add('hidden');
 
   // Add user bubble
@@ -470,6 +500,7 @@ async function sendJobChatTurn(text) {
   // Pending AI bubble
   const pendingEl = appendChatBubble('assistant', '', true);
   scrollChatToBottom();
+  startJobChatPatienceTimers(pendingEl);
 
   const context          = buildJobChatContext();
   const historyBeforeMsg = state.jobChat.messages.slice(0, -1);
@@ -484,8 +515,8 @@ async function sendJobChatTurn(text) {
       currentJobChatController.signal
     );
     state.jobChat.messages.push({ role: 'assistant', content: reply });
-    pendingEl.textContent  = reply;
-    pendingEl.className    = 'job-chat-msg job-chat-msg--assistant';
+    pendingEl.innerHTML  = renderChatMarkdown(reply);
+    pendingEl.className  = 'job-chat-msg job-chat-msg--assistant';
   } catch (e) {
     if (e.name === 'AbortError') {
       pendingEl.remove();
@@ -495,7 +526,9 @@ async function sendJobChatTurn(text) {
       pendingEl.className   = 'job-chat-msg job-chat-msg--assistant job-chat-msg--error';
     }
   } finally {
+    clearJobChatPatienceTimers();
     currentJobChatController = null;
+    dom.btnJobChatSend.textContent = 'Send';
     dom.btnJobChatSend.disabled = !dom.jobChatInput.value.trim();
     scrollChatToBottom();
   }
@@ -1613,7 +1646,10 @@ function bindEvents() {
   dom.btnDiscussJob.addEventListener('click', openJobChat);
   dom.btnCloseJobChat.addEventListener('click', closeJobChat);
   dom.btnClearJobChat.addEventListener('click', clearJobChat);
-  dom.btnJobChatSend.addEventListener('click', () => sendJobChatTurn(dom.jobChatInput.value));
+  dom.btnJobChatSend.addEventListener('click', () => {
+    if (currentJobChatController) { currentJobChatController.abort(); return; }
+    sendJobChatTurn(dom.jobChatInput.value);
+  });
   dom.jobChatInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -1621,7 +1657,8 @@ function bindEvents() {
     }
   });
   dom.jobChatInput.addEventListener('input', () => {
-    dom.btnJobChatSend.disabled = !dom.jobChatInput.value.trim() || Boolean(currentJobChatController);
+    if (currentJobChatController) return; // Stop button is active — leave it alone
+    dom.btnJobChatSend.disabled = !dom.jobChatInput.value.trim();
   });
   dom.jobChatChips.addEventListener('click', e => {
     const prompt = e.target.dataset.prompt;
@@ -1635,6 +1672,9 @@ function bindEvents() {
   // Saved jobs
   dom.btnJobs.addEventListener('click', () => dom.jobsView.classList.add('visible'));
   dom.btnCloseJobs.addEventListener('click', () => dom.jobsView.classList.remove('visible'));
+  dom.btnJobsTourOverlay.addEventListener('click', () => {
+    document.getElementById('jobs-frame')?.contentWindow?.postMessage({ type: 'START_JOBS_TOUR' }, '*');
+  });
   window.addEventListener('message', async e => {
     if (e.origin !== window.location.origin) return;
     if (SAVED_JOBS_MESSAGE_TYPES.has(e.data?.type) && !isFromJobsFrame(e)) return;
@@ -3187,6 +3227,25 @@ function startGenerationStatusMessages(type) {
 function clearGenerationStatusMessages() {
   generationStatusTimers.forEach(timerId => clearTimeout(timerId));
   generationStatusTimers = [];
+}
+
+function clearJobChatPatienceTimers() {
+  jobChatPatienceTimers.forEach(clearTimeout);
+  jobChatPatienceTimers = [];
+}
+
+function startJobChatPatienceTimers(pendingEl) {
+  if (state.settings?.provider !== 'ollama') return;
+  const messages = [
+    { delay: 10000, text: 'Ollama is thinking — this can take a moment depending on your computer.' },
+    { delay: 30000, text: 'Still waiting. Larger models take longer on local hardware.' },
+    { delay: 60000, text: 'Taking a while. Press Stop to cancel and try a smaller Ollama model like qwen2.5:3b.' },
+  ];
+  jobChatPatienceTimers = messages.map(({ delay, text }) =>
+    setTimeout(() => {
+      if (pendingEl.classList.contains('job-chat-msg--thinking')) pendingEl.textContent = text;
+    }, delay)
+  );
 }
 
 async function clearSavedGenerationReceipt() {

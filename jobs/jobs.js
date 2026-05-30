@@ -86,6 +86,14 @@ function fitScoreClass(score) {
   return 'fit-score fit-score--weak';
 }
 
+function fitCategoryBadge(job) {
+  const score = numericFitScore(job);
+  if (score === null) return '';
+  if (score >= 75) return '<span class="job-fit-badge job-fit-badge--strong">Strong</span>';
+  if (score >= 50) return '<span class="job-fit-badge job-fit-badge--good">Good</span>';
+  return '<span class="job-fit-badge job-fit-badge--developing">Developing</span>';
+}
+
 function numericFitScore(job) {
   const value = job?.fitAnalysis?.score;
   if (value === null || value === undefined || value === '') return null;
@@ -234,6 +242,11 @@ function sortSavedJobs(jobs) {
         sortText(a.title).localeCompare(sortText(b.title)) ||
         timeValue(b.updatedAt || b.createdAt) - timeValue(a.updatedAt || a.createdAt);
     }
+    if (currentSort === 'fit_desc') {
+      const aScore = numericFitScore(a) ?? -1;
+      const bScore = numericFitScore(b) ?? -1;
+      return bScore - aScore || timeValue(b.createdAt) - timeValue(a.createdAt);
+    }
     return timeValue(b.createdAt) - timeValue(a.createdAt);
   });
   return sorted;
@@ -302,6 +315,7 @@ function render(jobs) {
           <p class="job-company">${escHtml(job.company || 'Company not set')}</p>
         </div>
         <div class="job-meta">
+          ${fitCategoryBadge(job)}
           <span>${escHtml(statusLabel(job.status))}</span>
           ${date ? `<span>${escHtml(date)}</span>` : ''}
         </div>
@@ -663,7 +677,9 @@ async function init() {
   const sortSelect = document.getElementById('sort-jobs');
   sortSelect.value = currentSort;
 
-  document.getElementById('btn-jobs-tour').addEventListener('click', () => startJobsTour({ markSeen: true }));
+  window.addEventListener('message', e => {
+    if (e.data?.type === 'START_JOBS_TOUR') startJobsTour({ markSeen: true });
+  });
   document.getElementById('jobs-tour-btn-skip').addEventListener('click', endJobsTour);
   document.getElementById('jobs-tour-btn-prev').addEventListener('click', () => {
     if (jobsTourIndex > 0) showJobsTourStep(jobsTourIndex - 1);

@@ -125,6 +125,12 @@ chrome.tabs.onRemoved.addListener(tabId => {
   markSidePanelOpen(tabId, false);
 });
 
+// Prevent the side panel from propagating to new tabs (e.g. the print window
+// opened by window.open). New tabs only show the panel when explicitly opened.
+chrome.tabs.onCreated.addListener(tab => {
+  chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false }).catch(() => {});
+});
+
 // ── Action Icon Click ───────────────────────────────────────────────────────
 
 // If the user clicks the toolbar icon, enable and open for current tab
