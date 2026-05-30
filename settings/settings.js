@@ -1460,7 +1460,7 @@ const SETTINGS_TOURS = {
     {
       targetId: 'chip-builder',
       title: 'Build file names',
-      body: 'Use chips to control how exported files are named. Add useful parts like company, job title, document type, and date.'
+      body: 'Use chips to control the file names Chrome suggests in the Save as PDF dialog. Add useful parts like company, job title, document type, and date.'
     },
     {
       targetId: 'filename-preview-1',
@@ -1468,16 +1468,21 @@ const SETTINGS_TOURS = {
       body: 'The examples update as you change the pattern, so you can confirm the file names will be clear before saving.'
     },
     {
+      targetId: 'chk-auto-fit-check',
+      title: 'Control Fit Check',
+      body: 'Keep this on if you want a basic fit card after scanning a job page. Turn it off when you only want the generator workspace updated.'
+    },
+    {
       targetId: 'btn-save-documents',
       title: 'Save document settings',
-      body: 'Save these settings when the default mode or file naming pattern looks right.'
+      body: 'Save these settings when the default mode, file naming pattern, and Fit Check preference look right.'
     },
   ],
   profiles: [
     {
       targetId: 'profiles-list',
       title: 'Manage profiles',
-      body: 'Manage Profiles lets you keep separate background details for different career paths, industries, or application styles.'
+      body: 'Manage Profiles lets you keep separate background details and fit-scoring preferences for different career paths or application styles.'
     },
     {
       targetId: 'profiles-list',
@@ -1499,7 +1504,7 @@ const SETTINGS_TOURS = {
     {
       targetId: 'source-upload-area',
       title: 'Upload for faster setup',
-      body: 'Uploading a resume or cover letter can auto-fill profile details. It is optional; you can also fill everything in manually.'
+      body: 'Uploading a source resume can auto-fill profile details. It is optional; you can also fill everything in manually.'
     },
     {
       targetId: 'card-personal-details',
@@ -1515,6 +1520,11 @@ const SETTINGS_TOURS = {
       targetId: 'btn-add-exp',
       title: 'Add work history',
       body: 'Add roles, achievements, and responsibilities you want the assistant to draw from. Specific details produce stronger drafts.'
+    },
+    {
+      targetId: 'lock-btn-experience',
+      title: 'Protect reviewed sections',
+      body: 'Lock a section when you do not want future AI resume imports to overwrite details you have already reviewed.'
     },
     {
       targetId: 'p-do-not-claim',
@@ -1635,9 +1645,13 @@ function showSettingsTourStep(index) {
     if (!targetEl) return;
     // Instant scroll — smooth scroll causes a race with the position timer
     targetEl.scrollIntoView({ block: 'nearest' });
-    // Use center if the element lands at the very bottom of the viewport
+    // Use center if the element lands under sticky nav or near the viewport edge.
     const r = targetEl.getBoundingClientRect();
-    if (r.bottom > window.innerHeight - 60) targetEl.scrollIntoView({ block: 'center' });
+    const stickyNav = document.body.classList.contains('embedded') ? $('settings-nav') : null;
+    const topGuard = (stickyNav?.getBoundingClientRect().bottom || 0) + 12;
+    if (r.top < topGuard || r.bottom > window.innerHeight - 60) {
+      targetEl.scrollIntoView({ block: 'center' });
+    }
     requestAnimationFrame(() => requestAnimationFrame(() =>
       positionSettingsTourElements(targetEl, spotlight, tooltip)
     ));

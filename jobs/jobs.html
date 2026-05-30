@@ -14,6 +14,7 @@
       <p class="page-subtitle">Saved jobs stay separate from generated history</p>
     </div>
     <div class="jobs-header-actions">
+      <button id="btn-jobs-tour" class="jobs-tour-btn" type="button" title="Take a tour of Saved Jobs" aria-label="Start Saved Jobs tour">?</button>
       <label class="sort-control" for="sort-jobs">
         <span>Sort</span>
         <select id="sort-jobs" aria-label="Sort saved jobs">
@@ -64,6 +65,22 @@
       <div class="confirm-modal-actions">
         <button id="confirm-btn-cancel" class="btn-secondary" type="button">Cancel</button>
         <button id="confirm-btn-ok" class="btn-danger" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="jobs-tour-overlay" class="tour-overlay hidden" role="dialog" aria-modal="true" aria-label="Saved Jobs tour">
+    <div id="jobs-tour-spotlight" class="tour-spotlight"></div>
+    <div id="jobs-tour-tooltip" class="tour-tooltip">
+      <div id="jobs-tour-step-count" class="tour-step-count"></div>
+      <div id="jobs-tour-title" class="tour-title"></div>
+      <p id="jobs-tour-body" class="tour-body"></p>
+      <div class="tour-nav">
+        <button id="jobs-tour-btn-skip" class="tour-btn-skip" type="button">Skip tour</button>
+        <div class="tour-nav-right">
+          <button id="jobs-tour-btn-prev" class="tour-btn-secondary" type="button">← Back</button>
+          <button id="jobs-tour-btn-next" class="tour-btn-primary" type="button">Next →</button>
+        </div>
       </div>
     </div>
   </div>

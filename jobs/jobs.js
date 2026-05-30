@@ -4,6 +4,7 @@ import { openSafeHttpUrl } from '../modules/url.js';
 import { compactSavedJobs, isStorageQuotaError, storageQuotaMessage } from '../modules/storageLimits.js';
 
 const SAVED_JOBS_KEY = 'savedJobs';
+const SAVED_JOBS_TOUR_SEEN_KEY = 'savedJobsTourSeen';
 const GENERATION_MODES = new Set(['resume', 'cover-letter']);
 const STATUSES = [
   ['needs_review', 'Needs review'],
@@ -17,6 +18,8 @@ let suppressNextSavedJobsRefresh = false;
 let currentSort = 'created_desc';
 const analyzingJobs = new Set();
 const fitErrors = new Map();
+let jobsTourIndex = 0;
+let currentJobsTourSteps = [];
 
 function applyTheme(theme) {
   if (theme === 'dark') document.documentElement.dataset.theme = 'dark';
@@ -367,6 +370,183 @@ function render(jobs) {
   }
 }
 
+const SAVED_JOBS_TOUR_WITH_JOBS = [
+  {
+    target: '.jobs-header',
+    title: 'Saved Jobs workspace',
+    body: 'This is your application queue. It stays separate from generation history so you can track roles you may still act on.',
+  },
+  {
+    target: '#jobs-stats',
+    title: 'Queue summary',
+    body: 'The summary counts saved roles by fit score so strong matches and developing opportunities are easy to spot.',
+  },
+  {
+    target: '.job-card',
+    title: 'Saved job card',
+    body: 'Each card keeps the role, company, status, notes, fit analysis, and actions together for one application.',
+  },
+  {
+    target: '.status-select',
+    title: 'Track status',
+    body: 'Update the status as the application moves from saved to ready, applied, or closed.',
+  },
+  {
+    target: '.job-notes',
+    title: 'Keep notes',
+    body: 'Use notes for deadlines, contacts, salary details, or anything you want visible when you return to the job.',
+  },
+  {
+    target: '.job-action-group[aria-label="Application materials"]',
+    title: 'Application materials',
+    body: 'Generate a resume, cover letter, or short application answers from this saved job without re-scanning the posting.',
+  },
+  {
+    target: '.job-action-group[aria-label="Messaging tools"]',
+    title: 'Messaging tools',
+    body: 'Draft recruiter outreach, follow-up messages, or reminder text. These actions prepare copy only; nothing is sent automatically.',
+  },
+  {
+    target: '.job-action-group--management',
+    title: 'Job management',
+    body: 'Review the job in the generator, run or refresh Fit Analysis, open the posting URL, or delete the saved job.',
+  },
+  {
+    target: '#btn-jobs-tour',
+    title: 'Replay this tour',
+    body: 'Use this help button anytime you want a quick refresher on the Saved Jobs workflow.',
+  },
+];
+
+const SAVED_JOBS_TOUR_EMPTY = [
+  {
+    target: '.jobs-header',
+    title: 'Saved Jobs workspace',
+    body: 'This is where saved roles appear after you choose Save to Jobs from the dashboard.',
+  },
+  {
+    target: '#empty-state',
+    title: 'Start from the dashboard',
+    body: 'Scan or enter a job in the generator, then save it here when you want to track or revisit it later.',
+  },
+  {
+    target: '#sort-jobs',
+    title: 'Sort when the list grows',
+    body: 'Once you have saved jobs, sort by saved date, recent updates, status, or company.',
+  },
+  {
+    target: '#btn-jobs-tour',
+    title: 'Replay this tour',
+    body: 'Use this help button anytime you want a quick refresher on the Saved Jobs workflow.',
+  },
+];
+
+function isTourTargetAvailable(selector) {
+  const el = document.querySelector(selector);
+  if (!el) return false;
+  if (el.closest('.hidden')) return false;
+  return el.getClientRects().length > 0;
+}
+
+function getSavedJobsTourSteps() {
+  const base = document.querySelector('.job-card') ? SAVED_JOBS_TOUR_WITH_JOBS : SAVED_JOBS_TOUR_EMPTY;
+  return base.filter(step => isTourTargetAvailable(step.target));
+}
+
+async function markSavedJobsTourSeen() {
+  await chrome.storage.local.set({ [SAVED_JOBS_TOUR_SEEN_KEY]: true });
+}
+
+async function scheduleSavedJobsTourIfFirstVisit() {
+  const data = await chrome.storage.local.get([SAVED_JOBS_TOUR_SEEN_KEY]);
+  if (data[SAVED_JOBS_TOUR_SEEN_KEY]) return;
+  setTimeout(() => startJobsTour({ markSeen: true }), 260);
+}
+
+function startJobsTour({ markSeen = false } = {}) {
+  const overlay = document.getElementById('jobs-tour-overlay');
+  if (!overlay.classList.contains('hidden')) return;
+  currentJobsTourSteps = getSavedJobsTourSteps();
+  if (!currentJobsTourSteps.length) return;
+  if (markSeen) markSavedJobsTourSeen();
+  jobsTourIndex = 0;
+  overlay.classList.remove('hidden');
+  document.addEventListener('keydown', jobsTourKeyHandler);
+  showJobsTourStep(0);
+}
+
+function showJobsTourStep(index) {
+  jobsTourIndex = index;
+  const step = currentJobsTourSteps[index];
+  if (!step) return endJobsTour();
+  const targetEl = document.querySelector(step.target);
+  if (!targetEl) return endJobsTour();
+
+  document.getElementById('jobs-tour-step-count').textContent = `${index + 1} of ${currentJobsTourSteps.length}`;
+  document.getElementById('jobs-tour-title').textContent = step.title;
+  document.getElementById('jobs-tour-body').textContent = step.body;
+  document.getElementById('jobs-tour-btn-prev').style.visibility = index === 0 ? 'hidden' : '';
+  document.getElementById('jobs-tour-btn-next').textContent = index === currentJobsTourSteps.length - 1 ? 'Done' : 'Next →';
+
+  targetEl.scrollIntoView({ block: 'nearest' });
+  const rect = targetEl.getBoundingClientRect();
+  if (rect.bottom > window.innerHeight - 60) targetEl.scrollIntoView({ block: 'center' });
+  requestAnimationFrame(() => requestAnimationFrame(() => positionJobsTourElements(targetEl)));
+}
+
+function positionJobsTourElements(targetEl) {
+  const spotlight = document.getElementById('jobs-tour-spotlight');
+  const tooltip = document.getElementById('jobs-tour-tooltip');
+  const pad = 6;
+  const gap = 12;
+  const rect = targetEl.getBoundingClientRect();
+
+  spotlight.style.top = `${rect.top - pad}px`;
+  spotlight.style.left = `${rect.left - pad}px`;
+  spotlight.style.width = `${rect.width + pad * 2}px`;
+  spotlight.style.height = `${rect.height + pad * 2}px`;
+  spotlight.style.borderRadius = getComputedStyle(targetEl).borderRadius || '8px';
+  spotlight.style.boxShadow = `0 0 0 9999px oklch(0% 0 0 / 0.62), 0 0 0 2px var(--color-accent)`;
+
+  tooltip.style.visibility = 'hidden';
+  tooltip.style.top = '0px';
+  tooltip.style.left = '0px';
+  const tipRect = tooltip.getBoundingClientRect();
+  tooltip.style.visibility = '';
+
+  const viewH = window.innerHeight;
+  const viewW = window.innerWidth;
+  const tipH = tipRect.height;
+  const tipW = tipRect.width;
+
+  let top;
+  if (rect.bottom + pad + gap + tipH <= viewH - 8) {
+    top = rect.bottom + pad + gap;
+  } else if (rect.top - pad - gap - tipH >= 8) {
+    top = rect.top - pad - gap - tipH;
+  } else {
+    top = Math.max(8, (viewH - tipH) / 2);
+  }
+
+  let left = Math.max(8, rect.left);
+  if (left + tipW > viewW - 8) left = viewW - tipW - 8;
+  left = Math.max(8, left);
+
+  tooltip.style.top = `${top}px`;
+  tooltip.style.left = `${left}px`;
+}
+
+function endJobsTour() {
+  document.getElementById('jobs-tour-overlay').classList.add('hidden');
+  document.removeEventListener('keydown', jobsTourKeyHandler);
+}
+
+function jobsTourKeyHandler(e) {
+  if (e.key === 'Escape') endJobsTour();
+  if (e.key === 'ArrowRight' && jobsTourIndex < currentJobsTourSteps.length - 1) showJobsTourStep(jobsTourIndex + 1);
+  if (e.key === 'ArrowLeft' && jobsTourIndex > 0) showJobsTourStep(jobsTourIndex - 1);
+}
+
 function showConfirm(title, body, confirmLabel) {
   return new Promise(resolve => {
     const overlay = document.getElementById('confirm-overlay');
@@ -482,6 +662,20 @@ async function init() {
   const list = document.getElementById('jobs-list');
   const sortSelect = document.getElementById('sort-jobs');
   sortSelect.value = currentSort;
+
+  document.getElementById('btn-jobs-tour').addEventListener('click', () => startJobsTour({ markSeen: true }));
+  document.getElementById('jobs-tour-btn-skip').addEventListener('click', endJobsTour);
+  document.getElementById('jobs-tour-btn-prev').addEventListener('click', () => {
+    if (jobsTourIndex > 0) showJobsTourStep(jobsTourIndex - 1);
+  });
+  document.getElementById('jobs-tour-btn-next').addEventListener('click', () => {
+    if (jobsTourIndex < currentJobsTourSteps.length - 1) showJobsTourStep(jobsTourIndex + 1);
+    else endJobsTour();
+  });
+  document.getElementById('jobs-tour-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('jobs-tour-overlay')) endJobsTour();
+  });
+  scheduleSavedJobsTourIfFirstVisit();
 
   sortSelect.addEventListener('change', async () => {
     currentSort = sortSelect.value;

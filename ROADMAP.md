@@ -72,20 +72,6 @@ The V1 chat is live on `main`. These are the next natural improvements.
 
 The last item is the most significant: chat becomes the coordination layer that pushes intent back into Refine and generation. Worth a dedicated design pass before implementing.
 
-### 3. Tour Refresh And Saved Jobs Tour
-
-Suggested branch: `feature/saved-jobs-tour`
-
-Goal: review the existing dashboard/settings tours for drift after v3 UI changes, update any stale tour steps, and add a focused Saved Jobs page tour.
-
-Scope notes:
-
-- Check whether the existing dashboard feature tour still points to current controls and terminology.
-- Check whether Settings section tours still match current layout and copy.
-- Add a Saved Jobs tour that explains the saved job card, fit analysis, status/notes, grouped application-material actions, messaging actions, job management actions, and the "Review in Generator" workflow.
-- Keep the tour concise and task-focused; do not turn it into a full onboarding rewrite.
-- Verify keyboard navigation, Escape/skip behavior, small side-panel layout, and first-run/replay behavior.
-
 ## Later Autofill Improvements
 
 Autofill remains a broad future bucket, but no immediate autofill implementation task is selected. Keep changes targeted, deterministic, and review-before-fill; follow `TROUBLESHOOTING.md` entry 16 before modifying `modules/autofillMatcher.js`.
@@ -138,6 +124,17 @@ Preferred behavior:
 Treat it as a link collector first, not guaranteed full job-description extraction.
 
 ## Completed Roadmap Items
+
+### Tour Refresh And Saved Jobs Tour
+
+Status: **Complete on `main`** (2026-05-30).
+
+Completed scope:
+
+- Dashboard feature tour refreshed for the current v3 flow, including the optional Application Helper and Generate as Step 3.
+- Settings section tours refreshed for current document export, Fit Check, profile, and profile-lock behavior.
+- Saved Jobs page now has a focused tour covering queue summary, saved job cards, status and notes, application materials, messaging tools, and job management.
+- Saved Jobs tour can be replayed from the help button and is marked seen after first run.
 
 ### Direct PDF Download Removed For Store-Safety
 
@@ -292,7 +289,6 @@ Guardrails (permanent):
 
 1. v3 Smoke Test
 2. Job Discussion Chat Follow-Ups
-3. Tour Refresh And Saved Jobs Tour
 
 ## Autofill Known Limitations / Future Improvements
 

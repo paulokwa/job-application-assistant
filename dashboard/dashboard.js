@@ -1552,7 +1552,7 @@ function bindEvents() {
   $('tour-btn-skip').addEventListener('click', endTour);
   $('tour-btn-prev').addEventListener('click', () => { if (tourIndex > 0) showTourStep(tourIndex - 1); });
   $('tour-btn-next').addEventListener('click', () => {
-    if (tourIndex < TOUR_STEPS.length - 1) showTourStep(tourIndex + 1);
+    if (tourIndex < currentTourSteps.length - 1) showTourStep(tourIndex + 1);
     else endTour();
   });
 
@@ -4497,14 +4497,14 @@ const TOUR_STEPS = [
     body: 'Paste the full job posting here. The more detail the AI has, the more precisely it tailors your documents to this specific role.',
   },
   {
-    target: '#draft-settings',
-    title: 'Step 3 - Draft Settings',
-    body: 'Choose cover letter length and writing tone before generating. These settings affect the next AI draft, not an existing preview.',
+    target: '#card-application-form',
+    title: 'Application Helper',
+    body: 'Use this only on application pages with repetitive form fields. It is optional and always asks you to review before anything is filled.',
   },
   {
     target: '#card-generate',
-    title: 'Step 4 - Generate',
-    body: 'Generate a tailored resume, cover letter, or both with one click. A Stop button replaces this while the AI is working, in case you need to cancel.',
+    title: 'Step 3 - Generate',
+    body: 'Choose cover letter length and tone, then generate a tailored resume, cover letter, or both. A Stop button appears while the AI is working.',
   },
   {
     target: '#appearance-controls',
@@ -4528,8 +4528,8 @@ const TOUR_STEPS = [
   },
   {
     target: '#card-save',
-    title: 'Save as PDF',
-    body: 'When you\'re happy, open the browser print dialog for resume only, cover letter only, or both. Choose "Save as PDF" as the destination.',
+    title: 'Export and email',
+    body: 'When you\'re happy, open the browser print dialog and choose "Save as PDF." You can also prepare a reviewed application email from this card.',
   },
   {
     target: '#btn-settings',
@@ -4556,12 +4556,27 @@ const TOUR_STEPS = [
     title: 'History',
     body: 'Browse previously generated jobs. Select any entry to reload the job details and regenerate tailored documents for that role.',
   },
+  {
+    target: '#btn-jobs',
+    title: 'Saved Jobs',
+    body: 'Open your saved application queue to compare fit, track status, add notes, and launch application-material actions for a saved role.',
+  },
 ];
 
 let tourIndex = 0;
+let currentTourSteps = TOUR_STEPS;
+
+function isDashboardTourTargetAvailable(selector) {
+  const el = document.querySelector(selector);
+  if (!el) return false;
+  if (el.closest('[hidden], .hidden')) return false;
+  return el.getClientRects().length > 0;
+}
 
 function startTour() {
   dom.settingsView.classList.remove('visible');
+  currentTourSteps = TOUR_STEPS.filter(step => isDashboardTourTargetAvailable(step.target));
+  if (!currentTourSteps.length) return;
   tourIndex = 0;
   $('tour-overlay').classList.remove('hidden');
   showTourStep(0);
@@ -4571,15 +4586,15 @@ function startTour() {
 
 function showTourStep(index) {
   tourIndex = index;
-  const step = TOUR_STEPS[index];
+  const step = currentTourSteps[index];
   const targetEl = document.querySelector(step.target);
   if (!targetEl) { endTour(); return; }
 
-  $('tour-step-count').textContent = `${index + 1} of ${TOUR_STEPS.length}`;
+  $('tour-step-count').textContent = `${index + 1} of ${currentTourSteps.length}`;
   $('tour-title').textContent = step.title;
   $('tour-body').textContent = step.body;
   $('tour-btn-prev').style.visibility = index === 0 ? 'hidden' : 'visible';
-  $('tour-btn-next').textContent = index === TOUR_STEPS.length - 1 ? 'Finish' : 'Next →';
+  $('tour-btn-next').textContent = index === currentTourSteps.length - 1 ? 'Finish' : 'Next →';
 
   // Scroll to element, then position once scroll settles
   targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -4668,7 +4683,7 @@ function endTour() {
 
 function tourKeyHandler(e) {
   if (e.key === 'Escape') endTour();
-  if (e.key === 'ArrowRight' && tourIndex < TOUR_STEPS.length - 1) showTourStep(tourIndex + 1);
+  if (e.key === 'ArrowRight' && tourIndex < currentTourSteps.length - 1) showTourStep(tourIndex + 1);
   if (e.key === 'ArrowLeft'  && tourIndex > 0) showTourStep(tourIndex - 1);
 }
 
