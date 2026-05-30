@@ -160,7 +160,7 @@
         <div class="card-header">
           <span class="card-title">Application Helper — optional</span>
         </div>
-        <p class="autofill-helper">Use this only when the application page has repetitive form fields. Autofill never submits.</p>
+        <p class="autofill-helper">Use this on application pages with repetitive fields. The helper never submits the form.</p>
         <p id="autofill-no-profile" class="autofill-no-profile hidden" role="status">Select a profile before using autofill.</p>
         <p id="autofill-status-text" class="autofill-status-text">No form fields scanned yet.</p>
         <div class="autofill-actions">
@@ -177,7 +177,7 @@
         <div class="draft-settings" id="draft-settings" aria-label="Draft settings">
           <div class="draft-settings-header">
             <span class="ctrl-section-label">Draft Settings</span>
-            <span class="settings-note">Affects the next generation</span>
+            <span class="settings-note">Affects the next draft</span>
           </div>
           <div class="control-group">
             <label>Length</label>
@@ -372,7 +372,7 @@
             <div id="ats-matched-chips" class="ats-chips"></div>
           </div>
           <div id="ats-missing-group" class="ats-keyword-group hidden">
-            <div class="ats-group-label ats-group-label--missing">Missing — tap to deselect</div>
+            <div class="ats-group-label ats-group-label--missing">Missing — click to deselect</div>
             <div id="ats-missing-chips" class="ats-chips"></div>
           </div>
           <div id="ats-apply-row" class="ats-apply-row hidden">
@@ -447,7 +447,7 @@
       <div id="welcome-step-2" class="welcome-step hidden">
         <h2 class="welcome-title" id="welcome-title-setup">Set up AI generation</h2>
         <div class="welcome-body">
-          <p>To create real tailored drafts, Job Application Assistant needs an AI provider.</p>
+          <p>To generate tailored drafts, Job Application Assistant needs an AI provider.</p>
           <p>You can use local AI with Ollama, which runs on your own computer and does not require a paid API key.</p>
           <p>Or you can connect a cloud AI provider using your own API key. Cloud providers are often faster and may give better results, but usage may cost money depending on your provider.</p>
           <p>Demo Mode is still available if you only want to try the workflow, but it uses sample/mock generation rather than real AI output.</p>
@@ -616,7 +616,7 @@
   <div id="recruiter-message-view" class="settings-overlay" role="dialog" aria-label="Recruiter Message" aria-modal="true">
     <div class="overlay-header">
       <button id="btn-close-recruiter-message" class="back-btn" type="button" aria-label="Close recruiter message">
-        <span aria-hidden="true">â†</span> Close
+        <span aria-hidden="true">←</span> Close
       </button>
       <span class="overlay-title">Recruiter Message</span>
       <button id="btn-regen-recruiter-message" class="btn-scan recruiter-msg-regen-btn" type="button">Regenerate</button>
@@ -673,7 +673,7 @@
   <div id="follow-up-message-view" class="settings-overlay" role="dialog" aria-label="Follow-Up Message" aria-modal="true">
     <div class="overlay-header">
       <button id="btn-close-follow-up-message" class="back-btn" type="button" aria-label="Close follow-up message">
-        <span aria-hidden="true">â†</span> Close
+        <span aria-hidden="true">←</span> Close
       </button>
       <span class="overlay-title">Follow-Up Message</span>
       <button id="btn-regen-follow-up-message" class="btn-scan follow-up-msg-regen-btn" type="button">Regenerate</button>

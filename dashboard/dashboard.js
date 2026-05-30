@@ -2066,7 +2066,7 @@ async function runGeneration(mode) {
     switchTab(toGenerate[0]);
     state.generationReceipt = createGenerationReceipt(mode, generationStartedAt, Date.now());
     renderGenerationReceipt();
-    showToast('✨ Drafts ready!');
+    showToast('✦ Drafts ready.');
 
     // Persist so draft survives the panel being closed and reopened. If quota
     // fails, the in-memory draft remains usable for export in the current view.
@@ -2497,7 +2497,7 @@ async function applyRevision() {
       await clearEditedHtml(docType);
       updatePreviews();
       dom.fieldRevision.value = '';
-      showToast('✅ Changes applied!');
+      showToast('✦ Changes applied.');
     } else {
       showToast('⚠️ Could not apply changes — try rephrasing your request.');
     }
@@ -3233,7 +3233,6 @@ function renderGenerationReceipt(receipt = state.generationReceipt) {
 
   dom.genStatus.classList.remove('hidden');
   dom.genStatus.classList.add('gen-status--complete');
-  dom.genStatus.setAttribute('aria-label', 'Generation complete');
   dom.genStatusText.textContent = `${receipt.documentLabel || 'Draft'} completed by ${provider} with ${model} at ${completedAt}. Took ${elapsed}.`;
 }
 
@@ -3448,7 +3447,7 @@ function renderEmailPanel(result, options = {}) {
     banner.textContent = 'Special application instructions found. Review carefully before sending.';
   } else {
     banner.classList.add('email-context-banner--generic');
-    banner.textContent = 'No special application instructions were detected. Here is a standard application email you can use.';
+    banner.textContent = 'No special application instructions were detected. A standard application email is shown below.';
   }
 
   // Document generation warnings

@@ -194,7 +194,7 @@
 
       <!-- Source Resume / Auto-fill -->
       <div class="card">
-        <h3 class="card-sub-title">Source Resume and Auto-fill</h3>
+        <h3 class="card-sub-title">Source Resume and Autofill</h3>
         <p class="field-hint">For best results, upload a Word document (.docx). PDFs are supported, but PDF import is best-effort. Complex layouts, sidebars, two-column designs, decorative fonts, or scanned/image-based PDFs may produce incomplete or out-of-order text. Please review the extracted text before generating your tailored resume. Max 10 MB.</p>
 
         <div class="upload-area" id="source-upload-area" style="margin-top: 12px;">
@@ -229,7 +229,7 @@
                   data-section="personalInfo" aria-pressed="false"
                   title="Lock Personal Details from AI import">
             <span class="lock-icon" aria-hidden="true">🔓</span>
-            <span class="lock-label">Lock from AI import</span>
+            <span class="lock-label">Lock section</span>
           </button>
         </div>
         <div class="form-grid-2">
@@ -268,12 +268,12 @@
                   data-section="summaries" aria-pressed="false"
                   title="Lock Professional Summaries from AI import">
             <span class="lock-icon" aria-hidden="true">🔓</span>
-            <span class="lock-label">Lock from AI import</span>
+            <span class="lock-label">Lock section</span>
           </button>
         </div>
         <p class="field-hint">Store different summary styles. The AI will use the most relevant one for each application.</p>
         <div id="summaries-list"></div>
-        <button class="btn-add" id="btn-add-summary" type="button">+ Add Style</button>
+        <button class="btn-add" id="btn-add-summary" type="button">+ Add Summary Style</button>
       </div>
 
       <!-- Skills -->
@@ -284,7 +284,7 @@
                   data-section="skills" aria-pressed="false"
                   title="Lock Skills from AI import">
             <span class="lock-icon" aria-hidden="true">🔓</span>
-            <span class="lock-label">Lock from AI import</span>
+            <span class="lock-label">Lock section</span>
           </button>
         </div>
         <p class="field-hint">One skill per line. Include both soft and technical skills.</p>
@@ -299,7 +299,7 @@
                   data-section="experience" aria-pressed="false"
                   title="Lock Work Experience from AI import">
             <span class="lock-icon" aria-hidden="true">🔓</span>
-            <span class="lock-label">Lock from AI import</span>
+            <span class="lock-label">Lock section</span>
           </button>
         </div>
         <div id="experience-list"></div>
@@ -314,7 +314,7 @@
                   data-section="education" aria-pressed="false"
                   title="Lock Education from AI import">
             <span class="lock-icon" aria-hidden="true">🔓</span>
-            <span class="lock-label">Lock from AI import</span>
+            <span class="lock-label">Lock section</span>
           </button>
         </div>
         <div id="education-list"></div>
@@ -329,7 +329,7 @@
                   data-section="certifications" aria-pressed="false"
                   title="Lock Certifications from AI import">
             <span class="lock-icon" aria-hidden="true">🔓</span>
-            <span class="lock-label">Lock from AI import</span>
+            <span class="lock-label">Lock section</span>
           </button>
         </div>
         <div id="certifications-list"></div>
@@ -344,7 +344,7 @@
                   data-section="customSections" aria-pressed="false"
                   title="Lock Additional Background from AI import">
             <span class="lock-icon" aria-hidden="true">🔓</span>
-            <span class="lock-label">Lock from AI import</span>
+            <span class="lock-label">Lock section</span>
           </button>
         </div>
         <p class="field-hint">Use this for useful resume details that do not fit the standard fields, such as volunteer work, publications, awards, languages, or community leadership.</p>
@@ -435,7 +435,7 @@
   <div id="lock-warning-overlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="lock-warning-title">
     <div class="confirm-modal lock-warning-modal">
       <p class="confirm-modal-title" id="lock-warning-title">Some profile sections are locked</p>
-      <p class="confirm-modal-body">The AI analyser will preserve locked sections and will not update them from this resume import.</p>
+      <p class="confirm-modal-body">The AI will preserve locked sections and skip them during this import.</p>
       <ul id="lock-warning-list" class="lock-warning-list"></ul>
       <div class="confirm-modal-actions lock-warning-actions">
         <button id="btn-lock-warning-cancel" class="btn-secondary" type="button">Cancel import</button>
