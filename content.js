@@ -164,44 +164,154 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
     return null;
   }
 
+  function getIndeedSelectedJobKey(url) {
+    try {
+      const parsed = new URL(url);
+      if (!/(\.|^)indeed\.com$/i.test(parsed.hostname)) return '';
+
+      const jk = parsed.searchParams.get('jk') || parsed.searchParams.get('vjk');
+      if (jk && /^[a-z0-9]+$/i.test(jk)) return jk;
+    } catch (_) {}
+    return '';
+  }
+
+  function cleanExtractedText(value) {
+    return String(value || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/[ \t]*\n[ \t]*/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function getElementText(el) {
+    if (!el) return '';
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('script, style, svg, noscript').forEach(node => node.remove());
+    return cleanExtractedText(clone.textContent || '');
+  }
+
+  function firstText(doc, selectors) {
+    for (const sel of selectors) {
+      const text = getElementText(doc.querySelector(sel));
+      if (text) return text;
+    }
+    return '';
+  }
+
+  function getIndeedCompany(doc) {
+    const container = doc.querySelector('[data-testid="inlineHeader-companyName"], [data-testid="jobsearch-CompanyInfoContainer"]');
+    const link = container?.querySelector('a[aria-label], a');
+    const label = link?.getAttribute('aria-label') || '';
+    if (label) return cleanExtractedText(label.replace(/\s*\(opens in a new tab\)\s*$/i, ''));
+
+    const text = getElementText(link || container);
+    if (!text) return '';
+    return text.split('\n').map(line => line.trim()).find(Boolean) || '';
+  }
+
+  async function fetchIndeedSelectedJob(url) {
+    const jk = getIndeedSelectedJobKey(url);
+    if (!jk) return null;
+
+    let response;
+    try {
+      response = await fetch(`/viewjob?jk=${encodeURIComponent(jk)}`, { credentials: 'same-origin' });
+    } catch (_) {
+      return null;
+    }
+
+    if (!response?.ok) return null;
+
+    const html = await response.text();
+    const parsedDoc = new DOMParser().parseFromString(html, 'text/html');
+
+    const jobTitle = firstText(parsedDoc, [
+      '[data-testid="jobsearch-JobInfoHeader-title"]',
+      '.jobsearch-JobInfoHeader-title',
+      'h1',
+    ]).replace(/\s+-\s+job post\s*$/i, '').trim();
+
+    const company = getIndeedCompany(parsedDoc);
+    const locationText = firstText(parsedDoc, [
+      '[data-testid="job-location"]',
+      '[data-testid="inlineHeader-companyLocation"]',
+      '#jobLocationText',
+    ]);
+    const detailsText = firstText(parsedDoc, [
+      '#salaryInfoAndJobType',
+    ]);
+    const description = firstText(parsedDoc, [
+      '#jobDescriptionText',
+      '.jobsearch-JobComponent-description',
+      '[data-testid="jobsearch-JobComponent-description"]',
+    ]);
+
+    if (description.length < 500 || (!jobTitle && !company)) return null;
+
+    const pageText = [
+      jobTitle ? `Job Title: ${jobTitle}` : '',
+      company ? `Company: ${company}` : '',
+      locationText ? `Location: ${locationText}` : '',
+      detailsText ? `Job Details: ${detailsText}` : '',
+      '',
+      description,
+    ].filter(Boolean).join('\n');
+
+    return {
+      pageText,
+      jobTitle,
+      company,
+      url: response.url || `/viewjob?jk=${encodeURIComponent(jk)}`,
+    };
+  }
+
   // ── Message listener ──────────────────────────────────────────────────────
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'CAPTURE_CONTENT') {
-      try {
-        const selectedText = window.getSelection().toString().trim();
+      (async () => {
+        try {
+          const selectedText = window.getSelection().toString().trim();
 
-        // Prefer the most focused job detail container over the full page dump.
-        // selectedText from the user's text selection still wins downstream in
-        // dashboard logic — this only affects the pageText fallback path.
-        const detailResult = findBestJobDetailContainer(document);
-        const pageText = detailResult
-          ? (detailResult.el.innerText || '')
-          : (document.body.innerText || '');
+          // Prefer the most focused job detail container over the full page dump.
+          // selectedText from the user's text selection still wins downstream in
+          // dashboard logic — this only affects the pageText fallback path.
+          const indeedResult = selectedText ? null : await fetchIndeedSelectedJob(location.href);
+          const detailResult = indeedResult ? null : findBestJobDetailContainer(document);
+          const pageText = detailResult
+            ? (detailResult.el.innerText || '')
+            : indeedResult
+              ? indeedResult.pageText
+            : (document.body.innerText || '');
 
-        const title = document.title || '';
-        const url = location.href;
+          const title = document.title || '';
+          const url = indeedResult?.url || location.href;
 
-        // Collect JSON-LD structured data for job-page detection.
-        const structuredData = Array.from(
-          document.querySelectorAll('script[type="application/ld+json"]')
-        ).map(s => s.textContent || '').join('\n');
+          // Collect JSON-LD structured data for job-page detection.
+          const structuredData = Array.from(
+            document.querySelectorAll('script[type="application/ld+json"]')
+          ).map(s => s.textContent || '').join('\n');
 
-        sendResponse({
-          selectedText: selectedText || null,
-          pageText: pageText,
-          title: title,
-          url: url,
-          usedSelection: selectedText.length > 0,
-          structuredData: structuredData,
-          // Diagnostic metadata — not displayed in V1 UI but useful for debugging.
-          usedDetailContainer: Boolean(detailResult),
-          detailContainerScore: detailResult?.score ?? null,
-          detailContainerReason: detailResult?.reason ?? null,
-        });
-      } catch (error) {
-        sendResponse({ error: 'Failed to extract content.' });
-      }
+          sendResponse({
+            selectedText: selectedText || null,
+            pageText: pageText,
+            title: title,
+            url: url,
+            jobTitle: indeedResult?.jobTitle || '',
+            company: indeedResult?.company || '',
+            usedSelection: selectedText.length > 0,
+            structuredData: structuredData,
+            // Diagnostic metadata — not displayed in V1 UI but useful for debugging.
+            usedDetailContainer: Boolean(detailResult),
+            detailContainerScore: detailResult?.score ?? null,
+            detailContainerReason: detailResult?.reason ?? null,
+            usedIndeedViewJobFetch: Boolean(indeedResult),
+          });
+        } catch (error) {
+          sendResponse({ error: 'Failed to extract content.' });
+        }
+      })();
       return true;
     }
 

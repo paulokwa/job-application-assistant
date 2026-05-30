@@ -1233,7 +1233,7 @@ async function runFitCheck(scanResponse, tab, { force = false } = {}) {
 
   const text = scanResponse.pageText || '';
   const title = scanResponse.title || tab.title || '';
-  const url = tab.url || '';
+  const url = scanResponse.url || tab.url || '';
   const structuredData = scanResponse.structuredData || '';
 
   const { isLikelyJobPosting, isLikelySearchPage } = detectJobPage({ url, title, text, structuredData });
