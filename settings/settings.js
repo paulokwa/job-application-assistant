@@ -274,7 +274,12 @@ async function init() {
   // Profile dirty tracking — any field edit or row removal lights up the Save button
   $('section-profile').addEventListener('input', () => setProfileDirty(true));
   $('section-profile').addEventListener('click', e => {
-    if (e.target.closest('.btn-remove')) setProfileDirty(true);
+    const removeBtn = e.target.closest('.btn-remove[data-remove-entry]');
+    if (!removeBtn) return;
+    const entry = removeBtn.closest('.summary-entry, .exp-entry, .edu-entry, .cert-entry, .custom-section-entry');
+    if (!entry) return;
+    entry.remove();
+    setProfileDirty(true);
   });
 
   // Section lock toggles — save immediately on change, does not dirty the profile form
@@ -1106,7 +1111,7 @@ function addSummaryEntry(data = {}) {
   row.innerHTML = `
     <input type="text" class="summary-label-input" value="${esc(data.label || 'Summary')}" placeholder="Style (e.g. Modern)" style="width:140px; font-weight:600" />
     <textarea class="summary-text-input" rows="3" style="flex:1" placeholder="Paste summary text here...">${esc(data.text || '')}</textarea>
-    <button onclick="this.parentElement.remove()" class="btn-remove">✕</button>
+    <button type="button" class="btn-remove" data-remove-entry aria-label="Remove summary">✕</button>
   `;
   container.appendChild(row);
 }
@@ -1124,7 +1129,7 @@ function addExperienceEntry(data = {}) {
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between; margin-bottom:8px">
       <input type="text" class="exp-title" value="${esc(roleTitle)}" placeholder="Job Title" style="font-weight:bold" />
-      <button onclick="this.closest('.exp-entry').remove()" class="btn-remove">✕</button>
+      <button type="button" class="btn-remove" data-remove-entry aria-label="Remove work experience">✕</button>
     </div>
     <div class="form-grid-2">
       <input type="text" class="exp-company" value="${esc(employer)}" placeholder="Company" />
@@ -1147,7 +1152,7 @@ function addEducationEntry(data = {}) {
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between">
       <input type="text" class="edu-degree" value="${esc(degree)}" placeholder="Degree" style="font-weight:bold" />
-      <button onclick="this.closest('.edu-entry').remove()" class="btn-remove">✕</button>
+      <button type="button" class="btn-remove" data-remove-entry aria-label="Remove education">✕</button>
     </div>
     <div class="form-grid-2">
       <input type="text" class="edu-school" value="${esc(school)}" placeholder="School" />
@@ -1164,7 +1169,7 @@ function addCertEntry(data = {}) {
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between">
       <input type="text" class="cert-name" value="${esc(data.name)}" placeholder="Cert Name" style="font-weight:bold" />
-      <button onclick="this.closest('.cert-entry').remove()" class="btn-remove">✕</button>
+      <button type="button" class="btn-remove" data-remove-entry aria-label="Remove certification">✕</button>
     </div>
     <input type="text" class="cert-issuer" value="${esc(data.issuer)}" placeholder="Issuer" />
   `;
@@ -1179,7 +1184,7 @@ function addCustomSectionEntry(data = {}) {
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between; gap:8px">
       <input type="text" class="custom-section-label" value="${esc(data.label || data.name || data.title || '')}" placeholder="Section label" style="font-weight:bold" />
-      <button onclick="this.closest('.custom-section-entry').remove()" class="btn-remove">✕</button>
+      <button type="button" class="btn-remove" data-remove-entry aria-label="Remove additional background section">✕</button>
     </div>
     <textarea class="custom-section-text" rows="3" placeholder="Details the AI can use when relevant">${esc(data.text || data.value || data.content || '')}</textarea>
   `;
