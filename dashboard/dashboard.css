@@ -566,6 +566,23 @@ body {
 .job-info-review-action:hover {
   opacity: 0.75;
 }
+.scan-recovery-title {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink);
+}
+.scan-recovery-steps {
+  margin: 4px 0 6px;
+  padding-left: 18px;
+}
+.scan-recovery-note {
+  margin: 0 0 6px;
+  color: var(--color-ink-2);
+}
+.scan-recovery-action {
+  margin-left: 0;
+  font-weight: 600;
+}
 
 /* ── Application Form card ──────────────────── */
 .autofill-helper {

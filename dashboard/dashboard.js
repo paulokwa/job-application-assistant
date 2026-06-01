@@ -1006,6 +1006,35 @@ function showJobInfoReviewNotice(message, tone = 'warning', actionHtml = '') {
   dom.jobInfoReview.classList.remove('hidden');
 }
 
+function showScanRecoveryNotice(kind = 'reconnect') {
+  if (!dom.jobInfoReview) return;
+
+  const isRestricted = kind === 'restricted';
+  const title = isRestricted
+    ? 'This page cannot be scanned.'
+    : 'This page needs to be reconnected.';
+  const steps = isRestricted
+    ? [
+      'Open the job posting in a normal browser tab instead of a PDF, browser settings page, or Chrome Web Store page.',
+      'Reopen Job Application Assistant from that tab and try again.',
+    ]
+    : [
+      'Reload the job page, then reopen Job Application Assistant from the toolbar.',
+      'Try the scan again. If it still fails, right-click the job page and choose "Job Application Assistant".',
+    ];
+
+  dom.jobInfoReview.innerHTML = `
+    <strong class="scan-recovery-title">${esc(title)}</strong>
+    <ol class="scan-recovery-steps">
+      ${steps.map(step => `<li>${esc(step)}</li>`).join('')}
+    </ol>
+    <p class="scan-recovery-note">Your saved profile data is unaffected.</p>
+    <button type="button" class="job-info-review-action scan-recovery-action" data-action="retry-job-scan">Try Again</button>
+  `;
+  dom.jobInfoReview.dataset.tone = 'warning';
+  dom.jobInfoReview.classList.remove('hidden');
+}
+
 function hideJobInfoReviewNotice() {
   if (!dom.jobInfoReview) return;
   dom.jobInfoReview.classList.add('hidden');
@@ -1465,6 +1494,7 @@ async function scanCurrentPage() {
     // own if the page genuinely blocks scripts.
     if (tab.url && isRestrictedUrl(tab.url)) {
       showToast('⚠️ Cannot scan this page — open a job posting in a normal browser tab first.');
+      showScanRecoveryNotice('restricted');
       return;
     }
 
@@ -1474,7 +1504,8 @@ async function scanCurrentPage() {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
     } catch (injectErr) {
       console.warn('[JPDA] Could not inject content script:', injectErr.message);
-      showToast('⚠️ Cannot scan this page — Chrome blocks scripts here (e.g. PDFs, restricted sites).');
+      showToast('⚠️ This page needs to be reconnected. Reload the job page, reopen the extension, and try again.');
+      showScanRecoveryNotice('reconnect');
       return;
     }
 
@@ -1482,6 +1513,7 @@ async function scanCurrentPage() {
 
     if (!response) {
       showToast('⚠️ No response from page. Try right-clicking and using the context menu instead.');
+      showScanRecoveryNotice('reconnect');
       return;
     }
 
@@ -1502,6 +1534,7 @@ async function scanCurrentPage() {
   } catch (err) {
     console.warn('[JPDA] scanCurrentPage error:', err?.message || 'Unknown scan error');
     showToast('⚠️ Could not scan the page. Try the context menu instead.');
+    showScanRecoveryNotice('reconnect');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Scan page';
@@ -1523,6 +1556,7 @@ async function scanJobPageAndMaybeSuggestFields() {
 
     if (tab.url && isRestrictedUrl(tab.url)) {
       showToast('⚠️ Cannot scan this page — open a job posting in a normal browser tab first.');
+      showScanRecoveryNotice('restricted');
       return;
     }
 
@@ -1530,7 +1564,8 @@ async function scanJobPageAndMaybeSuggestFields() {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
     } catch (injectErr) {
       console.warn('[JPDA] Could not inject content script:', injectErr.message);
-      showToast('⚠️ Cannot scan this page — Chrome blocks scripts here (e.g. PDFs, restricted sites).');
+      showToast('⚠️ This page needs to be reconnected. Reload the job page, reopen the extension, and try again.');
+      showScanRecoveryNotice('reconnect');
       return;
     }
 
@@ -1538,6 +1573,7 @@ async function scanJobPageAndMaybeSuggestFields() {
 
     if (!response) {
       showToast('⚠️ No response from page. Try right-clicking and using the context menu instead.');
+      showScanRecoveryNotice('reconnect');
       return;
     }
 
@@ -1608,6 +1644,7 @@ async function scanJobPageAndMaybeSuggestFields() {
   } catch (err) {
     console.warn('[JPDA] scanJobPageAndMaybeSuggestFields error:', err?.message || 'Unknown scan error');
     showToast('⚠️ Could not scan the page. Try the context menu instead.');
+    showScanRecoveryNotice('reconnect');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Scan job page';
@@ -1711,6 +1748,7 @@ function bindEvents() {
   });
   dom.jobInfoReview.addEventListener('click', e => {
     if (e.target.dataset.action === 'open-ai-settings') openSettingsSection('provider');
+    if (e.target.dataset.action === 'retry-job-scan') scanJobPageAndMaybeSuggestFields();
   });
   dom.btnSaveJob.addEventListener('click', saveCurrentJob);
 

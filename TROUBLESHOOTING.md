@@ -253,3 +253,18 @@ Workday-specific matchers are the reference example: `datesectionmonth` and `dat
 **Root cause:** Browser default range input styling reserves thumb space inside the control. With only a styled input background, the visible thumb does not align with the visual track endpoints.
 
 **Fix (already applied):** `dashboard.css` now styles `#range-tone::-webkit-slider-runnable-track`, `#range-tone::-webkit-slider-thumb`, `#range-tone::-moz-range-track`, and `#range-tone::-moz-range-thumb` explicitly. The WebKit thumb uses `margin-top: -5px` so its center aligns with the 4px track.
+
+---
+
+## 19. Scan job page says Chrome blocks scripts on a normal job posting
+
+**Symptom:** Clicking "Scan job page" on a normal HTTPS job posting, such as an Indeed listing, shows a script-injection failure message even though the page is not a PDF, browser settings page, or Chrome Web Store page.
+
+**Root cause:** The extension intentionally uses Chrome's temporary `activeTab` access instead of permanent access to every website. Chrome can revoke that temporary access after an unpacked-extension reload, tab navigation, or reopening the side panel from a different tab. A failed `chrome.scripting.executeScript()` call on a normal web page does not necessarily mean the site permanently blocks extensions.
+
+**Fix (already applied):**
+- Known restricted page types keep the blocked-page message.
+- Injection failures on ordinary web pages show a reconnect message: reload the job page, reopen the extension from the toolbar, and try again.
+- The Job Info card keeps a persistent recovery notice with numbered steps, a "Try Again" button, a context-menu fallback, and reassurance that saved profile data is unaffected.
+
+**Deferred option:** `ROADMAP.md` records an opt-in optional host-permission experiment for common job sites such as Indeed. Do not add broad standing website access by default.

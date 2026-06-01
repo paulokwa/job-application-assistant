@@ -64,6 +64,19 @@ Important: do not package or submit v3.0 until smoke tests pass and the user exp
 
 Autofill remains a broad future bucket, but no immediate autofill implementation task is selected. Keep changes targeted, deterministic, and review-before-fill; follow `TROUBLESHOOTING.md` entry 16 before modifying `modules/autofillMatcher.js`.
 
+## Later Scan Permission Experiment
+
+Deferred for now. The dashboard recovers from expired temporary tab access with clearer instructions and a retry action, without expanding extension permissions.
+
+Potential future enhancement: offer opt-in optional host permissions for common job sites such as Indeed so users can scan those sites without reconnecting the extension after tab navigation or an extension reload.
+
+Guardrails:
+
+- Keep job-site access optional and clearly explained.
+- Request only the specific site permission the user chooses.
+- Preserve the privacy-first default: no standing access to all websites.
+- Reassess Chrome Web Store review impact before implementation.
+
 ## Later Intake Experiments
 
 Deferred for now because the primary workflow is one job at a time. Revisit if users ask for bulk intake or URL-based importing.
