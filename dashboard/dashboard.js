@@ -6,8 +6,6 @@ import { prepareApplicationEmail } from '../modules/emailDrafting.js';
 import { generateRecruiterMessage } from '../modules/recruiterMessage.js';
 import { generateFollowUpMessage } from '../modules/followUpMessage.js';
 import { generateApplicationAnswers, PRESET_QUESTIONS } from '../modules/applicationAnswers.js';
-import { detectJobPage } from '../modules/jobPageDetector.js';
-import { extractProfileKeywords, extractJobKeywords, scoreMatch } from '../modules/fitCheck.js';
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
 import { loadProfile, loadProfileById, loadProfiles, switchProfile } from '../modules/profile.js';
 import { analyzeFit } from '../modules/fitAnalysis.js';
@@ -71,7 +69,7 @@ const state = {
   },
   docSettings: {},
   profileIndex: [],    // [{id, name}] metadata — kept in sync by populateProfileStrip()
-  lastFitCheck: null,  // { jobKeywords, tab, allProfileScores, jobText, jobTitle, jobCompany, lastAiMatch } — reused when card profile selector changes
+  lastFitCheck: null,  // { tab, jobText, jobTitle, jobCompany, selectedProfileId, aiMatchesByProfile } — AI-only Fit Check context
   currentTab: 'resume',     // 'resume' | 'cover-letter'
   drafts:         { resume: null, 'cover-letter': null },
   originalDrafts: { resume: null, 'cover-letter': null },
@@ -100,7 +98,6 @@ const state = {
   },
   autofillFields:  [],
   autofillMatches: [],
-  lastScanData: null,
   jobChat: { messages: [], jobSignature: '' },
 };
 
@@ -216,7 +213,7 @@ const dom = {
   btnSaveJob:         $('btn-save-job'),
   btnTour:            $('btn-tour'),
   btnScan:            $('btn-scan-page'),
-  btnForceFitCheck:   $('btn-force-fit-check'),
+  btnAiFitCheck:      $('btn-ai-fit-check'),
   btnDiscussJob:      $('btn-discuss-job'),
   btnAiJobInfo:       $('btn-ai-job-info'),
   btnScanFormFields:  $('btn-scan-form-fields'),
@@ -356,17 +353,9 @@ function buildJobChatContext() {
   const profileMeta = state.profileIndex.find(p => p.id === activeProfileId);
   const profileName = profileMeta?.name || 'General';
 
-  let fitScore = null;
-  let matchedKeywords = [];
-  let missingKeywords = [];
   let aiReview = null;
   if (lastFitCheck) {
-    const ps = lastFitCheck.allProfileScores?.find(s => s.id === activeProfileId)
-             ?? lastFitCheck.allProfileScores?.[0];
-    if (ps) fitScore = ps.score;
-    matchedKeywords = lastFitCheck.matched  || [];
-    missingKeywords = lastFitCheck.unmatched || [];
-    aiReview = lastFitCheck.lastAiMatch?.result ?? null;
+    aiReview = lastFitCheck.aiMatchesByProfile?.[activeProfileId] ?? null;
   }
 
   return {
@@ -376,9 +365,6 @@ function buildJobChatContext() {
     description:     jobData.description || '',
     profileName,
     profile:         profile || null,
-    fitScore,
-    matchedKeywords,
-    missingKeywords,
     aiReview,
     hasResumeDraft:  Boolean(drafts.resume),
     hasCLDraft:      Boolean(drafts['cover-letter']),
@@ -466,13 +452,10 @@ function renderJobChatOverlay() {
   dom.jobChatEmpty.classList.toggle('hidden', hasContext);
 
   if (hasContext) {
-    const hasFitCheck = Boolean(state.lastFitCheck);
-    const hasAiReview = Boolean(state.lastFitCheck?.lastAiMatch?.result);
+    const hasAiReview = Boolean(buildJobChatContext().aiReview);
     const parts = ['profile', 'job description'];
-    if (hasFitCheck) parts.push('Fit Check results');
-    if (hasAiReview) parts.push('AI review');
-    const suffix = hasFitCheck && !hasAiReview ? ' · AI review not run yet' : '';
-    dom.jobChatContextNote.textContent = `AI has access to: ${parts.join(', ')}.${suffix}`;
+    if (hasAiReview) parts.push('AI Fit Check');
+    dom.jobChatContextNote.textContent = `AI has access to: ${parts.join(', ')}.`;
   }
   dom.jobChatContextNote.classList.toggle('hidden', !hasContext);
   dom.jobChatChips.classList.toggle('hidden', !hasContext || hasMessages);
@@ -705,15 +688,14 @@ async function init() {
     }
   });
 
-  // Listen for profile-switch events from the Fit Check card on the job page.
-  // The tabId guard ensures only the dashboard tracking that tab handles the rescore.
+  // Listen for AI Fit Check actions from the card injected into the job page.
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'FIT_CHECK_PROFILE_CHANGED') {
       const { profileId, tabId } = message;
       if (!profileId || tabId !== state.lastFitCheck?.tab?.id) return;
       currentAiMatchController?.abort();
       currentAiMatchController = null;
-      rerenderFitCheckWithProfile(profileId).catch(() => {});
+      rerenderAiFitCheckWithProfile(profileId).catch(() => {});
     }
     if (message.type === 'RUN_FIT_CHECK_AI') {
       const { profileId, tabId } = message;
@@ -1054,22 +1036,33 @@ function maybeShowScannedJobInfoReview(fields, jobTitle, company) {
   showJobInfoReviewNotice('Review Job Title and Employer before saving or analyzing. Page scans can miss these fields. Use AI suggest fields for a second pass.');
 }
 
-function jobInfoSuggestionBody(info) {
-  const title = info.jobTitle || '(no title found)';
-  const company = info.company || '(no employer found)';
+function jobInfoSuggestionReview(info) {
   return [
-    `Job Title: ${title}`,
-    `Employer: ${company}`,
-    '',
-    'Apply these suggestions to the Job Info fields? Review them before saving or analyzing.',
-  ].join('\n');
+    { label: 'Job title', value: info.jobTitle || '(no title found)' },
+    { label: 'Employer', value: info.company || '(no employer found)' },
+  ];
 }
 
 async function confirmAiJobInfoSuggestions(info) {
-  return showConfirmDialog(
+  return showChoiceDialog(
     'Apply AI field suggestions?',
-    jobInfoSuggestionBody(info),
-    'Apply'
+    'Review the detected details before applying.',
+    {
+      primaryLabel: 'Apply',
+      reviewDetails: jobInfoSuggestionReview(info),
+    }
+  ).then(result => result === 'primary');
+}
+
+async function confirmScannedAiJobInfoSuggestions(info) {
+  return showChoiceDialog(
+    'Apply AI field suggestions?',
+    'Review the detected details. Fit Check is optional.',
+    {
+      secondaryLabel: 'Apply',
+      primaryLabel: 'Apply + Fit Check',
+      reviewDetails: jobInfoSuggestionReview(info),
+    }
   );
 }
 
@@ -1213,11 +1206,11 @@ async function applySession(session) {
   const url = session.sourceUrl || raw.url || '';
   applyExtractedData(raw, url, !!raw.selectedText);
 
-  // Trigger Fit Check for context-menu scans when auto Fit Check is enabled.
-  // Not run on history regenerate (stale tab) or when the user has disabled the feature.
-  if (session.sourceTabId && !session.regenerateRequested && state.docSettings?.autoFitCheck !== false) {
+  // Context-menu scans prepare an explicit AI Fit Check action. They do not
+  // spend tokens automatically.
+  if (session.sourceTabId && !session.regenerateRequested) {
     chrome.tabs.get(session.sourceTabId)
-      .then(tab => { if (tab?.id) return runFitCheck(raw, tab); })
+      .then(tab => { if (tab?.id) prepareAiFitCheckContext(raw, tab); })
       .catch(() => {});  // Tab closed or unavailable — silently skip
   }
 
@@ -1250,150 +1243,58 @@ function isRestrictedUrl(url) {
   );
 }
 
-// ── Fit Check ─────────────────────────────────────────────────────────────
-// Runs automatically after Scan Page (local only — no AI, no tokens).
-// Detects whether the page looks like a job posting, then scores the active
-// profile against the job text. Injects a Shadow DOM card into the job page.
+// ── AI Fit Check ──────────────────────────────────────────────────────────
+// Scanning prepares context only. AI Fit Check runs only after an explicit
+// user choice so no provider request or token spend is hidden behind Scan.
 
-async function runFitCheck(scanResponse, tab, { force = false } = {}) {
+function prepareAiFitCheckContext(scanResponse, tab) {
   if (!tab?.id) return;
+  const text = scanResponse?.selectedText || scanResponse?.pageText || '';
+  if (text.trim().length < 50) return;
 
-  state.lastScanData = { scanResponse, tab };
-
-  const text = scanResponse.pageText || '';
-  const title = scanResponse.title || tab.title || '';
-  const url = scanResponse.url || tab.url || '';
-  const structuredData = scanResponse.structuredData || '';
-
-  const { isLikelyJobPosting, isLikelySearchPage } = detectJobPage({ url, title, text, structuredData });
-
-  if (!isLikelyJobPosting && !force) {
-    if (isLikelySearchPage) {
-      showToast('Fit Check skipped — this looks like a search results or listing page.');
-      return;
-    }
-    // Not detected as a job page — surface the manual button instead of a confusing toast
-    dom.btnForceFitCheck.classList.remove('hidden');
-    return;
-  }
-
-  dom.btnForceFitCheck.classList.add('hidden');
-
-  const jobKeywords = extractJobKeywords(text);
-  const activeProfileId = dom.profileSwitcher.dataset.profileId || '';
-  const isMultiProfile = state.profileIndex.length > 1;
-
-  let score, matched, unmatched;
-  let allProfileScores = [];
-
-  if (isMultiProfile) {
-    // Load all profile contents in parallel — one failure does not block the rest.
-    const settled = await Promise.allSettled(
-      state.profileIndex.map(p => loadProfileById(p.id))
-    );
-
-    // Score each profile; exclude those with no extractable keywords.
-    for (let i = 0; i < state.profileIndex.length; i++) {
-      const { id, name } = state.profileIndex[i];
-      const result = settled[i];
-      if (result.status !== 'fulfilled') continue;
-      const keywords = extractProfileKeywords(result.value || {});
-      if (!keywords.length) continue;
-      const s = scoreMatch(keywords, jobKeywords);
-      allProfileScores.push({ id, name, score: s.score });
-    }
-
-    // Sort descending; prefer the currently active profile in a tie.
-    allProfileScores.sort((a, b) =>
-      b.score !== a.score ? b.score - a.score
-      : a.id === activeProfileId ? -1
-      : b.id === activeProfileId ? 1
-      : 0
-    );
-
-    if (!allProfileScores.length) {
-      showToast('Fit Check needs a saved profile with skills or experience.');
-      return;
-    }
-
-    // Score the active profile for the card display (may be 0 if it has no keywords).
-    const activeIdx = state.profileIndex.findIndex(p => p.id === activeProfileId);
-    const activeResult = activeIdx >= 0 ? settled[activeIdx] : null;
-    const activeKeywords = activeResult?.status === 'fulfilled'
-      ? extractProfileKeywords(activeResult.value || {})
-      : [];
-    ({ score, matched, unmatched } = scoreMatch(activeKeywords, jobKeywords));
-  } else {
-    // Single profile — existing behavior unchanged.
-    const profileKeywords = extractProfileKeywords(state.profile || {});
-    if (!profileKeywords.length) {
-      showToast('Fit Check needs a saved profile with skills or experience.');
-      return;
-    }
-    ({ score, matched, unmatched } = scoreMatch(profileKeywords, jobKeywords));
-  }
-
-  // Store job keywords, matched/unmatched lists, profile scores, and job text so re-renders and chat can reuse them.
-  state.lastFitCheck = { jobKeywords, matched, unmatched, tab, allProfileScores, jobText: text, jobTitle: state.jobData.jobTitle || '', jobCompany: state.jobData.company || '', lastAiMatch: null };
-
-  const profiles = isMultiProfile ? state.profileIndex : [];
-  const bestProfile = allProfileScores.length > 0 ? allProfileScores[0] : null;
-  const hasAiProvider = Boolean(state.settings?.provider);
-
-  try {
-    await chrome.tabs.sendMessage(tab.id, {
-      type: 'SHOW_FIT_CHECK_CARD',
-      score,
-      matched,
-      unmatched,
-      tabId: tab.id,
-      activeProfileId,
-      profiles,
-      bestProfile,
-      hasAiProvider,
-      aiMatch: null,
-      aiMatchError: null,
-    });
-  } catch (err) {
-    // Content script may not be responding (e.g. page navigated away between scan and card send).
-    console.warn('[JPDA] Fit Check card injection failed:', err?.message || err);
-  }
+  const selectedProfileId = dom.profileSwitcher.dataset.profileId || '';
+  state.lastFitCheck = {
+    tab,
+    jobText: text,
+    jobTitle: state.jobData.jobTitle || '',
+    jobCompany: state.jobData.company || '',
+    selectedProfileId,
+    aiMatchesByProfile: {},
+  };
+  dom.btnAiFitCheck.classList.remove('hidden');
+  chrome.tabs.sendMessage(tab.id, { type: 'REMOVE_FIT_CHECK_CARD' }).catch(() => {});
 }
 
-// Re-score the last scanned job against a different profile and re-inject the card.
-// Called when the user changes the profile selector or clicks "Use this profile" in the Fit Check card.
-// Does NOT write to activeProfileId in storage — the selection is temporary.
-async function rerenderFitCheckWithProfile(profileId) {
+async function sendAiFitCheckCard({ profileId, aiMatch = null, aiMatchError = null, aiLoading = false }) {
   const fc = state.lastFitCheck;
   if (!fc?.tab?.id) return;
-
-  const profile = await loadProfileById(profileId);
-  const profileKeywords = extractProfileKeywords(profile || {});
-  if (!profileKeywords.length) return; // selected profile has no scoreable content — skip silently
-
-  const { score, matched, unmatched } = scoreMatch(profileKeywords, fc.jobKeywords);
-  const profiles = state.profileIndex.length > 1 ? state.profileIndex : [];
-  const bestProfile = fc.allProfileScores?.length > 0 ? fc.allProfileScores[0] : null;
-  const hasAiProvider = Boolean(state.settings?.provider);
-  const cachedAiMatch = fc.lastAiMatch?.profileId === profileId ? fc.lastAiMatch.result : null;
 
   try {
     await chrome.tabs.sendMessage(fc.tab.id, {
       type: 'SHOW_FIT_CHECK_CARD',
-      score,
-      matched,
-      unmatched,
       tabId: fc.tab.id,
       activeProfileId: profileId,
-      profiles,
-      bestProfile,
-      hasAiProvider,
-      aiMatch: cachedAiMatch,
-      aiMatchError: null,
+      profiles: state.profileIndex.length > 1 ? state.profileIndex : [],
+      hasAiProvider: Boolean(state.settings?.provider),
+      aiMatch,
+      aiMatchError,
+      aiLoading,
     });
   } catch (err) {
-    console.warn('[JPDA] Fit Check card re-render failed:', err?.message || err);
+    console.warn('[JPDA] AI Fit Check card injection failed:', err?.message || err);
   }
+}
+
+// Profile selection in the Fit Check card is temporary. Cached AI results are
+// reused; a profile that has not been reviewed gets an explicit run button.
+async function rerenderAiFitCheckWithProfile(profileId) {
+  const fc = state.lastFitCheck;
+  if (!fc?.tab?.id) return;
+  fc.selectedProfileId = profileId;
+  await sendAiFitCheckCard({
+    profileId,
+    aiMatch: fc.aiMatchesByProfile?.[profileId] || null,
+  });
 }
 
 function toFitCheckCardAiMatch(result) {
@@ -1408,22 +1309,32 @@ function toFitCheckCardAiMatch(result) {
 }
 
 async function runFitCheckAI(profileId) {
+  if (!profileId) {
+    showToast('Add a profile before running AI Fit Check.');
+    return;
+  }
+
   const fc = state.lastFitCheck;
   if (!fc?.tab?.id || !fc.jobText) return;
+
+  const settings = await loadSettings();
+  if (!settings?.provider) {
+    showToast('Set up an AI provider or Demo Mode before running AI Fit Check.');
+    return;
+  }
+  state.settings = settings;
 
   currentAiMatchController?.abort();
   const controller = new AbortController();
   currentAiMatchController = controller;
 
-  const hasAiProvider = Boolean(state.settings?.provider);
-  const profiles = state.profileIndex.length > 1 ? state.profileIndex : [];
-  const bestProfile = fc.allProfileScores?.length > 0 ? fc.allProfileScores[0] : null;
+  fc.selectedProfileId = profileId;
+  dom.btnAiFitCheck.disabled = true;
+  dom.btnAiFitCheck.textContent = 'Checking fit…';
+  await sendAiFitCheckCard({ profileId, aiLoading: true });
 
-  let score = 0, matched = [], unmatched = [];
   try {
     const profile = await loadProfileById(profileId);
-    const profileKeywords = extractProfileKeywords(profile || {});
-    ({ score, matched, unmatched } = scoreMatch(profileKeywords, fc.jobKeywords));
 
     const savedJobShape = {
       title: fc.jobTitle,
@@ -1432,23 +1343,12 @@ async function runFitCheckAI(profileId) {
       rawContent: fc.jobText.slice(0, 4000),
     };
 
-    const result = await analyzeFit(savedJobShape, profile, state.settings, '', controller.signal, 'transferable');
+    const result = await analyzeFit(savedJobShape, profile, settings, '', controller.signal, 'transferable');
     if (controller.signal.aborted) return;
 
     const cardAiMatch = toFitCheckCardAiMatch(result);
-    fc.lastAiMatch = { profileId, result: cardAiMatch };
-
-    await chrome.tabs.sendMessage(fc.tab.id, {
-      type: 'SHOW_FIT_CHECK_CARD',
-      score, matched, unmatched,
-      tabId: fc.tab.id,
-      activeProfileId: profileId,
-      profiles,
-      bestProfile,
-      hasAiProvider,
-      aiMatch: cardAiMatch,
-      aiMatchError: null,
-    });
+    fc.aiMatchesByProfile[profileId] = cardAiMatch;
+    await sendAiFitCheckCard({ profileId, aiMatch: cardAiMatch });
   } catch (err) {
     if (err?.name === 'AbortError') return;
     const errMsg = err?.message === 'fit_no_job_description' ? 'Add a job description before running AI review.'
@@ -1456,21 +1356,11 @@ async function runFitCheckAI(profileId) {
       : err?.message === 'no_provider' ? 'Set up an AI provider before running AI review.'
       : mapError(err).message;
 
-    try {
-      await chrome.tabs.sendMessage(fc.tab.id, {
-        type: 'SHOW_FIT_CHECK_CARD',
-        score, matched, unmatched,
-        tabId: fc.tab.id,
-        activeProfileId: profileId,
-        profiles,
-        bestProfile,
-        hasAiProvider,
-        aiMatch: null,
-        aiMatchError: errMsg,
-      });
-    } catch (_) {}
+    await sendAiFitCheckCard({ profileId, aiMatchError: errMsg });
   } finally {
     if (currentAiMatchController === controller) currentAiMatchController = null;
+    dom.btnAiFitCheck.disabled = false;
+    dom.btnAiFitCheck.textContent = 'Run AI Fit Check';
   }
 }
 
@@ -1523,14 +1413,8 @@ async function scanCurrentPage() {
     }
 
     applyExtractedData(response, tab.url || '', !!response.selectedText);
+    prepareAiFitCheckContext(response, tab);
     showToast('✦ Page scanned');
-
-    // Run Fit Check immediately — local only, no AI, does not block the scan button.
-    if (state.docSettings?.autoFitCheck !== false) {
-      runFitCheck(response, tab).catch(err => {
-        console.warn('[JPDA] Fit Check error:', err?.message || err);
-      });
-    }
   } catch (err) {
     console.warn('[JPDA] scanCurrentPage error:', err?.message || 'Unknown scan error');
     showToast('⚠️ Could not scan the page. Try the context menu instead.');
@@ -1583,12 +1467,7 @@ async function scanJobPageAndMaybeSuggestFields() {
     }
 
     applyExtractedData(response, tab.url || '', !!response.selectedText);
-
-    if (state.docSettings?.autoFitCheck !== false) {
-      runFitCheck(response, tab).catch(err => {
-        console.warn('[JPDA] Fit Check error:', err?.message || err);
-      });
-    }
+    prepareAiFitCheckContext(response, tab);
 
     const settings = await loadSettings();
     if (!settings?.provider) {
@@ -1621,13 +1500,16 @@ async function scanJobPageAndMaybeSuggestFields() {
       if (!info.jobTitle && !info.company) {
         showJobInfoReviewNotice('AI could not confidently find Job Title or Employer. Please review the fields manually.');
       } else {
-        const apply = await confirmAiJobInfoSuggestions(info);
-        if (apply) {
+        const choice = await confirmScannedAiJobInfoSuggestions(info);
+        if (choice !== 'cancel') {
           applyAiJobInfoSuggestions(info);
           showJobInfoReviewNotice(
             'Job page scanned. AI suggested job details — please review before generating.',
             'info'
           );
+          if (choice === 'primary') {
+            await runFitCheckAI(dom.profileSwitcher.dataset.profileId || '');
+          }
         }
       }
     } catch (aiErr) {
@@ -1742,9 +1624,13 @@ function bindEvents() {
 
   // Scan page
   dom.btnScan.addEventListener('click', scanJobPageAndMaybeSuggestFields);
-  dom.btnForceFitCheck.addEventListener('click', () => {
-    if (!state.lastScanData) return;
-    runFitCheck(state.lastScanData.scanResponse, state.lastScanData.tab, { force: true });
+  dom.btnAiFitCheck.addEventListener('click', () => {
+    const profileId = state.lastFitCheck?.selectedProfileId || dom.profileSwitcher.dataset.profileId || '';
+    if (!profileId) {
+      showToast('Add a profile before running AI Fit Check.');
+      return;
+    }
+    runFitCheckAI(profileId).catch(() => {});
   });
   dom.jobInfoReview.addEventListener('click', e => {
     if (e.target.dataset.action === 'open-ai-settings') openSettingsSection('provider');
@@ -2623,14 +2509,40 @@ function showWelcomeModal() {
 // ── Confirm Dialog ────────────────────────────────────────────────────────
 
 function showConfirmDialog(title, body, confirmLabel = 'Continue') {
+  return showChoiceDialog(title, body, { primaryLabel: confirmLabel })
+    .then(result => result === 'primary');
+}
+
+function showChoiceDialog(title, body, { primaryLabel = 'Continue', secondaryLabel = '', reviewDetails = [] } = {}) {
   return new Promise(resolve => {
     const overlay   = document.getElementById('confirm-overlay');
     const btnOk     = document.getElementById('confirm-btn-ok');
     const btnCancel = document.getElementById('confirm-btn-cancel');
+    const btnSecondary = document.getElementById('confirm-btn-secondary');
+    const review = document.getElementById('confirm-review');
 
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-body').textContent  = body;
-    btnOk.textContent = confirmLabel;
+    review.replaceChildren();
+    review.classList.toggle('hidden', !reviewDetails.length);
+    reviewDetails.forEach(({ label, value }) => {
+      const row = document.createElement('div');
+      row.className = 'confirm-review-row';
+
+      const rowLabel = document.createElement('span');
+      rowLabel.className = 'confirm-review-label';
+      rowLabel.textContent = label;
+
+      const rowValue = document.createElement('span');
+      rowValue.className = 'confirm-review-value';
+      rowValue.textContent = value;
+
+      row.append(rowLabel, rowValue);
+      review.appendChild(row);
+    });
+    btnOk.textContent = primaryLabel;
+    btnSecondary.textContent = secondaryLabel;
+    btnSecondary.classList.toggle('hidden', !secondaryLabel);
     overlay.classList.remove('hidden');
     btnCancel.focus();
 
@@ -2638,15 +2550,18 @@ function showConfirmDialog(title, body, confirmLabel = 'Continue') {
       overlay.classList.add('hidden');
       overlay.removeEventListener('click', onBackdrop);
       btnOk.removeEventListener('click', onOk);
+      btnSecondary.removeEventListener('click', onSecondary);
       btnCancel.removeEventListener('click', onCancel);
       resolve(result);
     };
 
-    const onOk       = () => cleanup(true);
-    const onCancel   = () => cleanup(false);
-    const onBackdrop = e => { if (e.target === overlay) cleanup(false); };
+    const onOk        = () => cleanup('primary');
+    const onSecondary = () => cleanup('secondary');
+    const onCancel    = () => cleanup('cancel');
+    const onBackdrop  = e => { if (e.target === overlay) cleanup('cancel'); };
 
     btnOk.addEventListener('click', onOk);
+    btnSecondary.addEventListener('click', onSecondary);
     btnCancel.addEventListener('click', onCancel);
     overlay.addEventListener('click', onBackdrop);
   });
@@ -3244,6 +3159,8 @@ async function clearDraft(tab) {
 }
 
 async function clearSession() {
+  const fitCheckTabId = state.lastFitCheck?.tab?.id;
+
   await Promise.all([
     chrome.storage.local.remove(['savedDraft']),
     chrome.storage.session.remove([
@@ -3262,6 +3179,7 @@ async function clearSession() {
   state.currentJobMeta = { sourceType: 'manual_entry', rawContent: '', aiJobInfoAttemptedFor: '' };
   state.lastRunMode = null;
   state.loadedFitContext = null;
+  state.lastFitCheck = null;
   state.generationReceipt = null;
   state.editedHtml  = { resume: null, 'cover-letter': null };
   clearTimeout(editedHtmlSaveTimers.resume);
@@ -3275,7 +3193,10 @@ async function clearSession() {
   dom.fieldDesc.value = '';
   dom.selectionNotice.classList.add('hidden');
   dom.sourceIndicator.textContent = '';
-  dom.btnForceFitCheck.classList.add('hidden');
+  dom.btnAiFitCheck.classList.add('hidden');
+  if (fitCheckTabId) {
+    chrome.tabs.sendMessage(fitCheckTabId, { type: 'REMOVE_FIT_CHECK_CARD' }).catch(() => {});
+  }
   dom.genStatus.classList.add('hidden');
   syncJobChatToCurrentJob();
   dom.genStatus.classList.remove('gen-status--complete');

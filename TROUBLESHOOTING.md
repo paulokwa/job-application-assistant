@@ -268,3 +268,19 @@ Workday-specific matchers are the reference example: `datesectionmonth` and `dat
 - The Job Info card keeps a persistent recovery notice with numbered steps, a "Try Again" button, a context-menu fallback, and reassurance that saved profile data is unaffected.
 
 **Deferred option:** `ROADMAP.md` records an opt-in optional host-permission experiment for common job sites such as Indeed. Do not add broad standing website access by default.
+
+---
+
+## 20. Fit Check shows misleading low scores from everyday job-posting words
+
+**Symptom:** The old local Fit Check reports words such as "care", "everyone", "bring", or "vision" as missing and produces a score that differs sharply from the contextual AI review.
+
+**Root cause:** Keyword overlap is too shallow for a useful application-fit decision. Normal posting language, branding copy, and broad nouns can dominate the missing-term list without representing meaningful qualifications.
+
+**Fix (applied locally on 2026-06-01, pending commit):**
+- Removed local keyword scoring, matched/missing chips, best-profile ranking, and the supporting search/listing detector.
+- Removed the automatic Fit Check Documents setting.
+- Made Fit Check AI-only and explicit: scan prepares context, while the user chooses whether to run AI Fit Check.
+- Added three choices after scanned AI details are suggested: Cancel, Apply, and Apply + Fit Check.
+
+**Rule:** Do not reintroduce local keyword-overlap scoring as a fallback. If no AI provider is configured, explain that AI Fit Check requires provider setup.

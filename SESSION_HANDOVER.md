@@ -23,7 +23,7 @@ Next planned work: run the full v3 smoke test. Do not package or submit until sm
 
 ## v3 Features Added Since v2.0
 
-All items in this section are complete on `main` as of 2026-05-30. Kept here for implementation reference and guardrail notes.
+Most items in this section are complete on `main` as of 2026-05-30. The AI-only Fit Check revision is implemented locally as of 2026-06-01 and pending commit. Kept here for implementation reference and guardrail notes.
 
 - Application Email Assistant added on `main` (2026-05-26):
   - New "Prepare application email" button in the Export PDF card — enabled whenever a job description is loaded, no generated resume/cover letter required.
@@ -46,16 +46,16 @@ All items in this section are complete on `main` as of 2026-05-30. Kept here for
 - Direct PDF Download was removed/deferred for store-safety before v3 packaging.
 - The print-dialog Save as PDF function remains the supported export path.
 - Print export now sets the print-window document title from the configured filename pattern, so Chrome Save as PDF can suggest the user's preferred filename.
-- Fit Check v3 candidate work was added on `main`:
-  - Local Basic Fit Check scoring after job-page scan.
-  - Context-menu scan support and a Settings -> Documents toggle for automatic Fit Check.
-  - Job-page detector coverage improvements and activeTab URL fallback for scan.
-  - Keyword scoring improved with phrase matching and normalization.
-  - Multi-profile Fit Check card selector with temporary profile switching only.
-  - Best scoring profile row with "Use this profile" action.
-  - Manual AI review button on the Fit Check card, shown only when an AI provider is configured.
-  - Fit Check AI review runs only after explicit user click/retry, uses `analyzeFit()` in `dashboard.js`, caps job text at 4000 chars, passes `sourceResumeText` as an empty string, uses `transferable` inference mode, caches the card-facing result by profile, aborts in-flight AI on Fit Check profile changes, and does not write `activeProfileId`.
-  - Fit Check AI review payload to `content.js` is whitelisted so `suggestedAngle`, provider settings, API keys, raw profile data, and job text do not reach the content script.
+- Fit Check is now AI-only:
+  - The local keyword-overlap scorer, search-results detector, best-profile ranking, and automatic Fit Check setting were removed. Everyday words made the local score misleading.
+  - Scanning prepares optional AI Fit Check context but does not spend tokens automatically.
+  - After scanned AI job-detail suggestions, the review dialog offers Cancel, Apply, and Apply + Fit Check.
+  - The scanned-details confirmation modal highlights Job Title and Employer in a dedicated review panel so users can verify the fields before applying them.
+  - A separate Run AI Fit Check button remains available after a successful scan.
+  - Context-menu scans prepare the same optional action without running AI.
+  - The on-page AI Fit Check card keeps temporary multi-profile selection, cached card-facing results by profile, explicit run/retry actions, and Job Chat access.
+  - AI Fit Check uses `analyzeFit()` in `dashboard.js`, caps job text at 4000 chars, passes `sourceResumeText` as an empty string, uses `transferable` inference mode, and does not write `activeProfileId`.
+  - AI Fit Check payload to `content.js` stays whitelisted so `suggestedAngle`, provider settings, API keys, raw profile data, and job text do not reach the content script.
 - Job Discussion Chat follow-ups completed on `main` (2026-05-30):
   - Dashboard Job Chat entry points are gated until job context exists.
   - Job Chat history clears when the job context changes.
@@ -96,7 +96,7 @@ All items in this section are complete on `main` as of 2026-05-30. Kept here for
   - Saved Jobs can launch resume-only and cover-letter-only generation.
   - Saved Jobs can prepare recruiter messages, follow-up messages, reminder text, short application answers, and application email drafts.
   - All actions remain review-first: nothing is sent, scheduled, attached, submitted, or form-filled automatically.
-- [DONE] Fit Check v3 candidate work (2026-05-25):
+- [DONE, SUPERSEDED BY AI-ONLY FLOW] Fit Check v3 candidate work (2026-05-25):
   - `d1b1ea8` - `feat: add local Fit Check scoring after job page scan`
   - `d95e78e` - `docs: add Fit Check follow-up items to ROADMAP`
   - `5a58334` - `fix: allow scan when tab URL is unavailable due to activeTab scope`
@@ -106,7 +106,7 @@ All items in this section are complete on `main` as of 2026-05-30. Kept here for
   - `fdbc1fe` - `feat: add profile selector to Fit Check card for multi-profile users`
   - `55cd8ec` - `feat: add best-profile comparison to Fit Check card`
   - `13a94e7` - `fix: whitelist Fit Check AI review card payload`
-- [DONE] Fit Check search-results detector refinement (2026-05-27):
+- [DONE, REMOVED WITH LOCAL SCORER] Fit Check search-results detector refinement (2026-05-27):
   - `c30b005` - `fix: refine Fit Check search results detection`
   - Added search/listing path patterns and high-precision text patterns such as save-search and job-alert phrases.
   - Fixed the Glassdoor `/Job/...jobs-SRCH...` search-page false negative while preserving `/job-listing/...` single postings with content signals.
@@ -159,11 +159,11 @@ All items in this section are complete on `main` as of 2026-05-30. Kept here for
 
 ## Current Main Branch State
 
-Latest known `main` commit (2026-05-30):
+Latest known `main` commit (2026-05-31):
 
-`b0c63c1` - `chore: add focus style for chat refine actions`
+`df3d359` - `feat: implement scan recovery notices for job page scanning failures`
 
-Working tree may have documentation updates until committed.
+Working tree contains the uncommitted AI-only Fit Check revision completed on 2026-06-01. Do not discard it. The revision removes the local scorer and detector, adds explicit AI-only Fit Check actions, and improves the scanned-details confirmation modal.
 
 ## Do Not Repeat
 
@@ -178,8 +178,7 @@ Working tree may have documentation updates until committed.
 - Do not rewrite roadmap docs unless the user asks.
 - Do not redo Job Discussion Chat follow-ups: entry gating, stale chat clearing, Fit Check card chat open, chat-to-Refine actions, and focus styling are complete.
 - Do not add native multi-turn provider messages, chat history persistence, closed-side-panel Fit Check routing, or structured JSON chat actions unless explicitly selected as new scope.
-- Do not rebuild Fit Check Phases 1-3; current `main` already has Basic Fit Check, auto/context-menu support, better scoring, multi-profile selector, best-profile row, and manual AI review.
-- Do not redo Fit Check search/listing detector refinement; current `main` already skips common search/listing pages, handles Glassdoor SRCH pages, returns `isLikelySearchPage`, and has lightweight detector checks.
+- Do not reintroduce the local keyword-overlap Fit Check, automatic Fit Check runs, best-profile ranking, or its search/listing detector. Fit Check is intentionally AI-only and explicit.
 - Do not send Fit Check AI internals to `content.js`; keep the card payload whitelisted and do not expose `suggestedAngle`, provider settings, API keys, raw profile data, or job text to the content script.
 - Do not add AI to the autofill matcher - it is intentionally deterministic and rule-based.
 - Do not redo graduation year select or GitHub portfolio matching in `modules/autofillMatcher.js`; those targeted matcher improvements are complete.
@@ -201,12 +200,17 @@ Working tree may have documentation updates until committed.
   - `node --check content.js`
   - `git diff --check -- dashboard/dashboard.js content.js` reported only line-ending normalization warnings.
   - Manual live Chrome extension test was not run in that audit session.
-- Fit Check detector refinement checks passed after `c30b005`:
-  - `node --check modules/jobPageDetector.js`
+- The earlier Fit Check detector refinement was removed when local keyword scoring was retired. AI Fit Check now runs only after an explicit user action following a successful scan.
+- AI-only Fit Check local verification passed on 2026-06-01:
   - `node --check dashboard/dashboard.js`
-  - `node --check tests/jobPageDetector.test.js`
-  - `node tests/jobPageDetector.test.js`
-  - Manual live Chrome extension test was not run in that session.
+  - `node --check content.js`
+  - `node --check settings/settings.js`
+  - `node --check modules/jobChat.js`
+  - `node --check modules/mock.js`
+  - `node tests/autofillMatcher.test.js`
+  - `node tests/pdfImport.test.js`
+  - `git diff --check`
+  - Manual live Chrome extension smoke testing is still required before commit/package decisions.
 - Autofill graduation year/GitHub matcher checks passed after `d9cd644`:
   - `node --check modules/autofillMatcher.js`
   - `git diff --check`

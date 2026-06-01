@@ -823,7 +823,6 @@ function renderChipBuilder() {
 function populateDocSection(d) {
   if (d.defaultType) defaultTypeSelect.setValue(d.defaultType, { silent: true });
   initChipBuilder(d.filenamePattern || '{docType} - {company} - {jobTitle}');
-  $('chk-auto-fit-check').checked = d.autoFitCheck !== false;
 }
 
 function updateFilenamePreview() {
@@ -847,7 +846,7 @@ async function saveDocuments() {
     $('inp-filename-pattern').value.trim(),
     STORAGE_LIMITS.docSettingsFilenamePatternChars
   );
-  docSettings.autoFitCheck = $('chk-auto-fit-check').checked;
+  delete docSettings.autoFitCheck;
   try {
     await chrome.storage.sync.set({ docSettings });
   } catch (err) {
@@ -1472,14 +1471,9 @@ const SETTINGS_TOURS = {
       body: 'The examples update as you change the pattern, so you can confirm the file names will be clear before saving.'
     },
     {
-      targetId: 'chk-auto-fit-check',
-      title: 'Control Fit Check',
-      body: 'Keep this on if you want a basic fit card after scanning a job page. Turn it off when you only want the generator workspace updated.'
-    },
-    {
       targetId: 'btn-save-documents',
       title: 'Save document settings',
-      body: 'Save these settings when the default mode, file naming pattern, and Fit Check preference look right.'
+      body: 'Save these settings when the default mode and file naming pattern look right.'
     },
   ],
   profiles: [

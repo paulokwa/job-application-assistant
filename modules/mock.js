@@ -384,18 +384,14 @@ export function generateMockJobChatReply(context, userMessage) {
     ? `${context.jobTitle}${context.company ? ` at ${context.company}` : ''}`
     : 'this role';
   const lower = (userMessage || '').toLowerCase();
-  const scoreNote = context.fitScore != null
-    ? ` Your keyword match score is ${context.fitScore}%.`
-    : '';
-
   if (/should.*(apply|go for)/.test(lower)) {
-    return `[Demo mode] Based on the available profile data, here is a realistic take on ${job}.${scoreNote} Review the Fit Check matched and missing terms — if the gaps are skills you can address honestly in a cover letter, applying is reasonable. Switch to a real AI provider and scan the job page to get a specific opinion.`;
+    return `[Demo mode] Based on the available profile data, here is a realistic take on ${job}. Demo mode cannot perform an AI Fit Check. Switch to a real AI provider, scan the job page, and run AI Fit Check for a specific opinion.`;
   }
   if (/emphasize|highlight|lead with|focus/.test(lower)) {
-    return `[Demo mode] For ${job}, lead with the experience and skills that appear in both your profile and the job description. Matched Fit Check terms are your strongest talking points. A real AI provider and full profile will unlock specific wording recommendations.`;
+    return `[Demo mode] For ${job}, lead with the experience and skills that honestly address the posting's priorities. A real AI provider and AI Fit Check will unlock specific wording recommendations.`;
   }
   if (/gap|miss|weak|lack|short/.test(lower)) {
-    return `[Demo mode] Your biggest gaps are the job requirements not clearly represented in your profile. The Fit Check missing-terms list is your starting point. I will not invent gaps — run a real Fit Check with a scanned job description to see an accurate list.`;
+    return `[Demo mode] I will not invent gaps from a keyword list. Switch to a real AI provider, scan the job description, and run AI Fit Check for a contextual review of possible gaps.`;
   }
   if (/resume|angle|position|frame|tailor/.test(lower)) {
     return `[Demo mode] The strongest resume angle for ${job} is a summary that mirrors the top 2–3 priority requirements from the posting, using the job's own language where it is accurate for you. Do not use language that implies experience you do not have. Scan the job and use a real provider for specific suggestions.`;
@@ -404,7 +400,7 @@ export function generateMockJobChatReply(context, userMessage) {
     return `[Demo mode] Only claim what is verifiably in your profile or source resume. For adjacent skills, use framing like "exposure to", "familiar with", or "have worked alongside" rather than claiming direct expertise. I will flag anything that seems overstated when reviewing real context.`;
   }
   if (/interview|question|prepare/.test(lower)) {
-    return `[Demo mode] Prepare to speak to the matched terms from your Fit Check — those are the areas where you have documented evidence. For missing requirements, prepare to acknowledge the gap honestly and pivot to a related verified strength. Real interview prep needs the full job description and profile loaded.`;
+    return `[Demo mode] Prepare examples for the requirements you can support with documented evidence. For missing requirements, acknowledge the gap honestly and pivot to a related verified strength. Real interview prep needs the full job description, profile, and a real AI provider.`;
   }
 
   return `[Demo mode] This is a simulated response — no real AI was called. Scan a job page, fill in your profile in Settings → My Profile, and switch to a real AI provider to get specific application strategy advice for ${job}.`;

@@ -23,7 +23,9 @@ Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by 
 - Storage quota guards
 - Session scan payload cap for large temporary scan text
 - Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
-- Post-v2 / v3 candidate work including Fit Check improvements, print filename support, Application Email Assistant, Application Pack actions, and targeted autofill matcher improvements
+- Post-v2 / v3 candidate work including print filename support, Application Email Assistant, Application Pack actions, and targeted autofill matcher improvements
+
+The AI-only Fit Check revision is implemented locally as of 2026-06-01 and pending commit.
 
 ## v2.0 Release Status
 
@@ -156,7 +158,7 @@ Status: **Complete on `main`** (2026-05-30).
 Completed scope:
 
 - Dashboard feature tour refreshed for the current v3 flow, including the optional Application Helper and Generate as Step 3.
-- Settings section tours refreshed for current document export, Fit Check, profile, and profile-lock behavior.
+- Settings section tours refreshed for current document export, profile, and profile-lock behavior.
 - Saved Jobs page now has a focused tour covering queue summary, saved job cards, status and notes, application materials, messaging tools, and job management.
 - Saved Jobs tour can be replayed from the help button and is marked seen after first run.
 
@@ -182,17 +184,18 @@ Completed scope:
 - This cleanup targeted private provider/profile data only.
 - Other intentional `chrome.storage.sync` usage for low-sensitivity settings/history was left untouched.
 
-### Fit Check Search-Results Detector Refinement
+### AI-Only Fit Check
 
-Status: **Complete on `main`** (2026-05-27).
+Status: **Complete locally; pending commit** (2026-06-01).
 
 Completed scope:
 
-- Search/listing page detection now includes additional path patterns and high-precision page-text phrases such as save-search and job-alert language.
-- Glassdoor `/Job/...jobs-SRCH...` search pages are skipped, while real `/job-listing/...` postings can still pass when posting content signals are present.
-- `detectJobPage()` return values include `isLikelySearchPage`.
-- Dashboard Fit Check skip toast distinguishes search/listing pages from generic non-job pages.
-- Lightweight Node detector checks cover LinkedIn, Indeed, Glassdoor, Greenhouse/Lever-style postings, JSON-LD JobPosting, and plain non-job pages.
+- Removed the local keyword-overlap scorer and search/listing detector because everyday words made the score unreliable.
+- Removed automatic Fit Check settings and automatic post-scan execution.
+- Scans now prepare optional AI Fit Check context without hidden token spend.
+- The scanned AI details dialog offers Cancel, Apply, and Apply + Fit Check.
+- A separate Run AI Fit Check action remains available after scan.
+- The on-page card is AI-only and keeps explicit run/retry, temporary profile selection, cached per-profile AI results, and Job Chat access.
 
 ### Autofill Graduation Year And GitHub Matching
 

@@ -342,6 +342,12 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
       }
       return true;
     }
+
+    if (message.type === 'REMOVE_FIT_CHECK_CARD') {
+      document.getElementById('fit-check-root')?.remove();
+      sendResponse({ ok: true });
+      return true;
+    }
   });
 
   // ── Form field collection ─────────────────────────────────────────────────
@@ -624,28 +630,7 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
       .replace(/'/g, '&#39;');
   }
 
-  function fcScoreLabel(score) {
-    if (score >= 80) return 'Strong keyword overlap';
-    if (score >= 60) return 'Good keyword overlap';
-    if (score >= 30) return 'Partial keyword overlap';
-    return 'Low keyword overlap';
-  }
-
-  function fcScoreColor(score) {
-    if (score >= 80) return '#16a34a';
-    if (score >= 60) return '#2563eb';
-    if (score >= 30) return '#d97706';
-    return '#dc2626';
-  }
-
-  function fcChips(terms, cls) {
-    if (!terms || !terms.length) {
-      return '<span style="color:#9ca3af;font-size:11px;font-style:italic;">None found</span>';
-    }
-    return terms.map(t => `<span class="chip ${fcEscape(cls)}">${fcEscape(t)}</span>`).join('');
-  }
-
-  function injectFitCheckCard({ score, matched, unmatched, profiles, activeProfileId, tabId, bestProfile, hasAiProvider, aiMatch, aiMatchError }) {
+  function injectFitCheckCard({ profiles, activeProfileId, tabId, hasAiProvider, aiMatch, aiMatchError, aiLoading }) {
     // Remove any existing card before re-injecting (e.g. on re-scan or profile switch).
     const existing = document.getElementById('fit-check-root');
     if (existing) existing.remove();
@@ -656,20 +641,7 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
 
     const shadow = host.attachShadow({ mode: 'open' });
 
-    const safeScore    = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
-    const label        = fcScoreLabel(safeScore);
-    const color        = fcScoreColor(safeScore);
-    const matchedArr   = Array.isArray(matched)   ? matched   : [];
-    const unmatchedArr = Array.isArray(unmatched) ? unmatched : [];
     const profilesArr  = Array.isArray(profiles) && profiles.length > 1 ? profiles : [];
-
-    const matchedSection = matchedArr.length > 0 ? `
-      <div class="section-head">Matched profile signals (${matchedArr.length})</div>
-      <div class="chips">${fcChips(matchedArr, 'chip--matched')}</div>` : '';
-
-    const unmatchedSection = unmatchedArr.length > 0 ? `
-      <div class="section-head">Job terms not clearly found (${unmatchedArr.length})</div>
-      <div class="chips">${fcChips(unmatchedArr, 'chip--unmatched')}</div>` : '';
 
     let profileSelectorSection = '';
     if (profilesArr.length > 1) {
@@ -678,31 +650,18 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
       ).join('');
       profileSelectorSection = `
         <div class="profile-row">
-          <label class="profile-label" for="fc-profile-sel">Profile used for score</label>
+          <label class="profile-label" for="fc-profile-sel">Profile used for AI review</label>
           <select id="fc-profile-sel" class="profile-sel">${options}</select>
         </div>`;
     }
 
-    let bestProfileSection = '';
-    if (bestProfile && typeof bestProfile === 'object') {
-      if (bestProfile.id === activeProfileId) {
-        bestProfileSection = `
-        <div class="best-row">
-          <span class="best-text">Best scoring profile: Current profile</span>
-        </div>`;
-      } else {
-        const bestName  = fcEscape(bestProfile.name || '');
-        const bestScore = Math.max(0, Math.min(100, Math.round(Number(bestProfile.score) || 0)));
-        bestProfileSection = `
-        <div class="best-row">
-          <span class="best-text">Best scoring profile: ${bestName} &middot; ${bestScore}%</span>
-          <button class="btn-use-best" id="fc-btn-use-best">Use this profile</button>
-        </div>`;
-      }
-    }
-
     let aiSection = '';
-    if (hasAiProvider) {
+    if (aiLoading) {
+      aiSection = `
+        <div class="ai-cta-row">
+          <span class="ai-cta-hint">Checking fit with your selected AI provider…</span>
+        </div>`;
+    } else if (hasAiProvider) {
       if (aiMatch && typeof aiMatch === 'object') {
         const labelMap = {
           strong_match: 'Strong match', good_match: 'Good match', maybe: 'Possible match',
@@ -732,10 +691,15 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
       } else {
         aiSection = `
           <div class="ai-cta-row">
-            <button class="btn-ai-review" id="fc-btn-ai-review">Run AI review</button>
+            <button class="btn-ai-review" id="fc-btn-ai-review">Run AI Fit Check</button>
             <span class="ai-cta-hint">Uses your selected AI provider.</span>
           </div>`;
       }
+    } else {
+      aiSection = `
+        <div class="ai-error-row">
+          <span class="ai-error-text">Set up an AI provider in Job Application Assistant before running Fit Check.</span>
+        </div>`;
     }
 
     shadow.innerHTML = `
@@ -807,77 +771,6 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           appearance: auto;
         }
         .profile-sel:focus { border-color: #2563eb; }
-        .score-row {
-          display: flex;
-          align-items: baseline;
-          gap: 4px;
-          margin-bottom: 12px;
-        }
-        .score-num {
-          font-size: 30px;
-          font-weight: 800;
-          line-height: 1;
-        }
-        .score-pct {
-          font-size: 15px;
-          font-weight: 700;
-        }
-        .score-lbl {
-          font-size: 12px;
-          color: #6b7280;
-          margin-left: 4px;
-        }
-        .section-head {
-          font-size: 10px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: #6b7280;
-          margin-bottom: 5px;
-          margin-top: 10px;
-        }
-        .chips { display: flex; flex-wrap: wrap; gap: 4px; }
-        .chip {
-          display: inline-block;
-          font-size: 11px;
-          padding: 2px 8px;
-          border-radius: 99px;
-          white-space: nowrap;
-          font-family: inherit;
-        }
-        .chip--matched  { background: #dcfce7; color: #14532d; }
-        .chip--unmatched { background: #fef9c3; color: #78350f; }
-        .best-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          margin-top: 10px;
-          padding: 7px 10px;
-          background: #eff6ff;
-          border: 1px solid #dbeafe;
-          border-radius: 8px;
-        }
-        .best-text {
-          font-size: 11px;
-          color: #1d4ed8;
-          flex: 1;
-          min-width: 0;
-        }
-        .btn-use-best {
-          font-size: 11px;
-          font-family: inherit;
-          font-weight: 600;
-          color: #1d4ed8;
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 0;
-          white-space: nowrap;
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
-        .btn-use-best:hover { color: #1e40af; }
         .ai-cta-row {
           display: flex;
           align-items: center;
@@ -986,24 +879,16 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
       </style>
       <div class="card" role="complementary" aria-label="Fit Check result">
         <div class="header">
-          <span class="title"><span class="title-dot">✦</span> Fit Check</span>
+          <span class="title"><span class="title-dot">✦</span> AI Fit Check</span>
           <button class="btn-dismiss" id="fc-dismiss" aria-label="Dismiss Fit Check card">✕</button>
         </div>
         ${profileSelectorSection}
-        <div class="score-row">
-          <span class="score-num" style="color:${color}">${safeScore}</span>
-          <span class="score-pct" style="color:${color}">%</span>
-          <span class="score-lbl">${fcEscape(label)}</span>
-        </div>
-        ${matchedSection}
-        ${unmatchedSection}
-        ${bestProfileSection}
         ${aiSection}
         <div class="chat-row">
           <button class="btn-chat" id="fc-btn-chat">Discuss this job</button>
         </div>
         <div class="divider"></div>
-        <div class="disclaimer">Keyword overlap is a signal, not a verdict. You may still be a strong fit even with a low score.</div>
+        <div class="disclaimer">AI Fit Check is guidance, not a verdict. Review the result before deciding whether to apply.</div>
       </div>
     `;
 
@@ -1016,19 +901,6 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           chrome.runtime.sendMessage({
             type: 'FIT_CHECK_PROFILE_CHANGED',
             profileId: profileSel.value,
-            tabId,
-          });
-        } catch (_) {}
-      });
-    }
-
-    const btnUseBest = shadow.getElementById('fc-btn-use-best');
-    if (btnUseBest && bestProfile) {
-      btnUseBest.addEventListener('click', () => {
-        try {
-          chrome.runtime.sendMessage({
-            type: 'FIT_CHECK_PROFILE_CHANGED',
-            profileId: bestProfile.id,
             tabId,
           });
         } catch (_) {}

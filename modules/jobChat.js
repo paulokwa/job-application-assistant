@@ -11,11 +11,11 @@ const MAX_CHAT_HISTORY_MESSAGES = 20; // last 10 turns (user + assistant per pai
 
 const SYSTEM_PROMPT = [
   'You are an application strategy advisor helping a job seeker decide how to approach a specific job posting.',
-  'You have been given the candidate\'s saved profile, the job description, and (if available) Fit Check results.',
+  'You have been given the candidate\'s saved profile, the job description, and (if available) AI Fit Check results.',
   'Everything in the provided context is information the candidate has already recorded about themselves.',
   '',
   'STRICT RULES — follow all of these exactly:',
-  '- Use ONLY the provided profile, job description, Fit Check results, and draft status. Do not add information from outside the context.',
+  '- Use ONLY the provided profile, job description, AI Fit Check results, and draft status. Do not add information from outside the context.',
   '- Do NOT fabricate qualifications, certifications, legal eligibility, salary expectations, availability,',
   '  lived experience, direct Indigenous relations experience, or any credential not explicitly stated in the profile.',
   '- If something is not in the profile or context, say so clearly. Do not imply the candidate has it.',
@@ -63,17 +63,6 @@ function buildUserPrompt(context, messages, newMessage) {
     if (context.profileName) lines.push(`Profile: ${context.profileName}`);
     lines.push(profileText);
     lines.push('=== END PROFILE ===', '');
-  }
-
-  // ── Fit Check (keyword score + matched/missing terms) ────────────────────
-  if (context.fitScore != null) {
-    lines.push('=== FIT CHECK — KEYWORD MATCH ===');
-    lines.push(`Keyword match score: ${context.fitScore}%`);
-    if (context.matchedKeywords?.length)
-      lines.push(`Matched terms (candidate has these): ${context.matchedKeywords.slice(0, 15).join(', ')}`);
-    if (context.missingKeywords?.length)
-      lines.push(`Missing terms (in job, not in profile): ${context.missingKeywords.slice(0, 15).join(', ')}`);
-    lines.push('=== END FIT CHECK ===', '');
   }
 
   // ── AI Fit Review ────────────────────────────────────────────────────────

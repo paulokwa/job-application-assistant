@@ -1,6 +1,6 @@
 # v3.0 Release Checklist
 
-Version 2.0 has been accepted by Google after Chrome Web Store submission. This checklist is for the future v3.0 package based on post-v2 work on `main`.
+Version 2.0 has been accepted by Google after Chrome Web Store submission. This checklist is for the future v3.0 package based on post-v2 work on `main` plus the current uncommitted AI-only Fit Check revision.
 
 ## Release Gate
 
@@ -19,12 +19,11 @@ Version 2.0 has been accepted by Google after Chrome Web Store submission. This 
 
 ## v3 Feature Summary
 
-All post-v2 candidate work is complete on `main`. Key features added since v2.0:
+Post-v2 candidate scope is implemented in the current working tree. The AI-only Fit Check revision is pending commit. Key features added since v2.0:
 
 - **Print export**: print-dialog flow for Resume Only, Cover Letter Only, Resume + Cover Letter, and Merged Document. Print-window document title is set from the configured filename pattern so Chrome's Save as PDF dialog suggests the user's preferred filename.
-- **Fit Check improvements**: local keyword scoring after scan; Auto Fit Check toggle (Settings → Documents); context-menu scan support; phrase matching and normalization; multi-profile selector with temporary switching; best-scoring profile row; manual AI review (explicit click only; requires configured provider). Card payload to `content.js` is whitelisted — no API keys, no raw profile data, no job text sent to content script.
+- **AI-only Fit Check**: scans prepare optional context without hidden token spend; context-menu scan support; three-choice apply-details flow; separate explicit Run AI Fit Check action; multi-profile selector with temporary switching and cached per-profile AI results. Card payload to `content.js` is whitelisted — no API keys, no raw profile data, no job text sent to content script.
 - **Job Discussion Chat follow-ups**: chat entry points are gated until job context exists; stale chat history clears on job changes; the Fit Check card can open Job Chat when the dashboard side panel is alive; assistant replies can prefill Resume/Cover Letter Refine as positioning guidance only. Chat refine actions do not auto-apply changes or generate automatically.
-- **Fit Check search-results detector**: skips search/listing pages; handles Glassdoor SRCH pages; `isLikelySearchPage` in return values; toast distinguishes search pages from non-job pages.
 - **Saved Jobs workspace**: stats bar; recently-updated sort; resume-only and cover-letter-only generation from saved jobs; Fit Analysis advisory context for saved-job generation.
 - **Application Pack Actions** (all on Saved Jobs): recruiter message drafts, follow-up message drafts, follow-up reminder text, short application answer drafts, application email drafts. All review-first; nothing is sent, scheduled, attached, submitted, or form-filled automatically.
 - **Autofill improvements**: graduation year select matcher; `toGraduationYear()` helper; GitHub/GitHub Profile/GitHub URL signals in portfolio matcher.
@@ -51,7 +50,6 @@ All post-v2 candidate work is complete on `main`. Key features added since v2.0:
 
 **Print and filename**
 - Settings → Documents: filename pattern saves and reloads.
-- Settings → Documents: Auto Fit Check toggle saves and reloads.
 - Print → Resume Only: print dialog opens, Save as PDF suggests the configured filename.
 - Print → Cover Letter Only: print dialog opens, Save as PDF suggests the configured filename.
 - Print → Resume + Cover Letter: two print dialogs open with per-document filename titles.
@@ -71,12 +69,12 @@ All post-v2 candidate work is complete on `main`. Key features added since v2.0:
 - Application email: overlay opens with manual instruction textarea; generation produces subject and body; pre-send checklist appears before action button.
 
 **Fit Check**
-- Auto Fit Check enabled, no provider: Scan Page on a job posting shows Basic Fit Check card, no AI review button.
-- Auto Fit Check disabled: Scan Page and context-menu scans do not show the Fit Check card.
-- On a job search results page (e.g. LinkedIn jobs list): Fit Check skips with a toast identifying it as a search/listing page.
-- AI provider configured: Fit Check card shows Run AI review button; AI runs only after clicking.
-- Profile selector: switching profiles and clicking Use this profile updates scores without changing `activeProfileId` globally.
-- Best scoring profile row appears for multi-profile users.
+- No AI provider configured: Scan Page prepares job context without running Fit Check; Run AI Fit Check explains that provider setup is required.
+- AI job-detail suggestions: review dialog offers Cancel, Apply, and Apply + Fit Check.
+- Successful scan: Run AI Fit Check remains available as a separate explicit action and does not run automatically.
+- Scan Page and context-menu scans prepare optional AI Fit Check context but do not run AI or show a result card automatically.
+- AI provider configured: clicking Run AI Fit Check injects the result card after the explicit AI request.
+- Profile selector: switching profiles reuses a cached AI result when available or offers an explicit Run AI Fit Check action without changing `activeProfileId` globally.
 - Scanning a new page resets any cached Fit Check AI result.
 - Dismissing the Fit Check card while AI is running does not cause uncaught errors.
 - Fit Check card shows Discuss this job; clicking it opens Job Chat only when the dashboard is alive and the tab/job context still matches.

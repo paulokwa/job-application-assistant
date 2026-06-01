@@ -123,7 +123,7 @@
           <div class="card-header-right">
             <span class="card-hint" id="source-indicator"></span>
             <button id="btn-scan-page" class="btn-scan" type="button" title="Scan the current browser tab for job details" aria-label="Scan current page for job details">Scan job page</button>
-            <button id="btn-force-fit-check" class="btn-scan hidden" type="button" title="Run Fit Check on this page even if job content was not auto-detected" aria-label="Run Fit Check">Fit Check</button>
+            <button id="btn-ai-fit-check" class="btn-scan hidden" type="button" title="Run an AI Fit Check for this job" aria-label="Run AI Fit Check">Run AI Fit Check</button>
             <button id="btn-ai-job-info" class="btn-scan hidden" type="button" title="Use AI to suggest Job Title and Employer from the description" aria-label="Use AI to suggest Job Title and Employer">Suggest fields</button>
             <button id="btn-save-job" class="btn-scan" type="button" title="Save this job to your application queue" aria-label="Save this job">Save to Jobs</button>
             <button id="btn-new-draft" class="btn-scan btn-scan--clear" type="button" title="Clear all fields and start a new draft" aria-label="Clear and start new draft">Clear</button>
@@ -475,8 +475,10 @@
     <div class="confirm-modal">
       <p class="confirm-modal-title" id="confirm-title"></p>
       <p class="confirm-modal-body" id="confirm-body"></p>
+      <div class="confirm-review hidden" id="confirm-review"></div>
       <div class="confirm-modal-actions">
         <button id="confirm-btn-cancel" class="btn-secondary" type="button">Cancel</button>
+        <button id="confirm-btn-secondary" class="btn-secondary hidden" type="button"></button>
         <button id="confirm-btn-ok" class="btn-primary" type="button"></button>
       </div>
     </div>
@@ -820,7 +822,7 @@
 
       <!-- Context note (shown when job is loaded) -->
       <div id="job-chat-context-note" class="job-chat-context-note hidden" role="status">
-        AI has access to your selected profile, job description, and Fit Check results for this session.
+        AI has access to your selected profile, job description, and AI Fit Check results for this session.
       </div>
 
       <!-- Starter chips (shown when job loaded, no messages yet) -->
