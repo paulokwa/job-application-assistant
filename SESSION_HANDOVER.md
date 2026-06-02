@@ -17,13 +17,15 @@ Status:
 - [DONE] v2.0 accepted by Google.
 - [DONE] v3.0 release scope confirmed for smoke testing.
 - [DONE] `manifest.json` bumped to `3.0.0`.
-- [WAITING] Full v3 smoke test before packaging/submission.
+- [DONE] User confirmed full v3 smoke testing passed (2026-06-02).
+- [DONE] v3 submission zip created and inspected locally (2026-06-02).
+- [WAITING] Update Chrome Web Store listing/privacy fields, upload the v3 zip, and submit for review.
 
-Next planned work: run the full v3 smoke test. Do not package or submit until smoke tests pass and the user explicitly confirms packaging/submission.
+Next planned work: upload `job-application-assistant-v3.0.0.zip` to the Chrome Web Store developer dashboard and submit v3.0 for review after the listing/privacy fields are updated.
 
 ## v3 Features Added Since v2.0
 
-Most items in this section are complete on `main` as of 2026-05-30. The AI-only Fit Check revision is implemented locally as of 2026-06-01 and pending commit. Kept here for implementation reference and guardrail notes.
+Most items in this section are complete on `main` as of 2026-06-01. The AI-only Fit Check revision is committed and included in the v3 submission zip. Kept here for implementation reference and guardrail notes.
 
 - Application Email Assistant added on `main` (2026-05-26):
   - New "Prepare application email" button in the Export PDF card — enabled whenever a job description is loaded, no generated resume/cover letter required.
@@ -159,11 +161,11 @@ Most items in this section are complete on `main` as of 2026-05-30. The AI-only 
 
 ## Current Main Branch State
 
-Latest known `main` commit (2026-05-31):
+Latest packaged extension code commit (2026-06-01):
 
-`df3d359` - `feat: implement scan recovery notices for job page scanning failures`
+`6a8aec7` - `Refactor job-related modules: remove Fit Check and job page detection`
 
-Working tree contains the uncommitted AI-only Fit Check revision completed on 2026-06-01. Do not discard it. The revision removes the local scorer and detector, adds explicit AI-only Fit Check actions, and improves the scanned-details confirmation modal.
+The v3 submission zip was created outside the repository at `C:\Coding\job-page-draft-assistant\job-application-assistant-v3.0.0.zip`. It contains runtime files only and was inspected to confirm `manifest.json` is at the archive root, the version is `3.0.0`, and `debugger` / `downloads` permissions are absent.
 
 ## Do Not Repeat
 
@@ -210,7 +212,7 @@ Working tree contains the uncommitted AI-only Fit Check revision completed on 20
   - `node tests/autofillMatcher.test.js`
   - `node tests/pdfImport.test.js`
   - `git diff --check`
-  - Manual live Chrome extension smoke testing is still required before commit/package decisions.
+  - User confirmed full manual v3 smoke testing passed on 2026-06-02 before packaging.
 - Autofill graduation year/GitHub matcher checks passed after `d9cd644`:
   - `node --check modules/autofillMatcher.js`
   - `git diff --check`
