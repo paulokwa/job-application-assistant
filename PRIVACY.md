@@ -1,8 +1,8 @@
 # Privacy Policy for Job Application Assistant
 
-Last updated: May 16, 2026
+Last updated: June 2, 2026
 
-Job Application Assistant is a Chrome extension that helps users create tailored resume and cover letter drafts for specific job postings.
+Job Application Assistant is a Chrome extension that helps users create tailored job application drafts and review their fit for specific job postings.
 
 This privacy policy explains what information the extension uses, where it is stored, and when it may be sent to an AI provider selected by the user.
 
@@ -12,7 +12,7 @@ Job Application Assistant may use the following information when you choose to e
 
 - Profile information, such as your name, contact details, work experience, education, skills, certifications, and other resume or cover letter details.
 - Job posting information, such as job title, employer, posting URL, and job description text.
-- Draft content, including generated resumes, generated cover letters, manual preview edits, and job history.
+- Draft content, including generated resumes, generated cover letters, application email drafts, recruiter message drafts, follow-up message drafts, short application answer drafts, reminder text, manual preview edits, and job history.
 - Settings, such as selected AI provider, selected model, document preferences, templates, accent colour, spacing, and filename preferences.
 - API keys or local endpoint settings that you provide for your selected AI provider.
 
@@ -30,16 +30,16 @@ Job Application Assistant does not operate its own external server for storing y
 
 ## AI providers and data sharing
 
-Job Application Assistant can generate drafts using the AI provider selected by the user. Supported provider endpoints may include OpenAI, Google Gemini, OpenRouter, or local Ollama endpoints running on your own device.
+Job Application Assistant can generate drafts, run manual AI Fit Check reviews, and answer Job Chat questions using the AI provider selected by the user. Supported provider endpoints may include OpenAI, Google Gemini, OpenRouter, or local Ollama endpoints running on your own device.
 
-When you generate or refine a draft using a cloud AI provider, the extension may send relevant content to that provider, such as:
+When you generate or refine a draft, run an AI Fit Check, or use Job Chat with a cloud AI provider, the extension may send relevant content to that provider, such as:
 
 - Job description text.
 - Resume, cover letter, or profile details needed to create the draft.
-- Revision instructions that you enter.
+- Revision instructions, application instructions, and Job Chat messages that you enter.
 - Selected drafting settings, such as tone or length.
 
-This information is sent only for the purpose of generating or refining resume and cover letter drafts. The selected AI provider processes the request according to its own terms and privacy policy.
+This information is sent only for the requested draft generation, draft refinement, AI Fit Check review, or Job Chat response. The selected AI provider processes the request according to its own terms and privacy policy.
 
 If you use local AI through Ollama, requests are sent to the local endpoint configured in the extension, such as `localhost` or `127.0.0.1`, rather than to a cloud AI provider.
 
@@ -55,7 +55,7 @@ The extension does not continuously monitor browsing activity, does not collect 
 
 Job Application Assistant does not load or execute remote JavaScript or remote WebAssembly. Extension code is packaged with the extension.
 
-Network requests to AI provider APIs are used only to generate or refine drafts and are not used to load executable code.
+Network requests to AI provider APIs are used only for requested AI features, such as generating or refining drafts, running AI Fit Check, or answering Job Chat questions. They are not used to load executable code.
 
 ## Data selling and unrelated use
 
@@ -73,7 +73,7 @@ You can remove stored profiles, draft content, job history, provider settings, a
 
 ## Accuracy of AI-generated content
 
-AI-generated content may be inaccurate, incomplete, or generic. You are responsible for reviewing all generated resumes, cover letters, facts, dates, job titles, qualifications, achievements, and claims before submitting an application.
+AI-generated content and advice may be inaccurate, incomplete, or generic. You are responsible for reviewing all generated resumes, cover letters, application messages, answers, facts, dates, job titles, qualifications, achievements, and claims before submitting an application.
 
 ## Changes to this policy
 
