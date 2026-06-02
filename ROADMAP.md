@@ -12,6 +12,8 @@ Version 1.0 is live on the Chrome Web Store.
 
 Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by Google. The v2.0 release checklist is complete: manifest bumped, smoke tests passed, privacy policy verified, screenshots updated, and overview copy updated.
 
+Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting Google review. Do not create or submit a replacement v3.0 package unless the user explicitly confirms a new release scope.
+
 `main` currently contains:
 
 - Saved Jobs workflow
@@ -23,9 +25,9 @@ Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by 
 - Storage quota guards
 - Session scan payload cap for large temporary scan text
 - Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
-- Post-v2 / v3 candidate work including print filename support, Application Email Assistant, Application Pack actions, and targeted autofill matcher improvements
+- Submitted v3.0 work including print filename support, Application Email Assistant, Application Pack actions, AI-only Fit Check, Job Chat follow-ups, and targeted autofill matcher improvements
 
-The AI-only Fit Check revision is implemented locally as of 2026-06-01 and pending commit.
+The AI-only Fit Check revision is committed and included in the submitted v3.0 package.
 
 ## v2.0 Release Status
 
@@ -38,7 +40,14 @@ The AI-only Fit Check revision is implemented locally as of 2026-06-01 and pendi
 - [DONE] v2.0 submitted to the Chrome Web Store on 2026-05-22.
 - [DONE] v2.0 accepted by Google.
 
-v3.0 release scope is confirmed for smoke testing. Do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission.
+## v3.0 Release Status
+
+- [DONE] Version number set to `3.0.0`.
+- [DONE] Full smoke tests passed.
+- [DONE] Privacy policy and Chrome Web Store listing/privacy fields updated.
+- [DONE] Submission zip created and inspected.
+- [DONE] v3.0 submitted to the Chrome Web Store on 2026-06-02.
+- [WAITING] Google review outcome.
 
 ## Final v2.0 Smoke Test Checklist
 
@@ -56,11 +65,7 @@ v3.0 release scope is confirmed for smoke testing. Do not package or submit v3.0
 
 ## Active Roadmap Ideas
 
-### 1. v3 Smoke Test
-
-Goal: run the full v3 smoke test against the confirmed release scope before packaging.
-
-Important: do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission. Direct PDF Download has been removed/deferred for store-safety; keep the print-dialog Save as PDF path available.
+No immediate feature work is selected while the v3.0 Chrome Web Store review is pending.
 
 ## Later Autofill Improvements
 
@@ -186,7 +191,7 @@ Completed scope:
 
 ### AI-Only Fit Check
 
-Status: **Complete locally; pending commit** (2026-06-01).
+Status: **Complete on `main` and included in the submitted v3.0 package** (2026-06-01).
 
 Completed scope:
 
@@ -314,7 +319,7 @@ Guardrails (permanent):
 
 ## Suggested Order For Active Work
 
-1. v3 Smoke Test
+No active implementation task is selected while v3.0 is awaiting Chrome Web Store review.
 
 ## Autofill Known Limitations / Future Improvements
 

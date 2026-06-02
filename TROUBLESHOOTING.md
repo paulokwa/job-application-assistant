@@ -277,7 +277,7 @@ Workday-specific matchers are the reference example: `datesectionmonth` and `dat
 
 **Root cause:** Keyword overlap is too shallow for a useful application-fit decision. Normal posting language, branding copy, and broad nouns can dominate the missing-term list without representing meaningful qualifications.
 
-**Fix (applied locally on 2026-06-01, pending commit):**
+**Fix (applied on `main` and included in the submitted v3.0 package):**
 - Removed local keyword scoring, matched/missing chips, best-profile ranking, and the supporting search/listing detector.
 - Removed the automatic Fit Check Documents setting.
 - Made Fit Check AI-only and explicit: scan prepares context, while the user chooses whether to run AI Fit Check.

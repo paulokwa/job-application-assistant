@@ -3,7 +3,8 @@
 ## Current Release Status
 
 - v2.0 submitted to the Chrome Web Store on 2026-05-22 and accepted by Google.
-- `main` is the active development branch for post-v2 / v3 candidate work.
+- v3.0 submitted to the Chrome Web Store on 2026-06-02 and awaiting Google review.
+- `main` contains the submitted v3.0 release continuity state.
 
 ## Next Action Gate
 
@@ -19,9 +20,10 @@ Status:
 - [DONE] `manifest.json` bumped to `3.0.0`.
 - [DONE] User confirmed full v3 smoke testing passed (2026-06-02).
 - [DONE] v3 submission zip created and inspected locally (2026-06-02).
-- [WAITING] Update Chrome Web Store listing/privacy fields, upload the v3 zip, and submit for review.
+- [DONE] Chrome Web Store listing/privacy fields updated and v3.0 submitted for review (2026-06-02).
+- [WAITING] Google review outcome for v3.0.
 
-Next planned work: upload `job-application-assistant-v3.0.0.zip` to the Chrome Web Store developer dashboard and submit v3.0 for review after the listing/privacy fields are updated.
+Next planned work: wait for the Chrome Web Store review outcome. Do not create or submit a replacement v3.0 package unless the user explicitly confirms a new release scope.
 
 ## v3 Features Added Since v2.0
 
@@ -165,7 +167,7 @@ Latest packaged extension code commit (2026-06-01):
 
 `6a8aec7` - `Refactor job-related modules: remove Fit Check and job page detection`
 
-The v3 submission zip was created outside the repository at `C:\Coding\job-page-draft-assistant\job-application-assistant-v3.0.0.zip`. It contains runtime files only and was inspected to confirm `manifest.json` is at the archive root, the version is `3.0.0`, and `debugger` / `downloads` permissions are absent.
+The submitted v3 zip was created outside the repository at `C:\Coding\job-page-draft-assistant\job-application-assistant-v3.0.0.zip`. It contains runtime files only and was inspected to confirm `manifest.json` is at the archive root, the version is `3.0.0`, and `debugger` / `downloads` permissions are absent.
 
 ## Do Not Repeat
 
@@ -224,7 +226,7 @@ See `ROADMAP.md`. Do not duplicate the full roadmap here.
 
 ## Release Checklists
 
-See `RELEASE_V3_CHECKLIST.md` for active v3 planning.
+See `RELEASE_V3_CHECKLIST.md` for the submitted v3.0 package record while Google review is pending.
 See `RELEASE_V2_CHECKLIST.md` only as the historical checklist for the already-submitted and accepted v2.0 package.
 
 ## Handover Maintenance Rule

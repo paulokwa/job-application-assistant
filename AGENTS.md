@@ -10,7 +10,7 @@ Before planning or coding, read these files in order:
 6. TROUBLESHOOTING.md
 
 Current release status:
-v2.0 was accepted by Google after Chrome Web Store submission. v3.0 planning can continue, but do not package or submit v3.0 until the user explicitly confirms the release scope.
+v2.0 was accepted by Google. v3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting Google review. Do not create or submit a replacement v3.0 package unless the user explicitly confirms a new release scope.
 
 Important v3 release note:
 Direct PDF download was removed/deferred for store-safety. Keep the print-dialog Save as PDF path available.

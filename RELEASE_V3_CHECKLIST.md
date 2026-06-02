@@ -1,13 +1,15 @@
 # v3.0 Release Checklist
 
-Version 2.0 has been accepted by Google after Chrome Web Store submission. This checklist is for the future v3.0 package based on post-v2 work on `main` plus the current uncommitted AI-only Fit Check revision.
+Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting Google review. This checklist records the submitted v3.0 package and the checks completed before submission.
 
 ## Release Gate
 
-- v3.0 planning can continue now that v2.0 has been accepted.
-- v3.0 release scope is confirmed for smoke testing.
-- `manifest.json` should now be `3.0.0`.
-- Do not package or submit v3.0 until smoke tests pass and the user explicitly confirms packaging/submission.
+- [DONE] v3.0 release scope confirmed.
+- [DONE] `manifest.json` set to `3.0.0`.
+- [DONE] Full smoke testing passed and the user explicitly confirmed packaging/submission.
+- [DONE] v3.0 submitted to the Chrome Web Store on 2026-06-02.
+- [WAITING] Google review outcome.
+- Do not create or submit a replacement v3.0 package unless the user explicitly confirms a new release scope.
 - Direct PDF Download was removed/deferred for store-safety before v3 packaging.
 
 ## Permission Review
@@ -19,7 +21,7 @@ Version 2.0 has been accepted by Google after Chrome Web Store submission. This 
 
 ## v3 Feature Summary
 
-Post-v2 candidate scope is implemented in the current working tree. The AI-only Fit Check revision is pending commit. Key features added since v2.0:
+The submitted v3.0 package includes these features added since v2.0:
 
 - **Print export**: print-dialog flow for Resume Only, Cover Letter Only, Resume + Cover Letter, and Merged Document. Print-window document title is set from the configured filename pattern so Chrome's Save as PDF dialog suggests the user's preferred filename.
 - **AI-only Fit Check**: scans prepare optional context without hidden token spend; context-menu scan support; three-choice apply-details flow; separate explicit Run AI Fit Check action; multi-profile selector with temporary switching and cached per-profile AI results. Card payload to `content.js` is whitelisted — no API keys, no raw profile data, no job text sent to content script.
@@ -98,18 +100,18 @@ Post-v2 candidate scope is implemented in the current working tree. The AI-only 
 
 ## Packaging Steps
 
-Run the pre-package checks and smoke tests first. Complete packaging/submission only after smoke tests pass and the user explicitly confirms packaging/submission:
+Completed before the 2026-06-02 submission:
 
-1. Confirm working tree is clean: `git status`
-2. Confirm latest commit is the expected release baseline: `git log --oneline -5`
-3. Confirm `manifest.json` version is `3.0.0`
-4. Reload the unpacked extension in Chrome
-5. Run the smoke test checklist above
-6. Update Chrome Web Store listing description to include Application Pack Actions, autofill, and Fit Check improvements
-7. Verify privacy policy accurately describes Application Pack Action draft generation (drafts are sent to the user's configured AI provider; not stored server-side by the extension)
-8. Package: zip all extension files, excluding `.git/`, `tests/`, `*.md` planning docs, and any dev-only files
-9. Upload zip to the Chrome Web Store developer dashboard
-10. Submit for review
+1. [DONE] Confirm working tree is clean: `git status`
+2. [DONE] Confirm latest commit is the expected release baseline: `git log --oneline -5`
+3. [DONE] Confirm `manifest.json` version is `3.0.0`
+4. [DONE] Reload the unpacked extension in Chrome
+5. [DONE] Run the smoke test checklist above
+6. [DONE] Update Chrome Web Store listing description to include Application Pack Actions, autofill, and Fit Check improvements
+7. [DONE] Verify privacy policy accurately describes Application Pack Action draft generation (drafts are sent to the user's configured AI provider; not stored server-side by the extension)
+8. [DONE] Package: zip all extension files, excluding `.git/`, `tests/`, `*.md` planning docs, and any dev-only files
+9. [DONE] Upload zip to the Chrome Web Store developer dashboard
+10. [DONE] Submit for review on 2026-06-02
 
 ## Listing / Privacy Check
 

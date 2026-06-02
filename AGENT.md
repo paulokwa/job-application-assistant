@@ -21,7 +21,7 @@ Before starting work, report:
 - Next gated action
 - What is already completed and must not be repeated
 
-Release gate: v2.0 has been accepted by Google. v3.0 planning can continue, but do not package or submit v3.0 until the user explicitly confirms the release scope.
+Release gate: v2.0 has been accepted by Google. v3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting Google review. Do not create or submit a replacement v3.0 package unless the user explicitly confirms a new release scope.
 
 ## Required reading reference
 
@@ -30,7 +30,7 @@ Release gate: v2.0 has been accepted by Google. v3.0 planning can continue, but 
 | `START_HERE.md` | First-stop summary for new sessions, current release status, and active v3 risk |
 | `AGENTS.md` | Short authoritative startup checklist and stop conditions |
 | `SESSION_HANDOVER.md` | Current release status, completed v2 work, v3 candidate work, and do-not-repeat list |
-| `RELEASE_V3_CHECKLIST.md` | Required checklist for future v3.0 packaging after the user confirms release scope |
+| `RELEASE_V3_CHECKLIST.md` | Historical checklist and submitted-package record for v3.0 while Google review is pending |
 | `RELEASE_V2_CHECKLIST.md` | Historical checklist for the accepted v2.0 package |
 | `ROADMAP.md` | Future roadmap ideas and suggested branch order after v2.0 |
 | `README.md` | Repo overview, setup, and basic usage |
