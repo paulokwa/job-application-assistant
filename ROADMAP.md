@@ -65,7 +65,64 @@ The AI-only Fit Check revision is committed and included in the submitted v3.0 p
 
 ## Active Roadmap Ideas
 
-No immediate feature work is selected while the v3.0 Chrome Web Store review is pending.
+Version 3.0 is still awaiting Chrome Web Store review. Do not package or submit a replacement v3.0 build unless the user explicitly confirms a new release scope.
+
+The first implementation task after review, or earlier only if the user explicitly confirms a post-v3 fix scope, should be the tab-scoped dashboard state work below.
+
+### Tab-Scoped Job Sessions And Draft Restore
+
+Suggested branch: `fix/tab-scoped-job-sessions`
+
+Status: **Urgent candidate for next implementation pass. Audit before coding.**
+
+Problem:
+
+- Job scan and generated draft state currently use shared extension-wide storage keys such as `chrome.storage.session.extractedData` and `chrome.storage.local.savedDraft`.
+- If the user opens the extension on multiple job tabs, scanning Job A can update every open dashboard instance, including the dashboard opened for Job B.
+- If the user scans Job B after generating for Job A, then closes/reopens the side panel, Job A can reappear because the last generated `savedDraft` is global rather than tied to the tab/job context.
+- A new extension instance opened from a fresh tab should start blank unless that tab already has its own saved job session.
+
+Desired behavior:
+
+- Tab A with Job A remembers Job A.
+- Tab B with Job B remembers Job B.
+- Scanning in Tab A must not update the dashboard instance for Tab B.
+- Reopening the extension on Tab A restores Tab A's job context and draft, if any.
+- Reopening the extension on Tab B restores Tab B's job context and draft, if any.
+- Opening the extension on a new Tab C with no prior job context opens blank.
+- Saved Jobs remains global. The per-tab state is only for the active dashboard/session/draft workspace.
+
+Implementation direction to audit carefully:
+
+- Replace the single global session payload with tab-scoped storage, for example `jobSessionsByTab[tabId]`.
+- Replace the single global saved draft key with tab-scoped draft storage, for example `savedDraftsByTab[tabId]`.
+- Ensure each dashboard instance knows its owning `sourceTabId`. `background.js` should open the side panel with a path such as `dashboard/dashboard.html?sourceTabId=<tab.id>` when launched from a browser tab.
+- Dashboard startup should load only the job session and saved draft for its own `sourceTabId`.
+- Dashboard `chrome.storage.onChanged` handling should ignore job-session changes for other tab IDs.
+- Dashboard scan should write only the current tab's job session and clear only that tab's previous generated draft.
+- Context-menu scan should write only the clicked tab's job session.
+- Saved Jobs and History "load into generator" flows need explicit routing to the intended dashboard/source tab, not a global `extractedData` overwrite.
+- The Clear button should clear only the current tab's job session and draft, not every tab's workspace.
+- Generated drafts should still survive closing/reopening the side panel, but only for the same tab/job context.
+
+Risk notes:
+
+- This must be done as a deliberate lifecycle/storage refactor, not as another small patch to the current global `extractedData` flow.
+- Audit `dashboard/dashboard.js`, `background.js`, `jobs/jobs.js`, and `history/history.js` before editing because all four currently participate in session handoff.
+- Preserve the existing `activeTab` permission model. Do not add broad host permissions as part of this task.
+- Do not break full-page mode. Full-page dashboard URLs already use `mode=full` and may include `sourceTabId`; confirm expected behavior before changing.
+- Do not break Saved Jobs, History regenerate, Fit Analysis context handoff, Application Pack actions, print/export, or manual Clear.
+
+Suggested manual smoke tests:
+
+- Open Job A in Tab A, open the extension, scan. Open Job B in Tab B, open the extension, scan. Confirm each dashboard shows only its own job.
+- With both dashboards open, rescan Tab A. Confirm Tab B does not change.
+- Generate for Job A. Confirm Job A auto-restores only when reopening from Tab A.
+- Scan Job B without generating. Close/reopen from Tab B. Confirm Job B restores and Job A does not appear.
+- Open a new blank Tab C and open the extension. Confirm it starts blank.
+- Load a Saved Job into the generator and confirm it targets only the current dashboard.
+- Regenerate from History and confirm it targets only the current dashboard.
+- Clear Tab A and confirm Tab B is unaffected.
 
 ## Later Autofill Improvements
 
