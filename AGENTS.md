@@ -5,12 +5,13 @@ Before planning or coding, read these files in order:
 1. START_HERE.md
 2. SESSION_HANDOVER.md
 3. AGENT.md
-4. RELEASE_V3_CHECKLIST.md
-5. ROADMAP.md
-6. TROUBLESHOOTING.md
+4. RELEASE_V4_CHECKLIST.md
+5. RELEASE_V3_CHECKLIST.md
+6. ROADMAP.md
+7. TROUBLESHOOTING.md
 
 Current release status:
-v2.0 was accepted by Google. v3.0 was submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04. Current post-v3 work is for the v4.0 release cycle. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
+v2.0 was accepted by Google. v3.0 was submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04. v4.0 is the active release cycle, with Tab-Scoped Job Sessions and Draft Restore completed as v4.0 development work. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
 
 Important v3 release note:
 Direct PDF download was removed/deferred for store-safety. Keep the print-dialog Save as PDF path available.

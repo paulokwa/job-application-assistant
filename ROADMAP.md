@@ -52,6 +52,17 @@ The AI-only Fit Check revision is committed and included in the approved v3.0 pa
 - [DONE] v3.0 submitted to the Chrome Web Store on 2026-06-02.
 - [DONE] v3.0 approved by Google on 2026-06-04.
 
+## v4.0 Release Status
+
+See `RELEASE_V4_CHECKLIST.md` for the active v4.0 release-cycle checklist, smoke tests, gates, and packaging guardrails.
+
+- [DONE] v4.0 development cycle opened.
+- [DONE] Tab-Scoped Job Sessions and Draft Restore completed for v4.0 development.
+- [WAITING] User confirms final v4.0 release scope.
+- [WAITING] `manifest.json` version bump to `4.0.0`.
+- [WAITING] Full v4.0 smoke testing.
+- [WAITING] User explicitly confirms v4.0 packaging/submission.
+
 ## Final v2.0 Smoke Test Checklist
 
 - Settings -> AI Provider still works.

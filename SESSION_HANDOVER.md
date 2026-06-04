@@ -4,7 +4,7 @@
 
 - v2.0 submitted to the Chrome Web Store on 2026-05-22 and accepted by Google.
 - v3.0 submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04.
-- Current post-v3 development work is for the v4.0 release cycle.
+- v4.0 is the active release cycle. Tab-Scoped Job Sessions and Draft Restore is completed v4.0 development work.
 
 ## Next Action Gate
 
@@ -22,7 +22,12 @@ Status:
 - [DONE] v3 submission zip created and inspected locally (2026-06-02).
 - [DONE] Chrome Web Store listing/privacy fields updated and v3.0 submitted for review (2026-06-02).
 - [DONE] v3.0 approved by Google (2026-06-04).
+- [DONE] v4.0 release checklist created.
 - [DONE] Tab-scoped job sessions and draft restore implemented for v4.0 development (2026-06-04). User tested locally and confirmed it seems to work well before commit/push.
+- [WAITING] User confirms final v4.0 release scope.
+- [WAITING] `manifest.json` version bump to `4.0.0`.
+- [WAITING] Full v4.0 smoke testing.
+- [WAITING] User explicitly confirms v4.0 packaging/submission.
 
 Next planned work: continue v4.0 development and regression testing as explicitly requested. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
 
@@ -240,6 +245,7 @@ See `ROADMAP.md`. Do not duplicate the full roadmap here.
 
 ## Release Checklists
 
+See `RELEASE_V4_CHECKLIST.md` for the active v4.0 release-cycle checklist, smoke tests, gates, and packaging guardrails.
 See `RELEASE_V3_CHECKLIST.md` for the approved v3.0 package record.
 See `RELEASE_V2_CHECKLIST.md` only as the historical checklist for the already-submitted and accepted v2.0 package.
 

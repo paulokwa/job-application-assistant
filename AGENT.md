@@ -6,10 +6,11 @@ Every AI agent/Codex/Claude session must start with `START_HERE.md`, then read t
 
 1. `SESSION_HANDOVER.md`
 2. `AGENT.md`
-3. `RELEASE_V3_CHECKLIST.md`
-4. `ROADMAP.md`
-5. `TROUBLESHOOTING.md`
-6. `README.md` as needed
+3. `RELEASE_V4_CHECKLIST.md`
+4. `RELEASE_V3_CHECKLIST.md`
+5. `ROADMAP.md`
+6. `TROUBLESHOOTING.md`
+7. `README.md` as needed
 
 `AGENTS.md` is the short authoritative startup checklist. This file gives the fuller project rules and should stay aligned with `AGENTS.md` and `START_HERE.md`.
 
@@ -21,15 +22,16 @@ Before starting work, report:
 - Next gated action
 - What is already completed and must not be repeated
 
-Release gate: v2.0 has been accepted by Google. v3.0 was submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04. Current post-v3 work is for the v4.0 release cycle. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
+Release gate: v2.0 has been accepted by Google. v3.0 was submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04. v4.0 is the active release cycle, with Tab-Scoped Job Sessions and Draft Restore completed as v4.0 development work. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
 
 ## Required reading reference
 
 | File | Purpose |
 |---|---|
-| `START_HERE.md` | First-stop summary for new sessions, current release status, and active v3 risk |
+| `START_HERE.md` | First-stop summary for new sessions, current release status, and active release gate |
 | `AGENTS.md` | Short authoritative startup checklist and stop conditions |
-| `SESSION_HANDOVER.md` | Current release status, completed v2 work, v3 candidate work, and do-not-repeat list |
+| `SESSION_HANDOVER.md` | Current release status, completed work, v4 gate status, and do-not-repeat list |
+| `RELEASE_V4_CHECKLIST.md` | Active v4.0 release-cycle checklist, smoke tests, gates, and packaging guardrails |
 | `RELEASE_V3_CHECKLIST.md` | Historical checklist and approved-package record for v3.0 |
 | `RELEASE_V2_CHECKLIST.md` | Historical checklist for the accepted v2.0 package |
 | `ROADMAP.md` | Future roadmap ideas and suggested branch order after v2.0 |
@@ -55,5 +57,5 @@ A Chrome extension (Manifest V3, side panel) that helps job seekers generate tai
 - The design system is "The Quiet Advisor" — warm parchment light mode, cool-tinted dark mode, slate-teal accent (`oklch(46% 0.10 195)`)
 - Both `dashboard/` and `settings/` share the same token names but have separate CSS files
 - JS modules live in `modules/` — provider abstraction, drafting, profile, extraction, renderer
-- `chrome.storage.local` → provider settings, profiles, source resume text, saved jobs, job history, saved draft; `chrome.storage.sync` → low-sensitivity document settings and compact history summaries; `chrome.storage.session` → captured job page data
+- `chrome.storage.local` → provider settings, profiles, source resume text, saved jobs, job history, and tab-scoped draft restore data; `chrome.storage.sync` → low-sensitivity document settings and compact history summaries; `chrome.storage.session` → tab-scoped captured job page data
 - Check `TROUBLESHOOTING.md` before debugging any API, CSS variable, or settings-page JS issue
