@@ -123,6 +123,12 @@ export async function clearProfileData(id) {
 
 // ── AI prompt helper ──────────────────────────────────────────────────────
 
+function formatCertification(cert) {
+  if (typeof cert === 'string') return cert;
+  if (!cert || typeof cert !== 'object') return '';
+  return [cert.name, cert.issuer, cert.year].filter(Boolean).join(' - ');
+}
+
 export function profileToPromptText(profile) {
   const p = profile.personalInfo;
   const lines = [];
@@ -178,7 +184,10 @@ export function profileToPromptText(profile) {
 
   if (profile.certifications?.length) {
     lines.push('\n--- Certifications ---');
-    profile.certifications.forEach(cert => lines.push(cert));
+    profile.certifications.forEach(cert => {
+      const line = formatCertification(cert);
+      if (line) lines.push(line);
+    });
   }
 
   if (profile.customSections?.length) {

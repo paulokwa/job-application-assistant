@@ -14,6 +14,8 @@ import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
 import { validateOllamaEndpoint } from '../modules/url.js';
 import { esc } from '../modules/html.js';
+import { normalizeCertificationEntry } from '../modules/schema.js';
+import { mergeProfileFormData } from '../modules/profileRoundTrip.js';
 
 // ── State ─────────────────────────────────────────────────────────────────
 let profile = null;
@@ -1162,15 +1164,16 @@ function addEducationEntry(data = {}) {
 }
 
 function addCertEntry(data = {}) {
+  const cert = normalizeCertificationEntry(data);
   const div = document.createElement('div');
   div.className = 'cert-entry card';
   div.style.marginBottom = '12px';
   div.innerHTML = `
     <div style="display:flex; justify-content:space-between">
-      <input type="text" class="cert-name" value="${esc(data.name)}" placeholder="Cert Name" style="font-weight:bold" />
+      <input type="text" class="cert-name" value="${esc(cert.name)}" placeholder="Cert Name" style="font-weight:bold" />
       <button type="button" class="btn-remove" data-remove-entry aria-label="Remove certification">✕</button>
     </div>
-    <input type="text" class="cert-issuer" value="${esc(data.issuer)}" placeholder="Issuer" />
+    <input type="text" class="cert-issuer" value="${esc(cert.issuer)}" placeholder="Issuer" />
   `;
   $('certifications-list').appendChild(div);
 }
@@ -1228,7 +1231,7 @@ function collectProfileFromForm() {
 }
 
 async function saveProfileData() {
-  profile = { ...collectProfileFromForm(), metadata: profile?.metadata };
+  profile = mergeProfileFormData(profile, collectProfileFromForm());
   await saveProfile(profile);
   const { activeId } = await loadProfiles();
   if (activeId && hasProfileContent(profile)) {
@@ -1776,7 +1779,7 @@ async function handleProfileRowAction(e) {
   const action = btn.dataset.action;
 
   if (action === 'switch') {
-    await saveProfile({ ...collectProfileFromForm(), metadata: profile?.metadata });
+    await saveProfile(mergeProfileFormData(profile, collectProfileFromForm()));
     await switchProfile(id);
     profile = await loadProfile();
     populateProfile(profile);
@@ -1871,7 +1874,7 @@ async function handleAddProfile() {
 
   const name = `Profile ${profiles.length + 1}`;
   const id   = await createProfile(name);
-  await saveProfile({ ...collectProfileFromForm(), metadata: profile?.metadata });
+  await saveProfile(mergeProfileFormData(profile, collectProfileFromForm()));
   await switchProfile(id);
   profile = await loadProfile();
   populateProfile(profile);

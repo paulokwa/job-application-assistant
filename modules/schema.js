@@ -64,7 +64,7 @@
  * @property {Education[]} education
  * @property {string[]} skills
  * @property {Project[]} projects
- * @property {string[]} certifications
+ * @property {{name: string, issuer: string, year: string}[]} certifications
  * @property {{label: string, text: string}[]} customSections
  * @property {string} doNotClaimNotes
  * @property {CoverLetterProfile} coverLetterProfile
@@ -129,6 +129,36 @@ function normalizeCustomSections(data = {}) {
     .filter(section => section.label && section.text);
 }
 
+export function normalizeCertificationEntry(cert = {}) {
+  if (typeof cert === 'string') {
+    return {
+      name: cert.trim(),
+      issuer: '',
+      year: '',
+    };
+  }
+
+  if (!cert || typeof cert !== 'object') {
+    return {
+      name: '',
+      issuer: '',
+      year: '',
+    };
+  }
+
+  return {
+    ...cert,
+    name: String(cert.name || cert.title || cert.certification || cert.value || '').trim(),
+    issuer: String(cert.issuer || cert.organization || cert.authority || '').trim(),
+    year: String(cert.year || cert.date || cert.dates || '').trim(),
+  };
+}
+
+function splitDateRange(dates = '') {
+  const parts = String(dates || '').split(/\s*\p{Dash}\s*/u);
+  return [parts[0]?.trim() || '', parts[1]?.trim() || ''];
+}
+
 /**
  * Normalizes any object into the ResumeContent schema.
  * Useful for migrating from old profile formats or cleaning AI output.
@@ -148,8 +178,9 @@ export function normalizeResumeContent(data = {}) {
       jobTitle: exp.jobTitle || exp.title || '',
       employer: exp.employer || exp.company || '',
       location: exp.location || '',
-      startDate: exp.startDate || exp.dates?.split(' - ')[0] || '',
-      endDate: exp.endDate || exp.dates?.split(' - ')[1] || '',
+      dates: exp.dates || '',
+      startDate: exp.startDate || splitDateRange(exp.dates)[0] || '',
+      endDate: exp.endDate || splitDateRange(exp.dates)[1] || '',
       bulletPoints: Array.isArray(exp.bulletPoints) ? exp.bulletPoints : (exp.bullets ? exp.bullets.split('\n').map(b => b.trim().replace(/^[•\-\*]\s*/, '')) : []),
     })),
     education: (data.education || []).map(edu => ({
@@ -167,7 +198,11 @@ export function normalizeResumeContent(data = {}) {
       technologies: Array.isArray(p.technologies) ? p.technologies : [],
       link: p.link || '',
     })),
-    certifications: Array.isArray(data.certifications) ? data.certifications.map(c => typeof c === 'string' ? c : (c.name || '')) : [],
+    certifications: Array.isArray(data.certifications)
+      ? data.certifications
+        .map(normalizeCertificationEntry)
+        .filter(c => c.name || c.issuer || c.year)
+      : [],
     customSections: normalizeCustomSections(data),
     doNotClaimNotes: data.doNotClaimNotes || data.doNotClaim || '',
     coverLetterProfile: { ...base.coverLetterProfile, ...(data.coverLetterProfile || {}) },
