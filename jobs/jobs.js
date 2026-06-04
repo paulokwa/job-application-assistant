@@ -635,13 +635,11 @@ async function loadIntoGenerator(id, options = {}) {
   if (fitContext) sessionPayload.loadedJobFitAnalysis = fitContext;
   if (generationMode) sessionPayload.pendingMode = generationMode;
 
-  await chrome.storage.session.remove(['pendingMode', 'regenerateRequested', 'loadedJobFitAnalysis']);
-  await chrome.storage.session.set(sessionPayload);
-
   window.parent?.postMessage({
     type: generationMode ? 'JPDA_SAVED_JOB_GENERATE_REQUESTED' : 'JPDA_SAVED_JOB_LOADED',
     id: job.id,
     mode: generationMode,
+    sessionPayload,
   }, window.location.origin);
 }
 

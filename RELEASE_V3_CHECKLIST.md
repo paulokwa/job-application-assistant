@@ -1,6 +1,6 @@
 # v3.0 Release Checklist
 
-Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting Google review. This checklist records the submitted v3.0 package and the checks completed before submission.
+Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04. This checklist records the approved v3.0 package and the checks completed before submission.
 
 ## Release Gate
 
@@ -8,8 +8,8 @@ Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting 
 - [DONE] `manifest.json` set to `3.0.0`.
 - [DONE] Full smoke testing passed and the user explicitly confirmed packaging/submission.
 - [DONE] v3.0 submitted to the Chrome Web Store on 2026-06-02.
-- [WAITING] Google review outcome.
-- Do not create or submit a replacement v3.0 package unless the user explicitly confirms a new release scope.
+- [DONE] v3.0 approved by Google on 2026-06-04.
+- Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
 - Direct PDF Download was removed/deferred for store-safety before v3 packaging.
 
 ## Permission Review
@@ -21,7 +21,7 @@ Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting 
 
 ## v3 Feature Summary
 
-The submitted v3.0 package includes these features added since v2.0:
+The approved v3.0 package includes these features added since v2.0:
 
 - **Print export**: print-dialog flow for Resume Only, Cover Letter Only, Resume + Cover Letter, and Merged Document. Print-window document title is set from the configured filename pattern so Chrome's Save as PDF dialog suggests the user's preferred filename.
 - **AI-only Fit Check**: scans prepare optional context without hidden token spend; context-menu scan support; three-choice apply-details flow; separate explicit Run AI Fit Check action; multi-profile selector with temporary switching and cached per-profile AI results. Card payload to `content.js` is whitelisted — no API keys, no raw profile data, no job text sent to content script.

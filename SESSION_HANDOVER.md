@@ -3,8 +3,8 @@
 ## Current Release Status
 
 - v2.0 submitted to the Chrome Web Store on 2026-05-22 and accepted by Google.
-- v3.0 submitted to the Chrome Web Store on 2026-06-02 and awaiting Google review.
-- `main` contains the submitted v3.0 release continuity state.
+- v3.0 submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04.
+- Current post-v3 development work is for the v4.0 release cycle.
 
 ## Next Action Gate
 
@@ -21,9 +21,10 @@ Status:
 - [DONE] User confirmed full v3 smoke testing passed (2026-06-02).
 - [DONE] v3 submission zip created and inspected locally (2026-06-02).
 - [DONE] Chrome Web Store listing/privacy fields updated and v3.0 submitted for review (2026-06-02).
-- [WAITING] Google review outcome for v3.0.
+- [DONE] v3.0 approved by Google (2026-06-04).
+- [DONE] Tab-scoped job sessions and draft restore implemented for v4.0 development (2026-06-04). User tested locally and confirmed it seems to work well before commit/push.
 
-Next planned work: wait for the Chrome Web Store review outcome. Do not create or submit a replacement v3.0 package unless the user explicitly confirms a new release scope.
+Next planned work: continue v4.0 development and regression testing as explicitly requested. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
 
 ## v3 Features Added Since v2.0
 
@@ -67,6 +68,18 @@ Most items in this section are complete on `main` as of 2026-06-01. The AI-only 
   - Assistant Job Chat replies can be sent to Resume Refine or Cover Letter Refine as positioning/emphasis guidance only.
   - Chat-to-Refine actions prefill the existing Refine textarea only; they do not auto-apply changes or generate automatically.
   - Native multi-turn provider messages, optional chat history persistence, closed-side-panel routing, and structured JSON action suggestions remain deferred.
+
+## v4 Development Work Started
+
+- Tab-scoped Job Sessions and Draft Restore completed locally on 2026-06-04:
+  - Side panel launches include `sourceTabId`, allowing each dashboard instance to bind to the browser tab that opened it.
+  - Active scanned-job session data moved from global session keys to `jobSessionsByTab[tabId]`.
+  - Generated draft restore data moved from global `savedDraft` to `savedDraftsByTab[tabId]`.
+  - Dashboard storage-change handling ignores session changes for other tab IDs.
+  - Scanning a different job in the same tab clears only that tab's stale generated draft restore data.
+  - Context-menu scans, Saved Jobs load/generate, History regenerate, full-page handoff, and Clear now route through the current tab workspace rather than global session state.
+  - Saved Jobs remains a global library; only the active dashboard workspace is tab-scoped.
+  - User manually tested and confirmed the fix seems to work well before commit/push.
 
 ## Completed Since v1.0 Submission
 
@@ -167,7 +180,7 @@ Latest packaged extension code commit (2026-06-01):
 
 `6a8aec7` - `Refactor job-related modules: remove Fit Check and job page detection`
 
-The submitted v3 zip was created outside the repository at `C:\Coding\job-page-draft-assistant\job-application-assistant-v3.0.0.zip`. It contains runtime files only and was inspected to confirm `manifest.json` is at the archive root, the version is `3.0.0`, and `debugger` / `downloads` permissions are absent.
+The approved v3 zip was created outside the repository at `C:\Coding\job-page-draft-assistant\job-application-assistant-v3.0.0.zip`. It contains runtime files only and was inspected to confirm `manifest.json` is at the archive root, the version is `3.0.0`, and `debugger` / `downloads` permissions are absent.
 
 ## Do Not Repeat
 
@@ -180,6 +193,7 @@ The submitted v3 zip was created outside the repository at `C:\Coding\job-page-d
 - Do not redo storage quota guards.
 - Do not redo the session scan payload cap.
 - Do not rewrite roadmap docs unless the user asks.
+- Do not redo Tab-Scoped Job Sessions and Draft Restore; the v4 development fix is complete and routes active job/draft workspace state through per-tab maps.
 - Do not redo Job Discussion Chat follow-ups: entry gating, stale chat clearing, Fit Check card chat open, chat-to-Refine actions, and focus styling are complete.
 - Do not add native multi-turn provider messages, chat history persistence, closed-side-panel Fit Check routing, or structured JSON chat actions unless explicitly selected as new scope.
 - Do not reintroduce the local keyword-overlap Fit Check, automatic Fit Check runs, best-profile ranking, or its search/listing detector. Fit Check is intentionally AI-only and explicit.
@@ -226,7 +240,7 @@ See `ROADMAP.md`. Do not duplicate the full roadmap here.
 
 ## Release Checklists
 
-See `RELEASE_V3_CHECKLIST.md` for the submitted v3.0 package record while Google review is pending.
+See `RELEASE_V3_CHECKLIST.md` for the approved v3.0 package record.
 See `RELEASE_V2_CHECKLIST.md` only as the historical checklist for the already-submitted and accepted v2.0 package.
 
 ## Handover Maintenance Rule

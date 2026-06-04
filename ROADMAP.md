@@ -12,7 +12,9 @@ Version 1.0 is live on the Chrome Web Store.
 
 Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by Google. The v2.0 release checklist is complete: manifest bumped, smoke tests passed, privacy policy verified, screenshots updated, and overview copy updated.
 
-Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting Google review. Do not create or submit a replacement v3.0 package unless the user explicitly confirms a new release scope.
+Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04.
+
+Version 4.0 development has started. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
 
 `main` currently contains:
 
@@ -25,9 +27,10 @@ Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and is awaiting 
 - Storage quota guards
 - Session scan payload cap for large temporary scan text
 - Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
-- Submitted v3.0 work including print filename support, Application Email Assistant, Application Pack actions, AI-only Fit Check, Job Chat follow-ups, and targeted autofill matcher improvements
+- Approved v3.0 work including print filename support, Application Email Assistant, Application Pack actions, AI-only Fit Check, Job Chat follow-ups, and targeted autofill matcher improvements
+- v4.0 development work started with Tab-Scoped Job Sessions and Draft Restore
 
-The AI-only Fit Check revision is committed and included in the submitted v3.0 package.
+The AI-only Fit Check revision is committed and included in the approved v3.0 package.
 
 ## v2.0 Release Status
 
@@ -47,7 +50,7 @@ The AI-only Fit Check revision is committed and included in the submitted v3.0 p
 - [DONE] Privacy policy and Chrome Web Store listing/privacy fields updated.
 - [DONE] Submission zip created and inspected.
 - [DONE] v3.0 submitted to the Chrome Web Store on 2026-06-02.
-- [WAITING] Google review outcome.
+- [DONE] v3.0 approved by Google on 2026-06-04.
 
 ## Final v2.0 Smoke Test Checklist
 
@@ -65,64 +68,7 @@ The AI-only Fit Check revision is committed and included in the submitted v3.0 p
 
 ## Active Roadmap Ideas
 
-Version 3.0 is still awaiting Chrome Web Store review. Do not package or submit a replacement v3.0 build unless the user explicitly confirms a new release scope.
-
-The first implementation task after review, or earlier only if the user explicitly confirms a post-v3 fix scope, should be the tab-scoped dashboard state work below.
-
-### Tab-Scoped Job Sessions And Draft Restore
-
-Suggested branch: `fix/tab-scoped-job-sessions`
-
-Status: **Urgent candidate for next implementation pass. Audit before coding.**
-
-Problem:
-
-- Job scan and generated draft state currently use shared extension-wide storage keys such as `chrome.storage.session.extractedData` and `chrome.storage.local.savedDraft`.
-- If the user opens the extension on multiple job tabs, scanning Job A can update every open dashboard instance, including the dashboard opened for Job B.
-- If the user scans Job B after generating for Job A, then closes/reopens the side panel, Job A can reappear because the last generated `savedDraft` is global rather than tied to the tab/job context.
-- A new extension instance opened from a fresh tab should start blank unless that tab already has its own saved job session.
-
-Desired behavior:
-
-- Tab A with Job A remembers Job A.
-- Tab B with Job B remembers Job B.
-- Scanning in Tab A must not update the dashboard instance for Tab B.
-- Reopening the extension on Tab A restores Tab A's job context and draft, if any.
-- Reopening the extension on Tab B restores Tab B's job context and draft, if any.
-- Opening the extension on a new Tab C with no prior job context opens blank.
-- Saved Jobs remains global. The per-tab state is only for the active dashboard/session/draft workspace.
-
-Implementation direction to audit carefully:
-
-- Replace the single global session payload with tab-scoped storage, for example `jobSessionsByTab[tabId]`.
-- Replace the single global saved draft key with tab-scoped draft storage, for example `savedDraftsByTab[tabId]`.
-- Ensure each dashboard instance knows its owning `sourceTabId`. `background.js` should open the side panel with a path such as `dashboard/dashboard.html?sourceTabId=<tab.id>` when launched from a browser tab.
-- Dashboard startup should load only the job session and saved draft for its own `sourceTabId`.
-- Dashboard `chrome.storage.onChanged` handling should ignore job-session changes for other tab IDs.
-- Dashboard scan should write only the current tab's job session and clear only that tab's previous generated draft.
-- Context-menu scan should write only the clicked tab's job session.
-- Saved Jobs and History "load into generator" flows need explicit routing to the intended dashboard/source tab, not a global `extractedData` overwrite.
-- The Clear button should clear only the current tab's job session and draft, not every tab's workspace.
-- Generated drafts should still survive closing/reopening the side panel, but only for the same tab/job context.
-
-Risk notes:
-
-- This must be done as a deliberate lifecycle/storage refactor, not as another small patch to the current global `extractedData` flow.
-- Audit `dashboard/dashboard.js`, `background.js`, `jobs/jobs.js`, and `history/history.js` before editing because all four currently participate in session handoff.
-- Preserve the existing `activeTab` permission model. Do not add broad host permissions as part of this task.
-- Do not break full-page mode. Full-page dashboard URLs already use `mode=full` and may include `sourceTabId`; confirm expected behavior before changing.
-- Do not break Saved Jobs, History regenerate, Fit Analysis context handoff, Application Pack actions, print/export, or manual Clear.
-
-Suggested manual smoke tests:
-
-- Open Job A in Tab A, open the extension, scan. Open Job B in Tab B, open the extension, scan. Confirm each dashboard shows only its own job.
-- With both dashboards open, rescan Tab A. Confirm Tab B does not change.
-- Generate for Job A. Confirm Job A auto-restores only when reopening from Tab A.
-- Scan Job B without generating. Close/reopen from Tab B. Confirm Job B restores and Job A does not appear.
-- Open a new blank Tab C and open the extension. Confirm it starts blank.
-- Load a Saved Job into the generator and confirm it targets only the current dashboard.
-- Regenerate from History and confirm it targets only the current dashboard.
-- Clear Tab A and confirm Tab B is unaffected.
+No active implementation task is selected. v4.0 development has started, but do not package or submit v4.0 unless the user explicitly confirms a release scope.
 
 ## Later Autofill Improvements
 
@@ -190,6 +136,34 @@ Treat it as a link collector first, not guaranteed full job-description extracti
 
 ## Completed Roadmap Items
 
+### Tab-Scoped Job Sessions And Draft Restore
+
+Status: **Complete for v4.0 development** (2026-06-04).
+
+Completed scope:
+
+- Active scanned-job session data is stored per source browser tab using `jobSessionsByTab[tabId]` instead of one shared `chrome.storage.session.extractedData` flow.
+- Generated draft restore data is stored per source browser tab using `savedDraftsByTab[tabId]` instead of one shared `chrome.storage.local.savedDraft` slot.
+- Side panel launches include `sourceTabId`, and dashboard startup loads only that tab's session and draft.
+- Dashboard storage-change handling ignores job-session changes for other tab IDs.
+- Context-menu scans write only the clicked tab's session.
+- Saved Jobs load/generate and History regenerate hand their payload to the current dashboard instead of overwriting global session state.
+- Full-page handoff preserves the target tab context.
+- Clear removes only the current tab's job session and draft restore data.
+- Scanning a different job in the same tab clears that tab's stale generated draft restore data so Job A does not reappear over Job B.
+- Saved Jobs remains global; only the active dashboard workspace is tab-scoped.
+
+Verification:
+
+- `node --check background.js`
+- `node --check dashboard/dashboard.js`
+- `node --check jobs/jobs.js`
+- `node --check history/history.js`
+- `node tests/autofillMatcher.test.js`
+- `node tests/pdfImport.test.js`
+- `git diff --check` reported only line-ending normalization warnings.
+- User manually tested locally and confirmed it seems to work well before commit/push.
+
 ### Job Discussion Chat Follow-Ups
 
 Status: **Complete on `main`** (2026-05-30).
@@ -248,7 +222,7 @@ Completed scope:
 
 ### AI-Only Fit Check
 
-Status: **Complete on `main` and included in the submitted v3.0 package** (2026-06-01).
+Status: **Complete on `main` and included in the approved v3.0 package** (2026-06-01).
 
 Completed scope:
 
@@ -376,7 +350,7 @@ Guardrails (permanent):
 
 ## Suggested Order For Active Work
 
-No active implementation task is selected while v3.0 is awaiting Chrome Web Store review.
+No active implementation task is selected. v4.0 development has started, but v4.0 release scope and packaging are not confirmed.
 
 ## Autofill Known Limitations / Future Improvements
 

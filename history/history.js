@@ -249,7 +249,7 @@ async function regenerateEntry(id) {
   const sourceUrl = jobData.sourceUrl || entry.sourceUrl || '';
   const mode = generationModeForEntry(entry);
 
-  await chrome.storage.session.set({
+  const sessionPayload = {
     extractedData: {
       pageText: jobData.description,
       jobTitle: jobData.jobTitle || entry.jobTitle || '',
@@ -259,11 +259,14 @@ async function regenerateEntry(id) {
     sourceUrl,
     sourceTitle: [jobData.jobTitle || entry.jobTitle, jobData.company || entry.company].filter(Boolean).join(' - '),
     pendingMode: mode,
-    regenerateRequested: {
-      id: entry.id,
-      requestedAt: new Date().toISOString(),
-    },
-  });
+  };
+
+  window.parent?.postMessage({
+    type: 'JPDA_HISTORY_REGENERATE_REQUESTED',
+    id: entry.id,
+    mode,
+    sessionPayload,
+  }, window.location.origin);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────

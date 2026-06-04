@@ -3,6 +3,7 @@
 // content.js is never injected automatically — only on explicit user action.
 
 const openSidePanelTabs = new Set();
+const JOB_SESSIONS_BY_TAB_KEY = 'jobSessionsByTab';
 const SESSION_SCAN_TEXT_CAP_CHARS = 60000;
 const SESSION_SCAN_TRUNCATION_MARKER = '\n\n[Truncated: page text exceeded session storage cap]';
 
@@ -66,6 +67,34 @@ function capSessionScanPayload(payload) {
   return capped;
 }
 
+function normalizeSessionMap(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+async function saveJobSessionForTab(tabId, session) {
+  if (!tabId) return;
+
+  const key = String(tabId);
+  const data = await chrome.storage.session.get([JOB_SESSIONS_BY_TAB_KEY]);
+  const sessions = normalizeSessionMap(data[JOB_SESSIONS_BY_TAB_KEY]);
+  await chrome.storage.session.set({
+    [JOB_SESSIONS_BY_TAB_KEY]: {
+      ...sessions,
+      [key]: session,
+    },
+  });
+}
+
+async function removeJobSessionForTab(tabId) {
+  if (!tabId) return;
+
+  const key = String(tabId);
+  const data = await chrome.storage.session.get([JOB_SESSIONS_BY_TAB_KEY]);
+  const sessions = { ...normalizeSessionMap(data[JOB_SESSIONS_BY_TAB_KEY]) };
+  delete sessions[key];
+  await chrome.storage.session.set({ [JOB_SESSIONS_BY_TAB_KEY]: sessions });
+}
+
 function markSidePanelOpen(tabId, isOpen) {
   if (!tabId) return;
 
@@ -84,7 +113,7 @@ async function openSidePanelForTab(tab) {
 
   chrome.sidePanel.setOptions({
     tabId: tab.id,
-    path: 'dashboard/dashboard.html',
+    path: `dashboard/dashboard.html?sourceTabId=${encodeURIComponent(String(tab.id))}`,
     enabled: true
   }).catch(error => console.error(error?.message || error));
 
@@ -148,8 +177,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
   // 2. SCAN PAGE IN BACKGROUND — user triggered this action, so we read content now
   (async () => {
-    await chrome.storage.session.set({ pendingMode: 'both' });
-
     let response;
 
     if (isRestrictedUrl(tab.url)) {
@@ -165,15 +192,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       }
     }
 
-    await chrome.storage.session.set({
+    await saveJobSessionForTab(tab.id, {
       extractedData: capSessionScanPayload(response),
       sourceUrl: tab.url,
       sourceTitle: tab.title,
       sourceTabId: tab.id,
+      pendingMode: 'both',
     });
 
-    // Tell any already-open dashboard to reload session data
-    chrome.runtime.sendMessage({ type: 'SESSION_UPDATED' }).catch(() => { });
+    // Tell the dashboard for this tab to reload its own session data.
+    chrome.runtime.sendMessage({ type: 'SESSION_UPDATED', sourceTabId: tab.id }).catch(() => { });
   })();
 });
 
@@ -187,12 +215,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'GET_SESSION') {
-    chrome.storage.session.get(null).then(data => sendResponse(data));
+    if (message.sourceTabId) {
+      chrome.storage.session.get([JOB_SESSIONS_BY_TAB_KEY]).then(data => {
+        const sessions = normalizeSessionMap(data[JOB_SESSIONS_BY_TAB_KEY]);
+        sendResponse(sessions[String(message.sourceTabId)] || {});
+      });
+    } else {
+      chrome.storage.session.get(null).then(data => sendResponse(data));
+    }
     return true; // async
   }
 
   if (message.type === 'CLEAR_SESSION') {
-    chrome.storage.session.clear().then(() => sendResponse({ ok: true }));
+    if (message.sourceTabId) {
+      removeJobSessionForTab(message.sourceTabId).then(() => sendResponse({ ok: true }));
+    } else {
+      chrome.storage.session.clear().then(() => sendResponse({ ok: true }));
+    }
     return true;
   }
 });

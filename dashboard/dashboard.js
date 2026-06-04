@@ -33,6 +33,8 @@ const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
 const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
 const CHAT_REFINE_REPLY_CHAR_LIMIT = 2000;
 const SAVED_JOBS_KEY = 'savedJobs';
+const JOB_SESSIONS_BY_TAB_KEY = 'jobSessionsByTab';
+const SAVED_DRAFTS_BY_TAB_KEY = 'savedDraftsByTab';
 const EDITED_HTML_SAVE_DELAY_MS = 500;
 const MAX_EDITED_HTML_CHARS = 500000;
 const MAX_SAVED_JOBS = 50;
@@ -45,6 +47,9 @@ const SAVED_JOBS_MESSAGE_TYPES = new Set([
   'JPDA_FOLLOW_UP_MESSAGE_REQUESTED',
   'JPDA_APPLICATION_ANSWERS_REQUESTED',
   'JPDA_REMINDER_TEXT_REQUESTED',
+]);
+const HISTORY_MESSAGE_TYPES = new Set([
+  'JPDA_HISTORY_REGENERATE_REQUESTED',
 ]);
 const MAX_SYNC_HISTORY_SUMMARIES = 12;
 const MAX_SYNC_HISTORY_BYTES = 7000;
@@ -643,15 +648,61 @@ function updateOutputPanelVisibility() {
   dom.outputPlaceholder.classList.toggle('hidden', hasOutput);
 }
 
+function buildJobContextSignature(jobData = state.jobData) {
+  const sourceUrl = String(jobData.sourceUrl || '').trim().replace(/\/+$/, '').toLowerCase();
+  const description = String(jobData.description || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const jobTitle = String(jobData.jobTitle || '').trim().toLowerCase();
+  const company = String(jobData.company || '').trim().toLowerCase();
+
+  if (sourceUrl || description) {
+    return `url:${sourceUrl}|desc:${description.length}:${description.slice(0, 160)}:${description.slice(-160)}`;
+  }
+  return `manual:${jobTitle}|${company}`;
+}
+
+async function clearGeneratedOutputForJobChange() {
+  state.drafts = { resume: null, 'cover-letter': null };
+  state.originalDrafts = { resume: null, 'cover-letter': null };
+  state.lastRunMode = null;
+  state.loadedFitContext = null;
+  state.generationReceipt = null;
+  state.lastFitCheck = null;
+  state.editedHtml = { resume: null, 'cover-letter': null };
+  state.hasEdits = { resume: false, 'cover-letter': false };
+  clearTimeout(editedHtmlSaveTimers.resume);
+  clearTimeout(editedHtmlSaveTimers['cover-letter']);
+  editedHtmlSaveTimers.resume = null;
+  editedHtmlSaveTimers['cover-letter'] = null;
+
+  dom.draftResumeEmpty.classList.remove('hidden');
+  dom.draftResumeContent.classList.add('hidden');
+  dom.draftCLEmpty.classList.remove('hidden');
+  dom.draftCLContent.classList.add('hidden');
+  dom.draftMergedEmpty.classList.remove('hidden');
+  dom.draftMergedContent.classList.add('hidden');
+  dom.tabBtnMerged.classList.add('hidden');
+  dom.btnPrintMerged.classList.add('hidden');
+  dom.btnAiFitCheck.classList.add('hidden');
+  dom.genStatus.classList.add('hidden');
+  dom.genStatus.classList.remove('gen-status--complete');
+  clearEditState('resume');
+  clearEditState('cover-letter');
+  updateManualEditNotice();
+  refreshExportButtons();
+  updateOutputPanelVisibility();
+  await removeScopedSavedDraft();
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 async function init() {
   state.settings = await loadSettings();
   state.profile  = await loadProfile();
   await populateProfileStrip();
 
-  const [localData, syncData] = await Promise.all([
-    chrome.storage.local.get(['sourceResumeText', 'savedDraft', AI_PROVIDER_SETUP_SAVED_KEY, 'theme']),
+  const [localData, syncData, scopedDraft] = await Promise.all([
+    chrome.storage.local.get(['sourceResumeText', AI_PROVIDER_SETUP_SAVED_KEY, 'theme']),
     chrome.storage.sync.get(['docSettings']),
+    loadScopedSavedDraft(),
   ]);
   state.docSettings = syncData.docSettings || {};
   applyTheme(localData.theme || 'system');
@@ -670,8 +721,8 @@ async function init() {
   refreshJobChatEntryPoints();
 
   // Restore any previously generated draft before loading session data
-  if (localData.savedDraft) {
-    restoreSavedDraft(localData.savedDraft);
+  if (scopedDraft) {
+    restoreSavedDraft(scopedDraft);
   } else {
     switchTab('resume');
   }
@@ -683,13 +734,19 @@ async function init() {
 
   // Listen for data written by background script (context menu extraction)
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'session' && (changes.extractedData || changes.pendingMode || changes.regenerateRequested)) {
+    if (areaName === 'session' && ownScopedValueChanged(changes[JOB_SESSIONS_BY_TAB_KEY])) {
       loadSession();
     }
   });
 
   // Listen for AI Fit Check actions from the card injected into the job page.
   chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'SESSION_UPDATED') {
+      if (message.sourceTabId && message.sourceTabId !== sourceTabId) return;
+      loadSession();
+      return;
+    }
+
     if (message.type === 'FIT_CHECK_PROFILE_CHANGED') {
       const { profileId, tabId } = message;
       if (!profileId || tabId !== state.lastFitCheck?.tab?.id) return;
@@ -716,8 +773,105 @@ async function init() {
   if (!aiProviderSetupComplete) showWelcomeModal();
 }
 
-function loadSession() {
-  return chrome.storage.session.get(null).then(applySession);
+function normalizeStorageMap(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function scopedTabKey(tabId = sourceTabId) {
+  return tabId ? String(tabId) : '';
+}
+
+function ownScopedValueChanged(change, tabId = sourceTabId) {
+  const key = scopedTabKey(tabId);
+  if (!key) return false;
+  return JSON.stringify(change?.oldValue?.[key] || null) !== JSON.stringify(change?.newValue?.[key] || null);
+}
+
+async function loadScopedJobSession(tabId = sourceTabId) {
+  const key = scopedTabKey(tabId);
+  if (!key) return null;
+
+  const data = await chrome.storage.session.get([JOB_SESSIONS_BY_TAB_KEY]);
+  const sessions = normalizeStorageMap(data[JOB_SESSIONS_BY_TAB_KEY]);
+  return sessions[key] || null;
+}
+
+async function saveScopedJobSession(session, tabId = sourceTabId) {
+  const key = scopedTabKey(tabId);
+  if (!key) return false;
+
+  const data = await chrome.storage.session.get([JOB_SESSIONS_BY_TAB_KEY]);
+  const sessions = normalizeStorageMap(data[JOB_SESSIONS_BY_TAB_KEY]);
+  await chrome.storage.session.set({
+    [JOB_SESSIONS_BY_TAB_KEY]: {
+      ...sessions,
+      [key]: session,
+    },
+  });
+  return true;
+}
+
+async function updateScopedJobSession(mutator, tabId = sourceTabId) {
+  const key = scopedTabKey(tabId);
+  if (!key) return null;
+
+  const data = await chrome.storage.session.get([JOB_SESSIONS_BY_TAB_KEY]);
+  const sessions = { ...normalizeStorageMap(data[JOB_SESSIONS_BY_TAB_KEY]) };
+  const next = mutator(sessions[key] || null);
+  if (next) sessions[key] = next;
+  else delete sessions[key];
+  await chrome.storage.session.set({ [JOB_SESSIONS_BY_TAB_KEY]: sessions });
+  return next;
+}
+
+async function removeScopedJobSession(tabId = sourceTabId) {
+  await updateScopedJobSession(() => null, tabId);
+}
+
+async function loadScopedSavedDraft(tabId = sourceTabId) {
+  const key = scopedTabKey(tabId);
+  if (!key) return null;
+
+  const data = await chrome.storage.local.get([SAVED_DRAFTS_BY_TAB_KEY]);
+  const drafts = normalizeStorageMap(data[SAVED_DRAFTS_BY_TAB_KEY]);
+  return drafts[key] || null;
+}
+
+async function saveScopedSavedDraft(savedDraft, tabId = sourceTabId) {
+  const key = scopedTabKey(tabId);
+  if (!key) return false;
+
+  const data = await chrome.storage.local.get([SAVED_DRAFTS_BY_TAB_KEY]);
+  const drafts = normalizeStorageMap(data[SAVED_DRAFTS_BY_TAB_KEY]);
+  await chrome.storage.local.set({
+    [SAVED_DRAFTS_BY_TAB_KEY]: {
+      ...drafts,
+      [key]: compactSavedDraft(savedDraft),
+    },
+  });
+  return true;
+}
+
+async function updateScopedSavedDraft(mutator, tabId = sourceTabId) {
+  const key = scopedTabKey(tabId);
+  if (!key) return null;
+
+  const data = await chrome.storage.local.get([SAVED_DRAFTS_BY_TAB_KEY]);
+  const drafts = { ...normalizeStorageMap(data[SAVED_DRAFTS_BY_TAB_KEY]) };
+  const next = mutator(drafts[key] || null);
+  if (next) drafts[key] = compactSavedDraft(next);
+  else delete drafts[key];
+  await chrome.storage.local.set({ [SAVED_DRAFTS_BY_TAB_KEY]: drafts });
+  return next;
+}
+
+async function removeScopedSavedDraft(tabId = sourceTabId) {
+  await updateScopedSavedDraft(() => null, tabId);
+}
+
+async function loadSession(session = null) {
+  const scopedSession = session || await loadScopedJobSession();
+  return applySession(scopedSession);
 }
 
 function normalizeSavedJobGenerationMode(mode) {
@@ -730,6 +884,18 @@ function generationModeLabel(mode) {
 
 function isFromJobsFrame(event) {
   return event.source === document.getElementById('jobs-frame')?.contentWindow;
+}
+
+function isFromHistoryFrame(event) {
+  return event.source === document.getElementById('history-frame')?.contentWindow;
+}
+
+function withCurrentSourceTab(sessionPayload) {
+  if (!sessionPayload || typeof sessionPayload !== 'object') return null;
+  return {
+    ...sessionPayload,
+    ...(sourceTabId ? { sourceTabId } : {}),
+  };
 }
 
 function refreshAutofillCard() {
@@ -1144,7 +1310,7 @@ async function runAiJobInfoExtraction() {
   }
 }
 
-function applyExtractedData(raw, url, usedSelection) {
+async function applyExtractedData(raw, url, usedSelection) {
   if (raw.error) {
     showToast(`⚠️ ${raw.error}`);
     return;
@@ -1174,13 +1340,20 @@ function applyExtractedData(raw, url, usedSelection) {
   const fields = extractJobFields(text, url);
   const jobTitle = raw.jobTitle || fields.jobTitle;
   const company = raw.company || fields.company;
+  const nextJobData = { jobTitle, company, sourceUrl: url, description: text };
+  const previousSignature = buildJobContextSignature();
+  const nextSignature = buildJobContextSignature(nextJobData);
+
+  if (previousSignature && nextSignature && previousSignature !== nextSignature && hasGeneratedOutput()) {
+    await clearGeneratedOutputForJobChange();
+  }
 
   dom.fieldTitle.value   = jobTitle;
   dom.fieldCompany.value = company;
   dom.fieldUrl.value     = url;
   dom.fieldDesc.value    = text;
 
-  state.jobData = { jobTitle, company, sourceUrl: url, description: text };
+  state.jobData = nextJobData;
   state.currentJobMeta = {
     sourceType,
     rawContent: raw.pageText || raw.selectedText || text,
@@ -1204,7 +1377,7 @@ async function applySession(session) {
 
   const raw = session.extractedData;
   const url = session.sourceUrl || raw.url || '';
-  applyExtractedData(raw, url, !!raw.selectedText);
+  await applyExtractedData(raw, url, !!raw.selectedText);
 
   // Context-menu scans prepare an explicit AI Fit Check action. They do not
   // spend tokens automatically.
@@ -1221,7 +1394,7 @@ async function applySession(session) {
   if (session.regenerateRequested) {
     const mode = session.pendingMode || 'both';
     dom.historyView.classList.remove('visible');
-    chrome.storage.session.remove(['regenerateRequested']);
+    await updateScopedJobSession(current => current ? { ...current, regenerateRequested: null } : current);
     await clearEditedHtml('resume');
     await clearEditedHtml('cover-letter');
     showToast('Reloaded job from history. Regenerating...');
@@ -1412,8 +1585,9 @@ async function scanCurrentPage() {
       return;
     }
 
-    applyExtractedData(response, tab.url || '', !!response.selectedText);
+    await applyExtractedData(response, tab.url || '', !!response.selectedText);
     prepareAiFitCheckContext(response, tab);
+    await persistScannedJobSession(response, tab);
     showToast('✦ Page scanned');
   } catch (err) {
     console.warn('[JPDA] scanCurrentPage error:', err?.message || 'Unknown scan error');
@@ -1466,8 +1640,9 @@ async function scanJobPageAndMaybeSuggestFields() {
       return;
     }
 
-    applyExtractedData(response, tab.url || '', !!response.selectedText);
+    await applyExtractedData(response, tab.url || '', !!response.selectedText);
     prepareAiFitCheckContext(response, tab);
+    await persistScannedJobSession(response, tab);
 
     const settings = await loadSettings();
     if (!settings?.provider) {
@@ -1722,17 +1897,26 @@ function bindEvents() {
   window.addEventListener('message', async e => {
     if (e.origin !== window.location.origin) return;
     if (SAVED_JOBS_MESSAGE_TYPES.has(e.data?.type) && !isFromJobsFrame(e)) return;
+    if (HISTORY_MESSAGE_TYPES.has(e.data?.type) && !isFromHistoryFrame(e)) return;
     if (e.data?.type === 'JPDA_SAVED_JOB_LOADED') {
       dom.jobsView.classList.remove('visible');
-      await loadSession();
+      const sessionPayload = withCurrentSourceTab(e.data.sessionPayload);
+      if (sessionPayload) {
+        await saveScopedJobSession(sessionPayload);
+        await loadSession(sessionPayload);
+      }
       showToast('Loaded saved job. Generate when ready.');
       return;
     }
     if (e.data?.type === 'JPDA_SAVED_JOB_GENERATE_REQUESTED') {
       const mode = normalizeSavedJobGenerationMode(e.data.mode);
       dom.jobsView.classList.remove('visible');
-      await loadSession();
-      await chrome.storage.session.remove(['pendingMode']);
+      const sessionPayload = withCurrentSourceTab(e.data.sessionPayload);
+      if (sessionPayload) {
+        await saveScopedJobSession(sessionPayload);
+        await loadSession(sessionPayload);
+      }
+      await updateScopedJobSession(current => current ? { ...current, pendingMode: null } : current);
       if (!mode) {
         showToast('Loaded saved job. Generate when ready.');
         return;
@@ -1743,6 +1927,21 @@ function bindEvents() {
       } else {
         showToast('Loaded saved job. Generation canceled.');
       }
+      return;
+    }
+    if (e.data?.type === 'JPDA_HISTORY_REGENERATE_REQUESTED') {
+      const mode = e.data.mode || 'both';
+      dom.historyView.classList.remove('visible');
+      const sessionPayload = withCurrentSourceTab(e.data.sessionPayload);
+      if (sessionPayload) {
+        await saveScopedJobSession(sessionPayload);
+        await loadSession(sessionPayload);
+      }
+      await updateScopedJobSession(current => current ? { ...current, regenerateRequested: null } : current);
+      await clearEditedHtml('resume');
+      await clearEditedHtml('cover-letter');
+      showToast('Reloaded job from history. Regenerating...');
+      runGeneration(mode);
       return;
     }
     if (e.data?.type === 'JPDA_ANALYZE_FIT_REQUESTED') {
@@ -1947,6 +2146,16 @@ function capSessionScanText(value) {
   return text.slice(0, keepChars) + SESSION_SCAN_TRUNCATION_MARKER;
 }
 
+function capSessionScanPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+
+  const capped = { ...payload };
+  for (const field of ['pageText', 'selectedText', 'structuredData']) {
+    if (field in capped) capped[field] = capSessionScanText(capped[field]);
+  }
+  return capped;
+}
+
 async function getScanTargetTab() {
   if (sourceTabId) {
     try {
@@ -1961,6 +2170,18 @@ async function getScanTargetTab() {
   return tab || null;
 }
 
+async function persistScannedJobSession(response, tab, pendingMode = null) {
+  if (!tab?.id) return false;
+
+  return saveScopedJobSession({
+    extractedData: capSessionScanPayload(response),
+    sourceUrl: tab.url || '',
+    sourceTitle: tab.title || '',
+    sourceTabId: tab.id,
+    ...(pendingMode ? { pendingMode } : {}),
+  }, tab.id);
+}
+
 async function openFullPage() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const pageUrl = new URL(chrome.runtime.getURL('dashboard/dashboard.html'));
@@ -1969,11 +2190,11 @@ async function openFullPage() {
   const targetTabId = sourceTabId || (tab?.id && !isRestrictedUrl(tab.url) ? tab.id : null);
   if (targetTabId) pageUrl.searchParams.set('sourceTabId', String(targetTabId));
 
-  await persistCurrentJobContextForFullPage();
+  await persistCurrentJobContextForFullPage(targetTabId);
   await chrome.tabs.create({ url: pageUrl.href, active: true });
 }
 
-async function persistCurrentJobContextForFullPage() {
+async function persistCurrentJobContextForFullPage(targetTabId = sourceTabId) {
   const jobTitle = dom.fieldTitle.value.trim();
   const company = dom.fieldCompany.value.trim();
   const sourceUrl = dom.fieldUrl.value.trim();
@@ -1981,7 +2202,7 @@ async function persistCurrentJobContextForFullPage() {
 
   if (!jobTitle && !company && !sourceUrl && !description) return;
 
-  await chrome.storage.session.set({
+  await saveScopedJobSession({
     extractedData: {
       jobTitle,
       company,
@@ -1990,7 +2211,8 @@ async function persistCurrentJobContextForFullPage() {
     },
     sourceUrl,
     sourceTitle: jobTitle || company || 'Job draft',
-  });
+    sourceTabId: targetTabId,
+  }, targetTabId);
 }
 
 function bindAppearanceControls() {
@@ -2208,8 +2430,7 @@ function createSavedDraftSnapshot(overrides = {}) {
 
 async function persistSavedDraftSnapshot(savedDraft, { toastOnQuota = true } = {}) {
   try {
-    await chrome.storage.local.set({ savedDraft: compactSavedDraft(savedDraft) });
-    return true;
+    return saveScopedSavedDraft(savedDraft);
   } catch (err) {
     console.warn('Could not persist saved draft:', err?.message || err);
     if (toastOnQuota && isStorageQuotaError(err)) {
@@ -2727,7 +2948,7 @@ async function persistEditedHtml(tab) {
   updateManualEditNotice();
 
   try {
-    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    const savedDraft = await loadScopedSavedDraft();
     if (!savedDraft) return;
 
     const saved = await persistSavedDraftSnapshot({
@@ -2755,7 +2976,7 @@ async function clearEditedHtml(tab) {
   state.hasEdits[tab] = false;
 
   try {
-    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    const savedDraft = await loadScopedSavedDraft();
     if (!savedDraft?.editedHtml?.[tab]) {
       updateManualEditNotice();
       return;
@@ -2817,7 +3038,7 @@ async function persistAppearanceSettingsToSavedDraft() {
   if (!state.drafts.resume && !state.drafts['cover-letter']) return;
 
   try {
-    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    const savedDraft = await loadScopedSavedDraft();
     if (!savedDraft) return;
 
     await persistSavedDraftSnapshot({
@@ -3141,9 +3362,9 @@ async function clearDraft(tab) {
     dom.draftMergedContent.classList.add('hidden');
     dom.tabBtnMerged.classList.add('hidden');
     dom.btnPrintMerged.classList.add('hidden');
-    await chrome.storage.local.remove(['savedDraft']);
+    await removeScopedSavedDraft();
   } else {
-    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    const savedDraft = await loadScopedSavedDraft();
     if (savedDraft) {
       savedDraft.drafts[tab] = null;
       if (savedDraft.originalDrafts) savedDraft.originalDrafts[tab] = null;
@@ -3162,16 +3383,8 @@ async function clearSession() {
   const fitCheckTabId = state.lastFitCheck?.tab?.id;
 
   await Promise.all([
-    chrome.storage.local.remove(['savedDraft']),
-    chrome.storage.session.remove([
-      'extractedData',
-      'sourceUrl',
-      'sourceTitle',
-      'pendingMode',
-      'regenerateRequested',
-      'loadedSavedJob',
-      'loadedJobFitAnalysis',
-    ]),
+    removeScopedSavedDraft(),
+    removeScopedJobSession(),
   ]);
 
   state.drafts      = { resume: null, 'cover-letter': null };
@@ -3348,7 +3561,7 @@ function startJobChatPatienceTimers(pendingEl) {
 
 async function clearSavedGenerationReceipt() {
   try {
-    const { savedDraft } = await chrome.storage.local.get(['savedDraft']);
+    const savedDraft = await loadScopedSavedDraft();
     if (!savedDraft?.generationReceipt) return;
     await persistSavedDraftSnapshot({
       ...savedDraft,
