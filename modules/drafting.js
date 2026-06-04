@@ -23,6 +23,24 @@ Do NOT invent, assume, or embellish:
 If information needed for a section is missing, omit that section rather than fabricating content. 
 Accuracy and honesty are non-negotiable.`;
 
+const RESUME_FACTUAL_GROUNDING_RULE = `RESUME FACTUAL FIELD RULE:
+For structured resume fields, copy factual history exactly from the user profile or source resume unless the user explicitly asks to change that factual field.
+Do not tailor, modernize, re-title, infer, or replace these factual fields:
+- experience jobTitle
+- experience employer/company
+- experience location
+- experience startDate
+- experience endDate
+- education institution
+- education credential
+- education dates
+- certification names
+- certification issuers
+- certification years
+
+The target job title may influence the headline, summary, skills emphasis, bullet wording, and ordering/emphasis of relevant experience.
+The target job title must never be inserted into a historical work experience title.`;
+
 function buildSourceTruthBlock(profileText, sourceResumeText) {
   const blocks = [];
   if (sourceResumeText) {
@@ -97,6 +115,7 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
   const systemPrompt = [
     'You are an expert resume writer helping a job seeker tailor their resume to a specific job posting.',
     HALLUCINATION_GUARD,
+    RESUME_FACTUAL_GROUNDING_RULE,
     toneInstruction(tone),
     'You must return a structured JSON object containing tailored content. The layout is controlled by the application; you only provide the words.',
     'Focus on highlighting achievements relevant to the target job description.',
@@ -108,19 +127,19 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
     skills: ["Skill 1", "Skill 2", "..."],
     experience: [
       {
-        jobTitle: "Tailored Job Title",
-        employer: "Company Name",
-        location: "City, State",
-        startDate: "Month Year",
-        endDate: "Month Year or Present",
+        jobTitle: "Original factual job title copied exactly from profile/source resume; do not use the target job title here",
+        employer: "Original factual employer/company copied exactly from profile/source resume",
+        location: "Original factual location copied exactly from profile/source resume; empty string if not provided",
+        startDate: "Original factual start date copied exactly from profile/source resume; empty string if not provided",
+        endDate: "Original factual end date copied exactly from profile/source resume; empty string if not provided",
         bulletPoints: ["Accomplishment bullet 1", "Accomplishment bullet 2", "..."]
       }
     ],
     education: [
       {
-        institution: "University Name",
-        credential: "Degree/Diploma Name",
-        location: "City, State",
+        institution: "Original factual institution copied exactly from profile/source resume",
+        credential: "Original factual degree/diploma/credential copied exactly from profile/source resume",
+        location: "Original factual location copied exactly from profile/source resume; empty string if not provided",
         dates: "(copy verbatim from profile; use empty string if not provided — do not invent dates)",
         notes: ["Academic achievement or detail"]
       }
@@ -134,7 +153,7 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
         link: "Optional Link"
       }
     ],
-    certifications: ["Certification 1", "Certification 2"]
+    certifications: ["Certification name exactly as listed in profile/source resume; include issuer/year only if already provided"]
   };
 
   const userPromptParts = [
@@ -147,7 +166,7 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
   ];
   if (fitContextBlock) userPromptParts.push(fitContextBlock, '');
   userPromptParts.push(
-    'TASK: Tailor the user profile/resume content to the target job description.',
+    'TASK: Tailor the resume to the target job description while keeping factual history fields unchanged. Improve headline, summary, skills emphasis, and bullet wording; do not rewrite historical job titles, employers, dates, locations, education credentials, or certifications.',
     '',
     JSON_OUTPUT_INSTRUCTION,
     JSON.stringify(resumeSchema, null, 2)
@@ -218,12 +237,19 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
     ? 'KEYWORD MODE: The user is explicitly directing you to incorporate the listed keywords and phrases. Add skill names, tools, and descriptive terms exactly as provided, placed naturally into existing bullet points or the skills list. Do not fabricate specific metrics, dates, or credentials not in the profile.'
     : HALLUCINATION_GUARD;
 
-  const systemPrompt = [
+  const systemPromptParts = [
     `You are revising a ${docType === 'resume' ? 'resume' : 'cover letter'} structured JSON based on user feedback.`,
     honestyRule,
     'Return the COMPLETE revised JSON object following the established schema.',
-    'IMPORTANT: Use any new information provided in the revision request even if not in the profile.',
-  ].join('\n\n');
+  ];
+  if (docType === 'resume') {
+    systemPromptParts.push(
+      RESUME_FACTUAL_GROUNDING_RULE,
+      'For resume revisions, improve bullets, summary, skills emphasis, and ordering unless the user explicitly requests a factual field correction.'
+    );
+  }
+  systemPromptParts.push('IMPORTANT: Use any new information provided in the revision request even if not in the profile.');
+  const systemPrompt = systemPromptParts.join('\n\n');
 
   const userPrompt = [
     '=== JOB DESCRIPTION ===',
