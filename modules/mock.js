@@ -406,6 +406,103 @@ export function generateMockJobChatReply(context, userMessage) {
   return `[Demo mode] This is a simulated response — no real AI was called. Scan a job page, fill in your profile in Settings → My Profile, and switch to a real AI provider to get specific application strategy advice for ${job}.`;
 }
 
+function mockProfileUpdateSection(message) {
+  if (/\bskill|skills\b/i.test(message)) return 'skills';
+  if (/\bsummary|summaries\b/i.test(message)) return 'summary';
+  if (/\bheadline\b/i.test(message)) return 'headline';
+  if (/\beducation|degree|diploma|school|university|college\b/i.test(message)) return 'education';
+  if (/\bcertification|certificate|license|licence\b/i.test(message)) return 'certifications';
+  if (/\bproject|projects\b/i.test(message)) return 'projects';
+  if (/\bpersonal info|email|phone|linkedin|portfolio|website\b/i.test(message)) return 'personalInfo';
+  if (/\bcover letter profile\b/i.test(message)) return 'coverLetterProfile';
+  if (/\bdo not claim\b/i.test(message)) return 'doNotClaimNotes';
+  if (/\bexperience|work history|employment|role|job\b/i.test(message)) return 'experience';
+  return 'customSections';
+}
+
+function mockProfileUpdateAction(message) {
+  if (/\b(remove|delete|drop)\b/i.test(message)) return 'remove';
+  if (/\b(update|edit|change|improve|rewrite|revise)\b/i.test(message)) return 'update';
+  return 'add';
+}
+
+function mockExtractSkill(message) {
+  const match = message.match(/\b(?:include|add|with)\s+(.+?)(?:\s+to\s+my\s+profile|$)/i);
+  return (match?.[1] || message).replace(/\b(skills?|profile|update|add|include)\b/gi, '').trim();
+}
+
+function mockExtractExperience(message) {
+  const atMatch = message.match(/\b(.+?)\s+at\s+(.+?)(?:\s+to\s+my\s+profile|\s+role|\s+job|$)/i);
+  if (atMatch) {
+    return {
+      jobTitle: atMatch[1].replace(/\b(add|include|my|role|job|experience|profile)\b/gi, '').trim(),
+      employer: atMatch[2].trim(),
+      location: '',
+      startDate: '',
+      endDate: '',
+      bulletPoints: [],
+    };
+  }
+
+  const roleMatch = message.match(/\b(?:add|include)\s+(?:my\s+)?(.+?)\s+(?:role|job|experience)\b/i);
+  const phrase = (roleMatch?.[1] || '').trim();
+  const words = phrase.split(/\s+/).filter(Boolean);
+  if (/sun life/i.test(phrase) && words.length >= 3) {
+    return {
+      jobTitle: words.slice(2).join(' '),
+      employer: words.slice(0, 2).join(' '),
+      location: '',
+      startDate: '',
+      endDate: '',
+      bulletPoints: [],
+    };
+  }
+  return {
+    jobTitle: phrase || 'Role described by user',
+    employer: '',
+    location: '',
+    startDate: '',
+    endDate: '',
+    bulletPoints: [],
+  };
+}
+
+export function generateMockJobChatProfileUpdateProposal(context, userMessage) {
+  const message = String(userMessage || '').trim();
+  const section = mockProfileUpdateSection(message);
+  const action = mockProfileUpdateAction(message);
+  let proposedValue;
+
+  if (section === 'skills') {
+    proposedValue = [mockExtractSkill(message)].filter(Boolean);
+  } else if (section === 'experience') {
+    proposedValue = mockExtractExperience(message);
+  } else if (section === 'summary') {
+    proposedValue = { text: message.replace(/\b(improve|update|rewrite|revise)\b/gi, '').trim() };
+  } else if (action === 'remove') {
+    proposedValue = null;
+  } else {
+    proposedValue = { note: message };
+  }
+
+  return {
+    type: 'profile_update_proposal',
+    proposalVersion: 1,
+    section,
+    action,
+    confidence: action === 'remove' ? 'needs_review' : 'user_stated',
+    requiresConfirmation: true,
+    summary: `${action.charAt(0).toUpperCase()}${action.slice(1)} ${section} from your request`,
+    target: action === 'remove' ? message : null,
+    proposedValue,
+    warnings: action === 'remove'
+      ? ['Removal suggestions are read-only in this phase. Review the profile manually before deleting anything.']
+      : ['[Demo mode] This is a simulated suggestion based only on the current chat message.'],
+    sensitiveFields: [],
+    sourceUserMessage: message,
+  };
+}
+
 export function mockReviseDraft(currentDraft, request, docType) {
   let parsed;
   try {

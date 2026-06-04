@@ -23,7 +23,7 @@ import {
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { buildFilename } from '../modules/template.js';
 import { mapError } from '../modules/errorMapper.js';
-import { sendJobChatMessage } from '../modules/jobChat.js';
+import { sendJobChatMessage, sendJobChatProfileUpdateProposal } from '../modules/jobChat.js';
 import { esc } from '../modules/html.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -475,13 +475,13 @@ function renderJobChatOverlay() {
 
 function renderChatMessages() {
   dom.jobChatMessages.innerHTML = '';
-  for (const msg of state.jobChat.messages) {
-    appendChatBubble(msg.role, msg.content);
-  }
+  state.jobChat.messages.forEach((msg, index) => {
+    appendChatBubble(msg.role, msg.content, false, msg.profileProposal, index);
+  });
   scrollChatToBottom();
 }
 
-function appendChatBubble(role, content, pending = false) {
+function appendChatBubble(role, content, pending = false, profileProposal = null, messageIndex = -1) {
   const el = document.createElement('div');
   el.className = [
     'job-chat-msg',
@@ -492,14 +492,18 @@ function appendChatBubble(role, content, pending = false) {
   if (pending || role !== 'assistant') {
     el.textContent = pending ? '…' : content;
   } else {
-    renderAssistantChatBubbleContent(el, content);
+    renderAssistantChatBubbleContent(el, content, profileProposal, messageIndex);
   }
   dom.jobChatMessages.appendChild(el);
   return el;
 }
 
-function renderAssistantChatBubbleContent(el, content) {
+function renderAssistantChatBubbleContent(el, content, profileProposal = null, messageIndex = -1) {
   el.innerHTML = renderChatMarkdown(content);
+
+  if (profileProposal) {
+    el.appendChild(renderProfileSuggestionCard(profileProposal, messageIndex));
+  }
 
   const actions = document.createElement('div');
   actions.className = 'job-chat-actions';
@@ -518,6 +522,161 @@ function renderAssistantChatBubbleContent(el, content) {
 
   actions.append(btnResume, btnCoverLetter);
   el.appendChild(actions);
+}
+
+function sectionLabel(section) {
+  const labels = {
+    personalInfo: 'Personal Info',
+    headline: 'Headline',
+    summary: 'Summary',
+    summaries: 'Summaries',
+    experience: 'Experience',
+    education: 'Education',
+    skills: 'Skills',
+    projects: 'Projects',
+    certifications: 'Certifications',
+    customSections: 'Custom Sections',
+    doNotClaimNotes: 'Do Not Claim Notes',
+    coverLetterProfile: 'Cover Letter Profile',
+  };
+  return labels[section] || section || 'Profile';
+}
+
+function actionLabel(action) {
+  const labels = { add: 'Add', update: 'Update', remove: 'Remove' };
+  return labels[action] || 'Review';
+}
+
+function formatProposalValue(value) {
+  if (value == null || value === '') return 'No specific value provided.';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    if (!value.length) return 'No items provided.';
+    return value.map(item => `- ${formatProposalValue(item).replace(/\n/g, '\n  ')}`).join('\n');
+  }
+  if (typeof value === 'object') {
+    const lines = [];
+    Object.entries(value).forEach(([key, item]) => {
+      if (item == null || item === '' || (Array.isArray(item) && !item.length)) return;
+      const formatted = formatProposalValue(item);
+      lines.push(`${key}: ${formatted.includes('\n') ? `\n${formatted}` : formatted}`);
+    });
+    return lines.length ? lines.join('\n') : 'No specific value provided.';
+  }
+  return String(value);
+}
+
+function formatProfileSuggestionForCopy(proposal) {
+  const lines = [
+    'Suggested Profile Update',
+    `Section: ${sectionLabel(proposal.section)}`,
+    `Action: ${actionLabel(proposal.action)}`,
+    `Summary: ${proposal.summary || 'Review suggested change'}`,
+  ];
+  if (proposal.target) lines.push(`Target: ${formatProposalValue(proposal.target)}`);
+  lines.push('', 'Proposed value:', formatProposalValue(proposal.proposedValue));
+  if (proposal.warnings?.length) {
+    lines.push('', 'Warnings:', ...proposal.warnings.map(w => `- ${w}`));
+  }
+  if (proposal.sensitiveFields?.length) {
+    lines.push('', 'Sensitive data review:', ...proposal.sensitiveFields.map(w => `- ${w}`));
+  }
+  lines.push('', 'This is only a suggestion. It has not changed your saved profile yet.');
+  return lines.join('\n');
+}
+
+function renderProfileSuggestionCard(proposal, messageIndex) {
+  const card = document.createElement('div');
+  card.className = 'job-chat-profile-suggestion';
+
+  const title = document.createElement('div');
+  title.className = 'job-chat-profile-suggestion-title';
+  title.textContent = 'Suggested Profile Update';
+
+  const meta = document.createElement('div');
+  meta.className = 'job-chat-profile-suggestion-meta';
+
+  const section = document.createElement('span');
+  section.className = 'job-chat-profile-section';
+  section.textContent = sectionLabel(proposal.section);
+
+  const action = document.createElement('span');
+  action.className = `job-chat-profile-action job-chat-profile-action--${proposal.action || 'review'}`;
+  action.textContent = actionLabel(proposal.action);
+
+  meta.append(section, action);
+
+  const summary = document.createElement('p');
+  summary.className = 'job-chat-profile-suggestion-summary';
+  summary.textContent = proposal.summary || 'Review suggested profile change.';
+
+  const preview = document.createElement('pre');
+  preview.className = 'job-chat-profile-suggestion-preview';
+  preview.textContent = formatProposalValue(proposal.proposedValue);
+
+  card.append(title, meta, summary, preview);
+
+  const warnings = [...(proposal.warnings || [])];
+  if (proposal.sensitiveFields?.length) {
+    warnings.push('Sensitive data warning: this may include protected or sensitive personal details. Review carefully before using it in job application materials.');
+  }
+  if (warnings.length) {
+    const list = document.createElement('ul');
+    list.className = 'job-chat-profile-suggestion-warnings';
+    warnings.forEach(warning => {
+      const item = document.createElement('li');
+      item.textContent = warning;
+      list.appendChild(item);
+    });
+    card.appendChild(list);
+  }
+
+  const notice = document.createElement('p');
+  notice.className = 'job-chat-profile-suggestion-notice';
+  notice.textContent = 'This is only a suggestion. It has not changed your saved profile yet.';
+  card.appendChild(notice);
+
+  const buttons = document.createElement('div');
+  buttons.className = 'job-chat-profile-suggestion-buttons';
+
+  const btnCopy = document.createElement('button');
+  btnCopy.type = 'button';
+  btnCopy.className = 'job-chat-action-btn';
+  btnCopy.textContent = 'Copy Suggestion';
+  btnCopy.addEventListener('click', () => {
+    navigator.clipboard
+      .writeText(formatProfileSuggestionForCopy(proposal))
+      .then(() => showToast('Profile suggestion copied'))
+      .catch(() => showToast('Copy failed — try selecting and copying manually.'));
+  });
+
+  const btnProfile = document.createElement('button');
+  btnProfile.type = 'button';
+  btnProfile.className = 'job-chat-action-btn';
+  btnProfile.textContent = 'View Profile';
+  btnProfile.addEventListener('click', () => {
+    closeJobChat();
+    openSettingsSection('profile');
+  });
+
+  const btnCancel = document.createElement('button');
+  btnCancel.type = 'button';
+  btnCancel.className = 'job-chat-action-btn';
+  btnCancel.textContent = 'Cancel';
+  btnCancel.addEventListener('click', () => {
+    if (messageIndex >= 0 && state.jobChat.messages[messageIndex]) {
+      state.jobChat.messages[messageIndex].profileProposal = null;
+    }
+    card.remove();
+    showToast('Profile suggestion dismissed');
+  });
+
+  buttons.append(btnCopy, btnProfile, btnCancel);
+  card.appendChild(buttons);
+
+  return card;
 }
 
 function buildChatRefineInstruction(reply, docType) {
@@ -611,9 +770,28 @@ async function sendJobChatTurn(text) {
       state.settings,
       currentJobChatController.signal
     );
-    state.jobChat.messages.push({ role: 'assistant', content: reply });
+    const assistantMessage = { role: 'assistant', content: reply, profileProposal: null };
+    state.jobChat.messages.push(assistantMessage);
+    const assistantMessageIndex = state.jobChat.messages.length - 1;
     pendingEl.className  = 'job-chat-msg job-chat-msg--assistant';
-    renderAssistantChatBubbleContent(pendingEl, reply);
+    renderAssistantChatBubbleContent(pendingEl, reply, null, assistantMessageIndex);
+
+    try {
+      const profileProposal = await sendJobChatProfileUpdateProposal(
+        context,
+        msg,
+        state.settings,
+        currentJobChatController.signal
+      );
+      if (profileProposal) {
+        assistantMessage.profileProposal = profileProposal;
+        renderAssistantChatBubbleContent(pendingEl, reply, profileProposal, assistantMessageIndex);
+        scrollChatToBottom();
+      }
+    } catch (proposalErr) {
+      if (proposalErr?.name === 'AbortError') return;
+      console.warn('Profile update suggestion was not rendered:', proposalErr?.message || proposalErr);
+    }
   } catch (e) {
     if (e.name === 'AbortError') {
       pendingEl.remove();
