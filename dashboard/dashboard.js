@@ -35,6 +35,7 @@ const CHAT_REFINE_REPLY_CHAR_LIMIT = 2000;
 const SAVED_JOBS_KEY = 'savedJobs';
 const JOB_SESSIONS_BY_TAB_KEY = 'jobSessionsByTab';
 const SAVED_DRAFTS_BY_TAB_KEY = 'savedDraftsByTab';
+const SOURCE_RESUME_KEYS = ['sourceResumeText', 'sourceResumeName'];
 const EDITED_HTML_SAVE_DELAY_MS = 500;
 const MAX_EDITED_HTML_CHARS = 500000;
 const MAX_SAVED_JOBS = 50;
@@ -89,6 +90,7 @@ const state = {
   settings: null,
   profile: null,
   sourceResumeText: '',
+  sourceResumeName: '',
   lastRunMode: null,
   loadedFitContext: null,
   generationReceipt: null,
@@ -694,19 +696,28 @@ async function clearGeneratedOutputForJobChange() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
+function setSourceResumeState(data = {}) {
+  state.sourceResumeText = data.sourceResumeText || '';
+  state.sourceResumeName = data.sourceResumeName || '';
+}
+
+async function refreshSourceResumeState() {
+  setSourceResumeState(await chrome.storage.local.get(SOURCE_RESUME_KEYS));
+}
+
 async function init() {
   state.settings = await loadSettings();
   state.profile  = await loadProfile();
   await populateProfileStrip();
 
   const [localData, syncData, scopedDraft] = await Promise.all([
-    chrome.storage.local.get(['sourceResumeText', AI_PROVIDER_SETUP_SAVED_KEY, 'theme']),
+    chrome.storage.local.get([...SOURCE_RESUME_KEYS, AI_PROVIDER_SETUP_SAVED_KEY, 'theme']),
     chrome.storage.sync.get(['docSettings']),
     loadScopedSavedDraft(),
   ]);
   state.docSettings = syncData.docSettings || {};
   applyTheme(localData.theme || 'system');
-  state.sourceResumeText = localData.sourceResumeText || '';
+  setSourceResumeState(localData);
   const aiProviderSetupComplete = localData[AI_PROVIDER_SETUP_SAVED_KEY] || hasExistingAiProviderSetup(state.settings);
   if (aiProviderSetupComplete && !localData[AI_PROVIDER_SETUP_SAVED_KEY]) {
     chrome.storage.local.set({ [AI_PROVIDER_SETUP_SAVED_KEY]: true });
@@ -1974,6 +1985,7 @@ function bindEvents() {
     dom.settingsView.classList.remove('visible');
     state.settings = await loadSettings();
     state.profile  = await loadProfile();
+    await refreshSourceResumeState();
     const { docSettings: refreshedDoc } = await chrome.storage.sync.get(['docSettings']);
     state.docSettings = refreshedDoc || {};
     dom.mockBanner.classList.toggle('hidden', state.settings?.provider !== 'mock');
@@ -3970,6 +3982,7 @@ async function runRecruiterMessageGeneration() {
 
   state.settings = await loadSettings();
   state.profile = await loadProfile();
+  await refreshSourceResumeState();
 
   if (!state.settings?.provider) {
     setRecruiterState('error', 'No AI provider configured. Open Settings to set one up.');
@@ -4112,6 +4125,7 @@ async function runFollowUpMessageGeneration() {
 
   state.settings = await loadSettings();
   state.profile = await loadProfile();
+  await refreshSourceResumeState();
 
   if (!state.settings?.provider) {
     setFollowUpState('error', 'No AI provider configured. Open Settings to set one up.');
@@ -4259,6 +4273,7 @@ async function runApplicationAnswersGeneration() {
 
   state.settings = await loadSettings();
   state.profile = await loadProfile();
+  await refreshSourceResumeState();
 
   if (!state.settings?.provider) {
     setAppAnswersState('error', 'No AI provider configured. Open Settings to set one up.');
@@ -4679,6 +4694,7 @@ async function switchToProfile(profileId) {
   }
 
   state.profile = await switchProfile(profileId);
+  await refreshSourceResumeState();
   await populateProfileStrip();
   closeProfileMenu();
 
