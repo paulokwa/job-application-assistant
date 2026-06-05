@@ -477,8 +477,24 @@ export function generateMockJobChatProfileUpdateProposal(context, userMessage) {
     proposedValue = [mockExtractSkill(message)].filter(Boolean);
   } else if (section === 'experience') {
     proposedValue = mockExtractExperience(message);
+  } else if (section === 'headline') {
+    proposedValue = message.replace(/\b(improve|update|rewrite|revise|headline|profile)\b/gi, '').trim();
   } else if (section === 'summary') {
     proposedValue = { text: message.replace(/\b(improve|update|rewrite|revise)\b/gi, '').trim() };
+  } else if (section === 'personalInfo') {
+    proposedValue = { cityProvince: message.replace(/\b(update|edit|change|personal info|profile)\b/gi, '').trim() };
+  } else if (section === 'education') {
+    proposedValue = { credential: message.replace(/\b(add|include|education|degree|diploma|profile)\b/gi, '').trim() };
+  } else if (section === 'certifications') {
+    proposedValue = { name: message.replace(/\b(add|include|certification|certificate|license|licence|profile)\b/gi, '').trim() };
+  } else if (section === 'projects') {
+    proposedValue = { name: message.replace(/\b(add|include|remove|delete|drop|project|profile)\b/gi, '').trim() };
+  } else if (section === 'customSections') {
+    proposedValue = { label: 'Additional Background', text: message };
+  } else if (section === 'doNotClaimNotes') {
+    proposedValue = message;
+  } else if (section === 'coverLetterProfile') {
+    proposedValue = { strengths: message.replace(/\b(update|edit|change|cover letter profile|profile)\b/gi, '').trim() };
   } else if (action === 'remove') {
     proposedValue = null;
   } else {

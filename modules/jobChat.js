@@ -67,6 +67,8 @@ const PROFILE_PROPOSAL_SYSTEM_PROMPT = [
   '',
   'Allowed sections: personalInfo, headline, summary, summaries, experience, education, skills, projects, certifications, customSections, doNotClaimNotes, coverLetterProfile.',
   'Allowed actions: add, update, remove.',
+  'Use only fields that belong to the selected section. For work experience, use jobTitle, employer, location, dates, startDate, endDate, and bulletPoints.',
+  'For skills, proposedValue must be a string or array of strings. For headline, summary, and doNotClaimNotes, proposedValue must be text or { "text": "..." }.',
 ].join('\n');
 
 const PROFILE_PROPOSAL_SCHEMA = {
@@ -85,6 +87,92 @@ const PROFILE_PROPOSAL_SCHEMA = {
 };
 
 export const INCOMPLETE_EXPERIENCE_WARNING = 'This suggestion is missing details such as responsibilities, dates, or location. Add more detail before using it in your profile.';
+export const LOCKED_SECTION_WARNING = 'This profile section is locked. Unlock it in Settings before applying changes in a future version.';
+
+const DUPLICATE_WARNINGS = {
+  skills: 'This skill already appears in the active profile.',
+  experience: 'A similar experience entry already appears in the active profile.',
+  education: 'A similar education entry already appears in the active profile.',
+  projects: 'A project with this name already appears in the active profile.',
+  certifications: 'A similar certification already appears in the active profile.',
+  summaries: 'A summary with this label already appears in the active profile.',
+  customSections: 'A custom section with this label already appears in the active profile.',
+};
+
+const SECTION_SCHEMAS = {
+  personalInfo: {
+    actions: new Set(['update']),
+    kind: 'object',
+    allowedKeys: new Set(['fullName', 'email', 'phone', 'cityProvince', 'linkedin', 'portfolio', 'website']),
+    requireAnyValue: true,
+  },
+  headline: {
+    actions: new Set(['update', 'remove']),
+    kind: 'text',
+  },
+  summary: {
+    actions: new Set(['update', 'remove']),
+    kind: 'text',
+  },
+  summaries: {
+    actions: new Set(['add', 'update', 'remove']),
+    kind: 'object',
+    allowedKeys: new Set(['label', 'text']),
+    addRequiredKeys: ['label', 'text'],
+    targetRequiredFor: new Set(['update', 'remove']),
+  },
+  experience: {
+    actions: new Set(['add', 'update', 'remove']),
+    kind: 'object',
+    allowedKeys: new Set(['jobTitle', 'title', 'employer', 'company', 'location', 'dates', 'startDate', 'endDate', 'bulletPoints', 'responsibilities', 'description']),
+    addRequiresAny: ['jobTitle', 'title', 'employer', 'company'],
+    targetRequiredFor: new Set(['update', 'remove']),
+  },
+  education: {
+    actions: new Set(['add', 'update', 'remove']),
+    kind: 'object',
+    allowedKeys: new Set(['institution', 'credential', 'location', 'dates', 'notes']),
+    addRequiresAny: ['institution', 'credential'],
+    targetRequiredFor: new Set(['update', 'remove']),
+  },
+  skills: {
+    actions: new Set(['add', 'update', 'remove']),
+    kind: 'stringList',
+    targetRequiredFor: new Set(['update']),
+  },
+  projects: {
+    actions: new Set(['add', 'update', 'remove']),
+    kind: 'object',
+    allowedKeys: new Set(['name', 'role', 'description', 'technologies', 'link']),
+    addRequiredKeys: ['name'],
+    targetRequiredFor: new Set(['update', 'remove']),
+  },
+  certifications: {
+    actions: new Set(['add', 'update', 'remove']),
+    kind: 'object',
+    allowedKeys: new Set(['name', 'issuer', 'year']),
+    addRequiredKeys: ['name'],
+    targetRequiredFor: new Set(['update', 'remove']),
+  },
+  customSections: {
+    actions: new Set(['add', 'update', 'remove']),
+    kind: 'object',
+    allowedKeys: new Set(['label', 'text']),
+    addRequiredKeys: ['label', 'text'],
+    targetRequiredFor: new Set(['update', 'remove']),
+  },
+  doNotClaimNotes: {
+    actions: new Set(['add', 'update', 'remove']),
+    kind: 'text',
+    removeRequiresTargetOrValue: true,
+  },
+  coverLetterProfile: {
+    actions: new Set(['update']),
+    kind: 'object',
+    allowedKeys: new Set(['tone', 'strengths', 'targetRole', 'notableAchievements']),
+    requireAnyValue: true,
+  },
+};
 
 const SYSTEM_PROMPT = [
   'You are an application strategy advisor helping a job seeker decide how to approach a specific job posting.',
@@ -194,20 +282,58 @@ function hasBlockedMutationText(proposal) {
   );
 }
 
-function normalizeProposalShape(proposal) {
-  if (proposal?.section !== 'experience' || !proposal.proposedValue || typeof proposal.proposedValue !== 'object' || Array.isArray(proposal.proposedValue)) {
-    return proposal;
-  }
-  const proposedValue = { ...proposal.proposedValue };
-  if (!proposedValue.employer && proposedValue.company) {
-    proposedValue.employer = proposedValue.company;
-    delete proposedValue.company;
-  }
-  return { ...proposal, proposedValue };
-}
-
 function hasTextValue(value) {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normalizeStringListValue(value) {
+  if (typeof value === 'string') {
+    const text = value.trim();
+    return text ? [text] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => String(item || '').trim()).filter(Boolean);
+  }
+  return null;
+}
+
+function normalizeProposalShape(proposal) {
+  if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) return proposal;
+  const next = { ...proposal };
+  const proposedValue = next.proposedValue;
+
+  if (next.section === 'experience' && proposedValue && typeof proposedValue === 'object' && !Array.isArray(proposedValue)) {
+    const normalized = { ...proposedValue };
+    if (normalized.title) {
+      if (!normalized.jobTitle) normalized.jobTitle = normalized.title;
+      delete normalized.title;
+    }
+    if (normalized.company) {
+      if (!normalized.employer) normalized.employer = normalized.company;
+      delete normalized.company;
+    }
+    if (normalized.responsibilities) {
+      if (!normalized.bulletPoints && !normalized.description) {
+        normalized.bulletPoints = Array.isArray(normalized.responsibilities)
+          ? normalized.responsibilities
+          : [normalized.responsibilities];
+      }
+      delete normalized.responsibilities;
+    }
+    next.proposedValue = normalized;
+  }
+
+  if (next.section === 'education' && proposedValue && typeof proposedValue === 'object' && !Array.isArray(proposedValue)) {
+    const normalized = { ...proposedValue };
+    if (hasTextValue(normalized.notes)) normalized.notes = [normalized.notes];
+    next.proposedValue = normalized;
+  }
+
+  return next;
 }
 
 function hasMeaningfulListValue(value) {
@@ -218,13 +344,86 @@ function hasMeaningfulListValue(value) {
   });
 }
 
-function hasInsufficientExperienceIdentity(proposal) {
-  if (proposal.section !== 'experience' || proposal.action !== 'add') return false;
-  const pv = proposal.proposedValue;
-  if (!pv || typeof pv !== 'object' || Array.isArray(pv)) return true;
-  const hasJobTitle = hasTextValue(pv.jobTitle);
-  const hasEmployer = hasTextValue(pv.employer);
-  return !hasJobTitle && !hasEmployer;
+function hasObjectValue(value) {
+  return value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function objectHasOnlyAllowedKeys(value, allowedKeys) {
+  return Object.keys(value).every(key => allowedKeys.has(key));
+}
+
+function objectHasAnyValue(value) {
+  return Object.values(value).some(item => {
+    if (Array.isArray(item)) return hasMeaningfulListValue(item);
+    return hasTextValue(item);
+  });
+}
+
+function objectHasRequiredKeys(value, requiredKeys = []) {
+  return requiredKeys.every(key => {
+    const item = value?.[key];
+    return Array.isArray(item) ? hasMeaningfulListValue(item) : hasTextValue(item);
+  });
+}
+
+function objectHasAnyRequiredAlias(value, keys = []) {
+  return keys.some(key => {
+    const item = value?.[key];
+    return Array.isArray(item) ? hasMeaningfulListValue(item) : hasTextValue(item);
+  });
+}
+
+function hasTargetValue(target) {
+  if (target == null) return false;
+  if (typeof target === 'string') return target.trim().length > 0;
+  if (Array.isArray(target)) return hasMeaningfulListValue(target);
+  if (typeof target === 'object') return objectHasAnyValue(target);
+  return Boolean(target);
+}
+
+function validateSectionSpecificShape(proposal) {
+  const schema = SECTION_SCHEMAS[proposal.section];
+  if (!schema || !schema.actions.has(proposal.action)) return false;
+
+  const value = proposal.proposedValue;
+
+  if (schema.targetRequiredFor?.has(proposal.action) && !hasTargetValue(proposal.target)) {
+    if (!(proposal.section === 'skills' && proposal.action === 'remove' && normalizeStringListValue(value)?.length)) {
+      return false;
+    }
+  }
+
+  if (schema.removeRequiresTargetOrValue && proposal.action === 'remove' && !hasTargetValue(proposal.target) && !hasTextValue(value)) {
+    return false;
+  }
+
+  if (schema.kind === 'stringList') {
+    const list = normalizeStringListValue(value);
+    if (!list) return false;
+    if (proposal.action === 'add' && !list.length) return false;
+    if (proposal.action === 'remove' && !hasTargetValue(proposal.target) && !list.length) return false;
+    return true;
+  }
+
+  if (schema.kind === 'text') {
+    if (typeof value === 'string') return proposal.action === 'remove' || value.trim().length > 0;
+    if (!hasObjectValue(value)) return proposal.action === 'remove' && hasTargetValue(proposal.target);
+    if (!objectHasOnlyAllowedKeys(value, new Set(['text']))) return false;
+    return proposal.action === 'remove' || hasTextValue(value.text);
+  }
+
+  if (schema.kind === 'object') {
+    if (!hasObjectValue(value)) return proposal.action === 'remove' && hasTargetValue(proposal.target);
+    if (!objectHasOnlyAllowedKeys(value, schema.allowedKeys)) return false;
+    if (schema.requireAnyValue && !objectHasAnyValue(value)) return false;
+    if (proposal.action === 'add') {
+      if (schema.addRequiredKeys && !objectHasRequiredKeys(value, schema.addRequiredKeys)) return false;
+      if (schema.addRequiresAny && !objectHasAnyRequiredAlias(value, schema.addRequiresAny)) return false;
+    }
+    return true;
+  }
+
+  return false;
 }
 
 function isIncompleteExperienceAdd(proposal) {
@@ -284,7 +483,98 @@ function trimProposalStrings(value) {
   return value ?? null;
 }
 
-export function validateProfileUpdateProposal(rawProposal, sourceUserMessage = '') {
+function stableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function profileFingerprint(profile) {
+  if (!profile) return '';
+  const text = stableSerialize(profile);
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fp_${(hash >>> 0).toString(16)}`;
+}
+
+function lockedSectionForProposal(section) {
+  if (section === 'summary') return 'summaries';
+  return section;
+}
+
+function lockedWarningForProposal(proposal, context = {}) {
+  const lockedSections = context.profile?.metadata?.lockedSections || {};
+  return lockedSections[lockedSectionForProposal(proposal.section)] ? LOCKED_SECTION_WARNING : '';
+}
+
+function normalizeDateRange(value = {}) {
+  if (hasTextValue(value.dates)) return normalizeText(value.dates);
+  return normalizeText([value.startDate || '', value.endDate || ''].filter(Boolean).join(' - '));
+}
+
+function certificationKey(cert = {}) {
+  if (typeof cert === 'string') return [cert, '', ''].map(normalizeText).join('|');
+  return [cert.name, cert.issuer, cert.year].map(normalizeText).join('|');
+}
+
+function likelyDuplicateWarning(proposal, context = {}) {
+  if (proposal.action !== 'add') return '';
+  const profile = context.profile || {};
+  const value = proposal.proposedValue;
+
+  if (proposal.section === 'skills') {
+    const proposed = normalizeStringListValue(value) || [];
+    const existing = new Set((profile.skills || []).map(normalizeText));
+    return proposed.some(skill => existing.has(normalizeText(skill))) ? DUPLICATE_WARNINGS.skills : '';
+  }
+
+  if (!hasObjectValue(value)) return '';
+
+  if (proposal.section === 'experience') {
+    const proposedKey = [value.jobTitle, value.employer, normalizeDateRange(value)].map(normalizeText).join('|');
+    const existing = (profile.experience || []).some(exp =>
+      [exp.jobTitle, exp.employer, normalizeDateRange(exp)].map(normalizeText).join('|') === proposedKey
+    );
+    return existing ? DUPLICATE_WARNINGS.experience : '';
+  }
+
+  if (proposal.section === 'education') {
+    const proposedKey = [value.credential, value.institution].map(normalizeText).join('|');
+    const existing = (profile.education || []).some(edu =>
+      [edu.credential, edu.institution].map(normalizeText).join('|') === proposedKey
+    );
+    return existing ? DUPLICATE_WARNINGS.education : '';
+  }
+
+  if (proposal.section === 'projects') {
+    const proposedName = normalizeText(value.name);
+    return (profile.projects || []).some(project => normalizeText(project.name) === proposedName) ? DUPLICATE_WARNINGS.projects : '';
+  }
+
+  if (proposal.section === 'certifications') {
+    const proposedKey = certificationKey(value);
+    return (profile.certifications || []).some(cert => certificationKey(cert) === proposedKey) ? DUPLICATE_WARNINGS.certifications : '';
+  }
+
+  if (proposal.section === 'summaries') {
+    const proposedLabel = normalizeText(value.label);
+    return (profile.summaries || []).some(summary => normalizeText(summary.label) === proposedLabel) ? DUPLICATE_WARNINGS.summaries : '';
+  }
+
+  if (proposal.section === 'customSections') {
+    const proposedLabel = normalizeText(value.label);
+    return (profile.customSections || []).some(section => normalizeText(section.label) === proposedLabel) ? DUPLICATE_WARNINGS.customSections : '';
+  }
+
+  return '';
+}
+
+export function validateProfileUpdateProposal(rawProposal, sourceUserMessage = '', context = {}) {
   const proposal = normalizeProposalShape(trimProposalStrings(rawProposal));
   if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) return null;
   if (proposal.type !== 'profile_update_proposal') return null;
@@ -292,7 +582,7 @@ export function validateProfileUpdateProposal(rawProposal, sourceUserMessage = '
   if (!PROFILE_UPDATE_SECTIONS.has(proposal.section)) return null;
   if (!PROFILE_UPDATE_ACTIONS.has(proposal.action)) return null;
   if (proposalContainsBlockedKey(proposal)) return null;
-  if (hasInsufficientExperienceIdentity(proposal)) return null;
+  if (!validateSectionSpecificShape(proposal)) return null;
   if (proposalLooksLikeFullProfileReplacement(proposal)) return null;
   if (hasPlaceholderOrDemoValues(proposal)) return null;
   if (hasBlockedMutationText(proposal)) return null;
@@ -305,6 +595,10 @@ export function validateProfileUpdateProposal(rawProposal, sourceUserMessage = '
   if (proposal.action === 'remove') {
     warnings.push('Removal suggestions are read-only in this phase. Review the profile manually before deleting anything.');
   }
+  const duplicateWarning = likelyDuplicateWarning(proposal, context);
+  if (duplicateWarning) warnings.push(duplicateWarning);
+  const lockedWarning = lockedWarningForProposal(proposal, context);
+  if (lockedWarning) warnings.push(lockedWarning);
   const { fields: sensitiveFields, hasHealthTerm } = detectSensitiveFields(proposal);
   if (sensitiveFields.length) {
     warnings.push(
@@ -327,6 +621,9 @@ export function validateProfileUpdateProposal(rawProposal, sourceUserMessage = '
     warnings: [...new Set(warnings)],
     sensitiveFields,
     sourceUserMessage: String(sourceUserMessage || proposal.sourceUserMessage || '').trim(),
+    targetProfileId: String(proposal.targetProfileId || context.targetProfileId || context.activeProfileId || '').trim(),
+    createdAt: proposal.createdAt || new Date().toISOString(),
+    baseProfileFingerprint: String(proposal.baseProfileFingerprint || proposal.baseProfileHash || profileFingerprint(context.profile)).trim(),
   };
 }
 
@@ -500,11 +797,12 @@ export async function sendJobChatProfileUpdateProposal(context, newMessage, sett
   if (settings.provider === 'mock') {
     return validateProfileUpdateProposal(
       generateMockJobChatProfileUpdateProposal(context, newMessage),
-      newMessage
+      newMessage,
+      context
     );
   }
 
   const raw = await callAI(PROFILE_PROPOSAL_SYSTEM_PROMPT, buildProfileProposalPrompt(newMessage), settings, signal);
   const parsed = extractJsonObject(raw);
-  return validateProfileUpdateProposal(parsed, newMessage);
+  return validateProfileUpdateProposal(parsed, newMessage, context);
 }

@@ -370,6 +370,7 @@ function buildJobChatContext() {
     company:         jobData.company   || '',
     sourceUrl:       jobData.sourceUrl || '',
     description:     jobData.description || '',
+    activeProfileId,
     profileName,
     profile:         profile || null,
     aiReview,

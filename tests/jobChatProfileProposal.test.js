@@ -42,17 +42,21 @@ assert.equal(validProposal.requiresConfirmation, true);
 assert.equal(validProposal.proposedValue.jobTitle, 'Claims Analyst');
 assert.equal(validProposal.sourceUserMessage, sourceMessage);
 assert.match(validProposal.warnings.join('\n'), /missing details such as responsibilities, dates, or location/i);
+assert.match(validProposal.createdAt, /^\d{4}-\d{2}-\d{2}T/);
+assert.equal(typeof validProposal.baseProfileFingerprint, 'string');
 
 const companyAliasProposal = validateProfileUpdateProposal({
   ...validProposal,
   proposedValue: {
-    jobTitle: 'Claims Analyst',
+    title: 'Claims Analyst',
     company: 'Sun Life',
   },
 }, sourceMessage);
 
 assert.ok(companyAliasProposal);
+assert.equal(companyAliasProposal.proposedValue.jobTitle, 'Claims Analyst');
 assert.equal(companyAliasProposal.proposedValue.employer, 'Sun Life');
+assert.equal(Object.hasOwn(companyAliasProposal.proposedValue, 'title'), false);
 assert.equal(Object.hasOwn(companyAliasProposal.proposedValue, 'company'), false);
 assert.equal(companyAliasProposal.warnings.includes(INCOMPLETE_EXPERIENCE_WARNING), true);
 
@@ -92,6 +96,43 @@ assert.equal(validateProfileUpdateProposal({
   ...validProposal,
   proposedValue: { jobTitle: 'Job Title', employer: 'Company Name' },
 }, sourceMessage), null);
+assert.equal(validateProfileUpdateProposal({
+  ...validProposal,
+  proposedValue: { jobTitle: 'Claims Analyst', employer: 'Sun Life', unexpected: 'nope' },
+}, sourceMessage), null);
+assert.equal(validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'personalInfo',
+  action: 'update',
+  proposedValue: { fullName: 'Jane Doe', nickname: 'JD' },
+}, 'Update my profile name'), null);
+
+const skillStringProposal = validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'skills',
+  action: 'add',
+  proposedValue: 'Dental claims processing',
+}, 'Update my skills to include dental claims processing');
+
+assert.ok(skillStringProposal);
+assert.equal(skillStringProposal.section, 'skills');
+
+const skillArrayProposal = validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'skills',
+  action: 'add',
+  proposedValue: ['Dental claims processing', 'Claims review'],
+}, 'Update my skills to include dental claims processing');
+
+assert.ok(skillArrayProposal);
+assert.equal(skillArrayProposal.section, 'skills');
+
+assert.equal(validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'certifications',
+  action: 'add',
+  proposedValue: { name: 'Claims Fundamentals', issuer: 'Insurance Institute', extra: 'nope' },
+}, 'Add certification to my profile'), null);
 
 const sensitiveProposal = validateProfileUpdateProposal({
   ...validProposal,
@@ -109,13 +150,14 @@ const removeProposal = validateProfileUpdateProposal({
   action: 'remove',
   summary: 'Remove old project',
   proposedValue: null,
+  target: { jobTitle: 'Old Role', employer: 'Old Employer' },
 }, 'Remove that old project from my profile');
 
 assert.ok(removeProposal);
 assert.match(removeProposal.warnings.join('\n'), /read-only/i);
 
 const mockProposal = await sendJobChatProfileUpdateProposal(
-  {},
+  { activeProfileId: 'p1', profile: {} },
   sourceMessage,
   { provider: 'mock' },
   new AbortController().signal
@@ -125,6 +167,7 @@ assert.equal(mockProposal.section, 'experience');
 assert.equal(mockProposal.action, 'add');
 assert.equal(mockProposal.proposedValue.jobTitle, 'Claims Analyst');
 assert.equal(mockProposal.proposedValue.employer, 'Sun Life');
+assert.equal(mockProposal.targetProfileId, 'p1');
 
 const normalMockProposal = await sendJobChatProfileUpdateProposal(
   {},
@@ -177,5 +220,46 @@ assert.equal(structuredExperienceAdd.section, 'experience');
 assert.equal(structuredExperienceAdd.proposedValue.jobTitle, 'Claims Analyst');
 assert.equal(structuredExperienceAdd.sensitiveFields.length, 0);
 assert.equal(structuredExperienceAdd.warnings.includes(INCOMPLETE_EXPERIENCE_WARNING), false);
+
+assert.equal(validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'experience',
+  action: 'update',
+  proposedValue: { jobTitle: 'Claims Specialist' },
+  warnings: [],
+  target: null,
+}, 'Update my experience'), null);
+
+assert.equal(validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'experience',
+  action: 'remove',
+  proposedValue: null,
+  warnings: [],
+  target: null,
+}, 'Remove that role from my profile'), null);
+
+const duplicateSkill = validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'skills',
+  action: 'add',
+  proposedValue: 'Dental Claims Processing',
+  warnings: [],
+}, 'Update my skills to include dental claims processing', {
+  profile: { skills: ['dental claims processing'] },
+});
+
+assert.ok(duplicateSkill);
+assert.match(duplicateSkill.warnings.join('\n'), /already appears/i);
+
+const lockedExperience = validateProfileUpdateProposal({
+  ...validProposal,
+  warnings: [],
+}, sourceMessage, {
+  profile: { metadata: { lockedSections: { experience: true } } },
+});
+
+assert.ok(lockedExperience);
+assert.match(lockedExperience.warnings.join('\n'), /section is locked/i);
 
 console.log('jobChatProfileProposal checks passed');
