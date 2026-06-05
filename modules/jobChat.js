@@ -88,6 +88,8 @@ const PROFILE_PROPOSAL_SCHEMA = {
 
 export const INCOMPLETE_EXPERIENCE_WARNING = 'This suggestion is missing details such as responsibilities, dates, or location. Add more detail before using it in your profile.';
 export const LOCKED_SECTION_WARNING = 'This profile section is locked. Unlock it in Settings before applying changes in a future version.';
+export const TARGET_UNRESOLVED_WARNING = 'Target not resolved. This preview cannot identify the exact existing profile item that would change.';
+export const DIFF_PREVIEW_NOTICE = 'This is a preview only. It has not changed your saved profile.';
 
 const DUPLICATE_WARNINGS = {
   skills: 'This skill already appears in the active profile.',
@@ -572,6 +574,156 @@ function likelyDuplicateWarning(proposal, context = {}) {
   }
 
   return '';
+}
+
+function targetTextSet(target) {
+  if (target == null) return new Set();
+  if (typeof target === 'string') return new Set([normalizeText(target)]);
+  if (Array.isArray(target)) return new Set(target.map(normalizeText).filter(Boolean));
+  if (typeof target === 'object') return new Set(collectProposalStrings(target).map(normalizeText).filter(Boolean));
+  return new Set([normalizeText(target)]);
+}
+
+function objectMatchesTarget(item = {}, target) {
+  if (!hasTargetValue(target)) return false;
+  if (typeof target === 'object' && !Array.isArray(target)) {
+    return Object.entries(target).every(([key, value]) => normalizeText(item?.[key]) === normalizeText(value));
+  }
+  const targetSet = targetTextSet(target);
+  return collectProposalStrings(item).some(value => targetSet.has(normalizeText(value)));
+}
+
+function findSkill(profile = {}, proposal = {}) {
+  const skills = profile.skills || [];
+  const targets = targetTextSet(proposal.target);
+  const proposed = new Set((normalizeStringListValue(proposal.proposedValue) || []).map(normalizeText));
+  return skills.find(skill => targets.has(normalizeText(skill)) || proposed.has(normalizeText(skill))) || null;
+}
+
+function findExperience(profile = {}, proposal = {}) {
+  const entries = profile.experience || [];
+  const target = proposal.target;
+  if (hasObjectValue(target)) {
+    const targetKey = [target.jobTitle || target.title, target.employer || target.company, normalizeDateRange(target)].map(normalizeText).join('|');
+    const keyed = entries.find(exp => [exp.jobTitle, exp.employer, normalizeDateRange(exp)].map(normalizeText).join('|') === targetKey);
+    if (keyed) return keyed;
+  }
+  return entries.find(exp => objectMatchesTarget(exp, target)) || null;
+}
+
+function findEducation(profile = {}, proposal = {}) {
+  const entries = profile.education || [];
+  const target = proposal.target;
+  if (hasObjectValue(target)) {
+    const targetKey = [target.credential, target.institution].map(normalizeText).join('|');
+    const keyed = entries.find(edu => [edu.credential, edu.institution].map(normalizeText).join('|') === targetKey);
+    if (keyed) return keyed;
+  }
+  return entries.find(edu => objectMatchesTarget(edu, target)) || null;
+}
+
+function findCertification(profile = {}, proposal = {}) {
+  const certs = profile.certifications || [];
+  const target = proposal.target;
+  if (hasObjectValue(target)) {
+    const targetKey = certificationKey(target);
+    const keyed = certs.find(cert => certificationKey(cert) === targetKey);
+    if (keyed) return cert;
+  }
+  return certs.find(cert => objectMatchesTarget(cert, target)) || null;
+}
+
+function findByName(entries = [], proposal = {}, field = 'name') {
+  const target = proposal.target;
+  if (hasObjectValue(target) && hasTextValue(target[field])) {
+    const targetValue = normalizeText(target[field]);
+    const keyed = entries.find(entry => normalizeText(entry?.[field]) === targetValue);
+    if (keyed) return keyed;
+  }
+  return entries.find(entry => objectMatchesTarget(entry, target)) || null;
+}
+
+function findByLabel(entries = [], proposal = {}) {
+  return findByName(entries, proposal, 'label');
+}
+
+function resolveProfileProposalTarget(profile = {}, proposal = {}) {
+  if (proposal.action === 'add') return null;
+  if (proposal.section === 'headline') return profile.headline || '';
+  if (proposal.section === 'summary') return profile.summary || '';
+  if (proposal.section === 'doNotClaimNotes') return profile.doNotClaimNotes || '';
+  if (proposal.section === 'coverLetterProfile') return profile.coverLetterProfile || {};
+  if (proposal.section === 'personalInfo') return profile.personalInfo || {};
+  if (proposal.section === 'skills') return findSkill(profile, proposal);
+  if (proposal.section === 'experience') return findExperience(profile, proposal);
+  if (proposal.section === 'education') return findEducation(profile, proposal);
+  if (proposal.section === 'projects') return findByName(profile.projects || [], proposal);
+  if (proposal.section === 'certifications') return findCertification(profile, proposal);
+  if (proposal.section === 'summaries') return findByLabel(profile.summaries || [], proposal);
+  if (proposal.section === 'customSections') return findByLabel(profile.customSections || [], proposal);
+  return null;
+}
+
+function proposedTextValue(value) {
+  if (typeof value === 'string') return value;
+  if (hasObjectValue(value) && Object.keys(value).length === 1 && hasTextValue(value.text)) return value.text;
+  return value;
+}
+
+function mergeAfterValue(before, proposal) {
+  if (proposal.action === 'remove') return null;
+  const proposed = proposedTextValue(proposal.proposedValue);
+  if (proposal.action === 'add') return proposed;
+  if (typeof before === 'string' && typeof proposed === 'string') return proposed;
+  if (hasObjectValue(before) && hasObjectValue(proposed)) return { ...before, ...proposed };
+  return proposed;
+}
+
+function diffFieldChanges(before, after) {
+  if (before == null && after == null) return [];
+  if (typeof before !== 'object' || typeof after !== 'object' || Array.isArray(before) || Array.isArray(after)) {
+    if (stableSerialize(before) === stableSerialize(after)) return [];
+    return [{
+      field: 'value',
+      changeType: before == null ? 'added' : after == null ? 'removed' : 'changed',
+      before,
+      after,
+    }];
+  }
+  const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+  return [...keys].filter(key => stableSerialize(before?.[key]) !== stableSerialize(after?.[key])).map(key => ({
+    field: key,
+    changeType: before?.[key] == null || before?.[key] === '' ? 'added' : after?.[key] == null || after?.[key] === '' ? 'removed' : 'changed',
+    before: before?.[key] ?? null,
+    after: after?.[key] ?? null,
+  }));
+}
+
+export function buildProfileProposalDiff(proposal, context = {}) {
+  const profile = context.profile || {};
+  const warnings = [...(proposal?.warnings || [])];
+  const before = proposal.action === 'add' ? null : resolveProfileProposalTarget(profile, proposal);
+  const targetResolved = proposal.action === 'add' || before != null;
+  if (!targetResolved) warnings.push(TARGET_UNRESOLVED_WARNING);
+  const after = targetResolved ? mergeAfterValue(before, proposal) : null;
+
+  return {
+    type: 'profile_update_diff_preview',
+    section: proposal.section,
+    sectionLabel: proposalSectionLabel(proposal.section),
+    action: proposal.action,
+    actionLabel: proposalActionLabel(proposal.action),
+    profileName: context.profileName || '',
+    targetResolved,
+    beforeLabel: proposal.action === 'add' ? 'No existing entry selected.' : targetResolved ? 'Current value' : 'Target not resolved',
+    afterLabel: proposal.action === 'remove' ? 'Would be removed' : 'Proposed value',
+    before,
+    after,
+    fieldChanges: targetResolved ? diffFieldChanges(before, after) : [],
+    warnings: [...new Set(warnings)],
+    sensitiveFields: proposal.sensitiveFields || [],
+    readOnlyNotice: DIFF_PREVIEW_NOTICE,
+  };
 }
 
 export function validateProfileUpdateProposal(rawProposal, sourceUserMessage = '', context = {}) {

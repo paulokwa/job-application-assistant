@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import {
+  buildProfileProposalDiff,
   formatProfileUpdateProposalForCopy,
   hasExplicitProfileUpdateIntent,
   INCOMPLETE_EXPERIENCE_WARNING,
+  TARGET_UNRESOLVED_WARNING,
   sendJobChatProfileUpdateProposal,
   validateProfileUpdateProposal,
 } from '../modules/jobChat.js';
@@ -261,5 +263,94 @@ const lockedExperience = validateProfileUpdateProposal({
 
 assert.ok(lockedExperience);
 assert.match(lockedExperience.warnings.join('\n'), /section is locked/i);
+
+const experienceAddDiff = buildProfileProposalDiff(structuredExperienceAdd, {
+  profileName: 'General',
+  profile: { experience: [] },
+});
+
+assert.equal(experienceAddDiff.profileName, 'General');
+assert.equal(experienceAddDiff.section, 'experience');
+assert.equal(experienceAddDiff.action, 'add');
+assert.equal(experienceAddDiff.before, null);
+assert.equal(experienceAddDiff.beforeLabel, 'No existing entry selected.');
+assert.equal(experienceAddDiff.after.jobTitle, 'Claims Analyst');
+assert.equal(experienceAddDiff.fieldChanges.some(change => change.changeType === 'added'), true);
+assert.match(experienceAddDiff.readOnlyNotice, /preview only/i);
+
+const duplicateSkillDiff = buildProfileProposalDiff(duplicateSkill, {
+  profile: { skills: ['dental claims processing'] },
+});
+
+assert.match(duplicateSkillDiff.warnings.join('\n'), /already appears/i);
+assert.equal(duplicateSkillDiff.after, 'Dental Claims Processing');
+
+const summaryUpdate = validateProfileUpdateProposal({
+  type: 'profile_update_proposal',
+  proposalVersion: 1,
+  section: 'summary',
+  action: 'update',
+  summary: 'Update summary',
+  target: 'Old summary',
+  proposedValue: { text: 'New summary' },
+  warnings: [],
+  sensitiveFields: [],
+}, 'Update my profile summary');
+
+assert.ok(summaryUpdate);
+const summaryDiff = buildProfileProposalDiff(summaryUpdate, {
+  profile: { summary: 'Old summary' },
+});
+
+assert.equal(summaryDiff.before, 'Old summary');
+assert.equal(summaryDiff.after, 'New summary');
+assert.equal(summaryDiff.fieldChanges[0].changeType, 'changed');
+
+const lockedDiff = buildProfileProposalDiff(lockedExperience, {
+  profile: { metadata: { lockedSections: { experience: true } } },
+});
+
+assert.match(lockedDiff.warnings.join('\n'), /section is locked/i);
+
+const unresolvedUpdate = validateProfileUpdateProposal({
+  type: 'profile_update_proposal',
+  proposalVersion: 1,
+  section: 'experience',
+  action: 'update',
+  summary: 'Update old role',
+  target: { jobTitle: 'Missing Role', employer: 'Missing Employer' },
+  proposedValue: { jobTitle: 'Updated Role' },
+  warnings: [],
+  sensitiveFields: [],
+}, 'Update my old role in my profile');
+
+assert.ok(unresolvedUpdate);
+const unresolvedUpdateDiff = buildProfileProposalDiff(unresolvedUpdate, {
+  profile: { experience: [{ jobTitle: 'Other Role', employer: 'Other Employer' }] },
+});
+
+assert.equal(unresolvedUpdateDiff.targetResolved, false);
+assert.match(unresolvedUpdateDiff.warnings.join('\n'), /Target not resolved/i);
+assert.equal(unresolvedUpdateDiff.fieldChanges.length, 0);
+
+const unresolvedRemove = validateProfileUpdateProposal({
+  type: 'profile_update_proposal',
+  proposalVersion: 1,
+  section: 'projects',
+  action: 'remove',
+  summary: 'Remove missing project',
+  target: { name: 'Missing Project' },
+  proposedValue: null,
+  warnings: [],
+  sensitiveFields: [],
+}, 'Remove that old project from my profile');
+
+assert.ok(unresolvedRemove);
+const unresolvedRemoveDiff = buildProfileProposalDiff(unresolvedRemove, {
+  profile: { projects: [{ name: 'Other Project' }] },
+});
+
+assert.equal(unresolvedRemoveDiff.targetResolved, false);
+assert.equal(unresolvedRemoveDiff.warnings.includes(TARGET_UNRESOLVED_WARNING), true);
 
 console.log('jobChatProfileProposal checks passed');

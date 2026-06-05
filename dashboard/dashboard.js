@@ -23,7 +23,7 @@ import {
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { buildFilename } from '../modules/template.js';
 import { mapError } from '../modules/errorMapper.js';
-import { formatProfileUpdateProposalForCopy, sendJobChatMessage, sendJobChatProfileUpdateProposal } from '../modules/jobChat.js';
+import { buildProfileProposalDiff, formatProfileUpdateProposalForCopy, sendJobChatMessage, sendJobChatProfileUpdateProposal } from '../modules/jobChat.js';
 import { esc } from '../modules/html.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -569,6 +569,82 @@ function formatProposalValue(value) {
   return String(value);
 }
 
+function formatDiffFieldChanges(changes = []) {
+  if (!changes.length) return 'No field-level changes detected.';
+  return changes.map(change => {
+    const before = formatProposalValue(change.before).replace(/\n/g, '\n    ');
+    const after = formatProposalValue(change.after).replace(/\n/g, '\n    ');
+    return `${change.changeType.toUpperCase()} ${change.field}\n  Before: ${before}\n  After: ${after}`;
+  }).join('\n\n');
+}
+
+function renderProfileDiffPreviewPanel(diff) {
+  const panel = document.createElement('div');
+  panel.className = 'job-chat-profile-diff';
+
+  const title = document.createElement('div');
+  title.className = 'job-chat-profile-diff-title';
+  title.textContent = 'Profile Change Preview';
+
+  const meta = document.createElement('p');
+  meta.className = 'job-chat-profile-diff-meta';
+  meta.textContent = [
+    diff.profileName ? `Profile: ${diff.profileName}` : '',
+    `Section: ${diff.sectionLabel}`,
+    `Action: ${diff.actionLabel}`,
+  ].filter(Boolean).join(' | ');
+
+  const grid = document.createElement('div');
+  grid.className = 'job-chat-profile-diff-grid';
+
+  const before = document.createElement('div');
+  before.className = 'job-chat-profile-diff-col';
+  before.innerHTML = '<strong>Before</strong>';
+  const beforePre = document.createElement('pre');
+  beforePre.textContent = diff.before == null ? diff.beforeLabel : formatProposalValue(diff.before);
+  before.appendChild(beforePre);
+
+  const after = document.createElement('div');
+  after.className = 'job-chat-profile-diff-col';
+  after.innerHTML = '<strong>After</strong>';
+  const afterPre = document.createElement('pre');
+  afterPre.textContent = diff.after == null ? diff.afterLabel : formatProposalValue(diff.after);
+  after.appendChild(afterPre);
+
+  grid.append(before, after);
+
+  const changes = document.createElement('pre');
+  changes.className = 'job-chat-profile-diff-changes';
+  changes.textContent = formatDiffFieldChanges(diff.fieldChanges);
+
+  panel.append(title, meta, grid, changes);
+
+  if (diff.warnings?.length || diff.sensitiveFields?.length) {
+    const warnings = document.createElement('ul');
+    warnings.className = 'job-chat-profile-suggestion-warnings';
+    [...(diff.warnings || []), ...(diff.sensitiveFields || []).map(field => `Sensitive data review: ${field}`)].forEach(warning => {
+      const item = document.createElement('li');
+      item.textContent = warning;
+      warnings.appendChild(item);
+    });
+    panel.appendChild(warnings);
+  }
+
+  const notice = document.createElement('p');
+  notice.className = 'job-chat-profile-suggestion-notice';
+  notice.textContent = diff.readOnlyNotice;
+  panel.appendChild(notice);
+
+  const disabledApply = document.createElement('button');
+  disabledApply.type = 'button';
+  disabledApply.className = 'job-chat-action-btn';
+  disabledApply.textContent = 'Apply coming later';
+  disabledApply.disabled = true;
+  panel.appendChild(disabledApply);
+
+  return panel;
+}
+
 function renderProfileSuggestionCard(proposal, messageIndex) {
   const card = document.createElement('div');
   card.className = 'job-chat-profile-suggestion';
@@ -634,6 +710,23 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
       .catch(() => showToast('Copy failed — try selecting and copying manually.'));
   });
 
+  const btnPreview = document.createElement('button');
+  btnPreview.type = 'button';
+  btnPreview.className = 'job-chat-action-btn';
+  btnPreview.textContent = 'Preview Changes';
+  btnPreview.addEventListener('click', () => {
+    let panel = card.querySelector('.job-chat-profile-diff');
+    if (panel) {
+      panel.remove();
+      btnPreview.textContent = 'Preview Changes';
+      return;
+    }
+    const diff = buildProfileProposalDiff(proposal, buildJobChatContext());
+    panel = renderProfileDiffPreviewPanel(diff);
+    card.insertBefore(panel, buttons);
+    btnPreview.textContent = 'Hide Preview';
+  });
+
   const btnProfile = document.createElement('button');
   btnProfile.type = 'button';
   btnProfile.className = 'job-chat-action-btn';
@@ -655,7 +748,7 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
     showToast('Profile suggestion dismissed');
   });
 
-  buttons.append(btnCopy, btnProfile, btnCancel);
+  buttons.append(btnCopy, btnPreview, btnProfile, btnCancel);
   card.appendChild(buttons);
 
   return card;
