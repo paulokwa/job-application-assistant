@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {
+  formatProfileUpdateProposalForCopy,
   hasExplicitProfileUpdateIntent,
+  INCOMPLETE_EXPERIENCE_WARNING,
   sendJobChatProfileUpdateProposal,
   validateProfileUpdateProposal,
 } from '../modules/jobChat.js';
@@ -39,6 +41,26 @@ assert.equal(validProposal.action, 'add');
 assert.equal(validProposal.requiresConfirmation, true);
 assert.equal(validProposal.proposedValue.jobTitle, 'Claims Analyst');
 assert.equal(validProposal.sourceUserMessage, sourceMessage);
+assert.match(validProposal.warnings.join('\n'), /missing details such as responsibilities, dates, or location/i);
+
+const companyAliasProposal = validateProfileUpdateProposal({
+  ...validProposal,
+  proposedValue: {
+    jobTitle: 'Claims Analyst',
+    company: 'Sun Life',
+  },
+}, sourceMessage);
+
+assert.ok(companyAliasProposal);
+assert.equal(companyAliasProposal.proposedValue.employer, 'Sun Life');
+assert.equal(Object.hasOwn(companyAliasProposal.proposedValue, 'company'), false);
+assert.equal(companyAliasProposal.warnings.includes(INCOMPLETE_EXPERIENCE_WARNING), true);
+
+const incompleteCopyText = formatProfileUpdateProposalForCopy(companyAliasProposal);
+assert.match(incompleteCopyText, /Warnings:/);
+assert.match(incompleteCopyText, /This suggestion is missing details such as responsibilities, dates, or location/);
+assert.match(incompleteCopyText, /employer: Sun Life/);
+assert.doesNotMatch(incompleteCopyText, /company: Sun Life/);
 
 assert.equal(validateProfileUpdateProposal(null, sourceMessage), null);
 assert.equal(validateProfileUpdateProposal({ ...validProposal, section: 'unknown' }, sourceMessage), null);
@@ -133,6 +155,7 @@ const structuredSensitiveAdd = validateProfileUpdateProposal({
   action: 'add',
   summary: 'Add cancer treatment support role',
   proposedValue: { jobTitle: 'Cancer Treatment Support Volunteer', employer: 'Hospital', bulletPoints: ['Assisted patients during treatment'] },
+  warnings: [],
 }, cancerSourceMessage);
 
 assert.ok(structuredSensitiveAdd);
@@ -146,11 +169,13 @@ const structuredExperienceAdd = validateProfileUpdateProposal({
   action: 'add',
   summary: 'Add role at company',
   proposedValue: { jobTitle: 'Claims Analyst', employer: 'Sun Life', bulletPoints: ['Processed claims'] },
+  warnings: [],
 }, sourceMessage);
 
 assert.ok(structuredExperienceAdd);
 assert.equal(structuredExperienceAdd.section, 'experience');
 assert.equal(structuredExperienceAdd.proposedValue.jobTitle, 'Claims Analyst');
 assert.equal(structuredExperienceAdd.sensitiveFields.length, 0);
+assert.equal(structuredExperienceAdd.warnings.includes(INCOMPLETE_EXPERIENCE_WARNING), false);
 
 console.log('jobChatProfileProposal checks passed');

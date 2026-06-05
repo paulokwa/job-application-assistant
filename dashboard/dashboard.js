@@ -23,7 +23,7 @@ import {
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { buildFilename } from '../modules/template.js';
 import { mapError } from '../modules/errorMapper.js';
-import { sendJobChatMessage, sendJobChatProfileUpdateProposal } from '../modules/jobChat.js';
+import { formatProfileUpdateProposalForCopy, sendJobChatMessage, sendJobChatProfileUpdateProposal } from '../modules/jobChat.js';
 import { esc } from '../modules/html.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -568,25 +568,6 @@ function formatProposalValue(value) {
   return String(value);
 }
 
-function formatProfileSuggestionForCopy(proposal) {
-  const lines = [
-    'Suggested Profile Update',
-    `Section: ${sectionLabel(proposal.section)}`,
-    `Action: ${actionLabel(proposal.action)}`,
-    `Summary: ${proposal.summary || 'Review suggested change'}`,
-  ];
-  if (proposal.target) lines.push(`Target: ${formatProposalValue(proposal.target)}`);
-  lines.push('', 'Proposed value:', formatProposalValue(proposal.proposedValue));
-  if (proposal.warnings?.length) {
-    lines.push('', 'Warnings:', ...proposal.warnings.map(w => `- ${w}`));
-  }
-  if (proposal.sensitiveFields?.length) {
-    lines.push('', 'Sensitive data review:', ...proposal.sensitiveFields.map(w => `- ${w}`));
-  }
-  lines.push('', 'This is only a suggestion. It has not changed your saved profile yet.');
-  return lines.join('\n');
-}
-
 function renderProfileSuggestionCard(proposal, messageIndex) {
   const card = document.createElement('div');
   card.className = 'job-chat-profile-suggestion';
@@ -647,7 +628,7 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
   btnCopy.textContent = 'Copy Suggestion';
   btnCopy.addEventListener('click', () => {
     navigator.clipboard
-      .writeText(formatProfileSuggestionForCopy(proposal))
+      .writeText(formatProfileUpdateProposalForCopy(proposal))
       .then(() => showToast('Profile suggestion copied'))
       .catch(() => showToast('Copy failed — try selecting and copying manually.'));
   });

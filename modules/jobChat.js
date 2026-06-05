@@ -84,6 +84,8 @@ const PROFILE_PROPOSAL_SCHEMA = {
   sourceUserMessage: 'Exact current user message',
 };
 
+export const INCOMPLETE_EXPERIENCE_WARNING = 'This suggestion is missing details such as responsibilities, dates, or location. Add more detail before using it in your profile.';
+
 const SYSTEM_PROMPT = [
   'You are an application strategy advisor helping a job seeker decide how to approach a specific job posting.',
   'You have been given the candidate\'s saved profile, the job description, and (if available) AI Fit Check results.',
@@ -192,13 +194,56 @@ function hasBlockedMutationText(proposal) {
   );
 }
 
-function hasInsufficientExperienceDetail(proposal) {
+function normalizeProposalShape(proposal) {
+  if (proposal?.section !== 'experience' || !proposal.proposedValue || typeof proposal.proposedValue !== 'object' || Array.isArray(proposal.proposedValue)) {
+    return proposal;
+  }
+  const proposedValue = { ...proposal.proposedValue };
+  if (!proposedValue.employer && proposedValue.company) {
+    proposedValue.employer = proposedValue.company;
+    delete proposedValue.company;
+  }
+  return { ...proposal, proposedValue };
+}
+
+function hasTextValue(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasMeaningfulListValue(value) {
+  return Array.isArray(value) && value.some(item => {
+    if (typeof item === 'string') return item.trim().length > 0;
+    if (item && typeof item === 'object') return collectProposalStrings(item).some(hasTextValue);
+    return false;
+  });
+}
+
+function hasInsufficientExperienceIdentity(proposal) {
   if (proposal.section !== 'experience' || proposal.action !== 'add') return false;
   const pv = proposal.proposedValue;
   if (!pv || typeof pv !== 'object' || Array.isArray(pv)) return true;
-  const hasJobTitle = typeof pv.jobTitle === 'string' && pv.jobTitle.trim().length > 0;
-  const hasEmployer = typeof pv.employer === 'string' && pv.employer.trim().length > 0;
+  const hasJobTitle = hasTextValue(pv.jobTitle);
+  const hasEmployer = hasTextValue(pv.employer);
   return !hasJobTitle && !hasEmployer;
+}
+
+function isIncompleteExperienceAdd(proposal) {
+  if (proposal.section !== 'experience' || proposal.action !== 'add') return false;
+  const pv = proposal.proposedValue;
+  if (!pv || typeof pv !== 'object' || Array.isArray(pv)) return false;
+  const hasJobTitle = hasTextValue(pv.jobTitle);
+  const hasEmployer = hasTextValue(pv.employer);
+  if (!hasJobTitle || !hasEmployer) return false;
+  return !(
+    hasMeaningfulListValue(pv.bulletPoints) ||
+    hasMeaningfulListValue(pv.responsibilities) ||
+    hasTextValue(pv.responsibilities) ||
+    hasTextValue(pv.description) ||
+    hasTextValue(pv.dates) ||
+    hasTextValue(pv.startDate) ||
+    hasTextValue(pv.endDate) ||
+    hasTextValue(pv.location)
+  );
 }
 
 function claimsAlreadyChanged(proposal) {
@@ -240,20 +285,23 @@ function trimProposalStrings(value) {
 }
 
 export function validateProfileUpdateProposal(rawProposal, sourceUserMessage = '') {
-  const proposal = trimProposalStrings(rawProposal);
+  const proposal = normalizeProposalShape(trimProposalStrings(rawProposal));
   if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) return null;
   if (proposal.type !== 'profile_update_proposal') return null;
   if (proposal.proposalVersion !== 1) return null;
   if (!PROFILE_UPDATE_SECTIONS.has(proposal.section)) return null;
   if (!PROFILE_UPDATE_ACTIONS.has(proposal.action)) return null;
   if (proposalContainsBlockedKey(proposal)) return null;
-  if (hasInsufficientExperienceDetail(proposal)) return null;
+  if (hasInsufficientExperienceIdentity(proposal)) return null;
   if (proposalLooksLikeFullProfileReplacement(proposal)) return null;
   if (hasPlaceholderOrDemoValues(proposal)) return null;
   if (hasBlockedMutationText(proposal)) return null;
   if (claimsAlreadyChanged(proposal)) return null;
 
   const warnings = normalizeStringArray(proposal.warnings);
+  if (isIncompleteExperienceAdd(proposal)) {
+    warnings.push(INCOMPLETE_EXPERIENCE_WARNING);
+  }
   if (proposal.action === 'remove') {
     warnings.push('Removal suggestions are read-only in this phase. Review the profile manually before deleting anything.');
   }
@@ -280,6 +328,69 @@ export function validateProfileUpdateProposal(rawProposal, sourceUserMessage = '
     sensitiveFields,
     sourceUserMessage: String(sourceUserMessage || proposal.sourceUserMessage || '').trim(),
   };
+}
+
+function proposalSectionLabel(section) {
+  const labels = {
+    personalInfo: 'Personal Info',
+    headline: 'Headline',
+    summary: 'Summary',
+    summaries: 'Summaries',
+    experience: 'Experience',
+    education: 'Education',
+    skills: 'Skills',
+    projects: 'Projects',
+    certifications: 'Certifications',
+    customSections: 'Custom Sections',
+    doNotClaimNotes: 'Do Not Claim Notes',
+    coverLetterProfile: 'Cover Letter Profile',
+  };
+  return labels[section] || section || 'Profile';
+}
+
+function proposalActionLabel(action) {
+  const labels = { add: 'Add', update: 'Update', remove: 'Remove' };
+  return labels[action] || 'Review';
+}
+
+function formatProposalValueForText(value) {
+  if (value == null || value === '') return 'No specific value provided.';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    if (!value.length) return 'No items provided.';
+    return value.map(item => `- ${formatProposalValueForText(item).replace(/\n/g, '\n  ')}`).join('\n');
+  }
+  if (typeof value === 'object') {
+    const lines = [];
+    Object.entries(value).forEach(([key, item]) => {
+      if (item == null || item === '' || (Array.isArray(item) && !item.length)) return;
+      const formatted = formatProposalValueForText(item);
+      lines.push(`${key}: ${formatted.includes('\n') ? `\n${formatted}` : formatted}`);
+    });
+    return lines.length ? lines.join('\n') : 'No specific value provided.';
+  }
+  return String(value);
+}
+
+export function formatProfileUpdateProposalForCopy(proposal) {
+  const lines = [
+    'Suggested Profile Update',
+    `Section: ${proposalSectionLabel(proposal?.section)}`,
+    `Action: ${proposalActionLabel(proposal?.action)}`,
+    `Summary: ${proposal?.summary || 'Review suggested change'}`,
+  ];
+  if (proposal?.target) lines.push(`Target: ${formatProposalValueForText(proposal.target)}`);
+  lines.push('', 'Proposed value:', formatProposalValueForText(proposal?.proposedValue));
+  if (proposal?.warnings?.length) {
+    lines.push('', 'Warnings:', ...proposal.warnings.map(w => `- ${w}`));
+  }
+  if (proposal?.sensitiveFields?.length) {
+    lines.push('', 'Sensitive data review:', ...proposal.sensitiveFields.map(w => `- ${w}`));
+  }
+  lines.push('', 'This is only a suggestion. It has not changed your saved profile yet.');
+  return lines.join('\n');
 }
 
 function buildProfileProposalPrompt(newMessage) {
