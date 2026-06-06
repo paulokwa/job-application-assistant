@@ -32,6 +32,7 @@ import {
   sendJobChatProfileUpdateProposal,
   validateEditedProfileUpdateProposal,
 } from '../modules/jobChat.js';
+import { validateAndApplyProfileProposal } from '../modules/profileProposalApply.js';
 import { esc } from '../modules/html.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ const MAX_SYNC_FIELD_LENGTHS = {
   sourceUrl: 1200,
   docType: 40,
 };
+const PROFILE_APPLY_CONFIRMATION_WARNING = 'This will update your saved profile and may affect future resumes, cover letters, job-fit analysis, and email drafts. Review carefully before applying.';
 
 const urlParams = new URLSearchParams(window.location.search);
 const dashboardMode = urlParams.get('mode') === 'full' ? 'full' : 'panel';
@@ -586,6 +588,153 @@ function formatDiffFieldChanges(changes = []) {
   }).join('\n\n');
 }
 
+function profileApplySectionValue(profile = {}, section = '') {
+  if (section === 'summary') return profile.summary || '';
+  if (section === 'skills') return profile.skills || [];
+  if (section === 'certifications') return profile.certifications || [];
+  if (section === 'experience') return profile.experience || [];
+  return profile?.[section] ?? null;
+}
+
+function profileApplyStatusText(result = {}) {
+  if (result.ok) return 'Eligible for future Apply.';
+  if (result.needsConfirmation) return 'Sensitive confirmation required.';
+  return 'Blocked for future Apply.';
+}
+
+function profileApplyStatusClass(result = {}) {
+  if (result.ok) return 'job-chat-profile-apply-status--ready';
+  if (result.needsConfirmation) return 'job-chat-profile-apply-status--confirm';
+  return 'job-chat-profile-apply-status--blocked';
+}
+
+function appendProfileApplyList(host, titleText, values = [], emptyText = 'None.') {
+  const section = document.createElement('div');
+  section.className = 'job-chat-profile-apply-section';
+  const title = document.createElement('strong');
+  title.textContent = titleText;
+  section.appendChild(title);
+
+  const items = values.filter(Boolean);
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.textContent = emptyText;
+    section.appendChild(empty);
+  } else {
+    const list = document.createElement('ul');
+    list.className = 'job-chat-profile-apply-list';
+    items.forEach(value => {
+      const item = document.createElement('li');
+      item.textContent = value;
+      list.appendChild(item);
+    });
+    section.appendChild(list);
+  }
+
+  host.appendChild(section);
+}
+
+function renderProfileApplyReadinessPanel(result, proposal, context, confirmedSensitive = false, onSensitiveConfirmationChange) {
+  const panel = document.createElement('div');
+  panel.className = 'job-chat-profile-apply-readiness';
+  panel.dataset.profileApplyReadinessPanel = 'true';
+
+  const title = document.createElement('div');
+  title.className = 'job-chat-profile-diff-title';
+  title.textContent = 'Apply Requirements Review';
+
+  const status = document.createElement('p');
+  status.className = `job-chat-profile-apply-status ${profileApplyStatusClass(result)}`;
+  status.textContent = profileApplyStatusText(result);
+
+  const meta = document.createElement('p');
+  meta.className = 'job-chat-profile-diff-meta';
+  meta.textContent = [
+    `Section: ${sectionLabel(result.section || proposal.section)}`,
+    `Action: ${actionLabel(result.action || proposal.action)}`,
+    context.profileName ? `Profile: ${context.profileName}` : '',
+    proposal.targetProfileId ? `Target ID: ${proposal.targetProfileId}` : context.activeProfileId ? `Active ID: ${context.activeProfileId}` : '',
+  ].filter(Boolean).join(' | ');
+
+  const warning = document.createElement('p');
+  warning.className = 'job-chat-profile-apply-warning';
+  warning.textContent = PROFILE_APPLY_CONFIRMATION_WARNING;
+
+  const grid = document.createElement('div');
+  grid.className = 'job-chat-profile-diff-grid';
+
+  const before = document.createElement('div');
+  before.className = 'job-chat-profile-diff-col';
+  before.innerHTML = '<strong>Before</strong>';
+  const beforePre = document.createElement('pre');
+  beforePre.textContent = formatProposalValue(profileApplySectionValue(result.beforeProfile || context.profile || {}, result.section || proposal.section));
+  before.appendChild(beforePre);
+
+  const after = document.createElement('div');
+  after.className = 'job-chat-profile-diff-col';
+  after.innerHTML = '<strong>After</strong>';
+  const afterPre = document.createElement('pre');
+  afterPre.textContent = result.afterProfile
+    ? formatProposalValue(profileApplySectionValue(result.afterProfile, result.section || proposal.section))
+    : 'No simulated profile output. Resolve the requirements below first.';
+  after.appendChild(afterPre);
+  grid.append(before, after);
+
+  const patch = document.createElement('div');
+  patch.className = 'job-chat-profile-apply-section';
+  const patchTitle = document.createElement('strong');
+  patchTitle.textContent = 'Patch summary';
+  const patchPre = document.createElement('pre');
+  patchPre.className = 'job-chat-profile-apply-summary';
+  patchPre.textContent = result.patchSummary
+    ? formatProposalValue(result.patchSummary)
+    : 'No patch summary. This suggestion is not ready for simulated Apply.';
+  patch.append(patchTitle, patchPre);
+
+  panel.append(title, status, meta, warning, grid, patch);
+
+  appendProfileApplyList(panel, 'Warnings', result.warnings || [], 'No warnings.');
+  appendProfileApplyList(panel, 'Block reasons', result.reasons || [], result.ok ? 'No blocking reasons.' : 'No specific reason provided.');
+
+  const eligibility = document.createElement('p');
+  eligibility.className = 'job-chat-profile-apply-eligibility';
+  eligibility.textContent = result.ok
+    ? 'This proposal is currently eligible for a future Apply flow. Nothing has been saved.'
+    : result.needsConfirmation
+      ? 'This proposal needs sensitive-content confirmation before it could be eligible for a future Apply flow. Nothing has been saved.'
+      : 'This proposal is not currently eligible for a future Apply flow. Nothing has been saved.';
+  panel.appendChild(eligibility);
+
+  if (result.needsConfirmation || proposal.sensitiveFields?.length) {
+    const label = document.createElement('label');
+    label.className = 'job-chat-profile-apply-confirm';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = confirmedSensitive;
+    checkbox.addEventListener('change', () => onSensitiveConfirmationChange?.(checkbox.checked));
+    const text = document.createElement('span');
+    text.textContent = 'I understand this may include sensitive personal information.';
+    label.append(checkbox, text);
+    panel.appendChild(label);
+  }
+
+  const disabledApply = document.createElement('button');
+  disabledApply.type = 'button';
+  disabledApply.className = 'job-chat-action-btn';
+  disabledApply.textContent = 'Apply coming later.';
+  disabledApply.disabled = true;
+  panel.appendChild(disabledApply);
+
+  return panel;
+}
+
+function invalidateProfileApplyReadinessPanel(panel) {
+  const readiness = panel?.querySelector('[data-profile-apply-readiness-panel]');
+  readiness?.remove();
+  const reviewButton = panel?.querySelector('[data-profile-apply-readiness-button]');
+  if (reviewButton) reviewButton.textContent = 'Review Apply Requirements';
+}
+
 function proposalTextValue(value) {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object' && !Array.isArray(value) && typeof value.text === 'string') return value.text;
@@ -820,6 +969,26 @@ function renderProfileDiffPreviewPanel(diff, proposal, callbacks = {}) {
   editControls.append(btnEdit);
   panel.append(editControls, editor);
 
+  const reviewControls = document.createElement('div');
+  reviewControls.className = 'job-chat-profile-apply-controls';
+  const btnReviewApply = document.createElement('button');
+  btnReviewApply.type = 'button';
+  btnReviewApply.className = 'job-chat-action-btn';
+  btnReviewApply.dataset.profileApplyReadinessButton = 'true';
+  btnReviewApply.textContent = 'Review Apply Requirements';
+  btnReviewApply.addEventListener('click', () => {
+    const existing = panel.querySelector('[data-profile-apply-readiness-panel]');
+    if (existing) {
+      existing.remove();
+      btnReviewApply.textContent = 'Review Apply Requirements';
+      return;
+    }
+    callbacks.onReviewApplyRequirements?.(panel, false);
+    btnReviewApply.textContent = 'Hide Apply Requirements';
+  });
+  reviewControls.appendChild(btnReviewApply);
+  panel.appendChild(reviewControls);
+
   const disabledApply = document.createElement('button');
   disabledApply.type = 'button';
   disabledApply.className = 'job-chat-action-btn';
@@ -894,6 +1063,7 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
     renderProfileSuggestionWarnings(warningsHost, currentProposal);
     if (panel) {
       updateProfileDiffPreviewPanel(panel, buildProfileProposalDiff(currentProposal, buildJobChatContext()));
+      invalidateProfileApplyReadinessPanel(panel);
     }
     if (status) {
       status.textContent = 'Preview updated. Saved profile unchanged.';
@@ -913,6 +1083,27 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
     syncEditedProposal(result.proposal, panel, status);
   };
 
+  const renderApplyReadiness = (targetPanel, confirmedSensitive = false) => {
+    const context = buildJobChatContext();
+    const result = validateAndApplyProfileProposal({
+      profile: context.profile,
+      proposal: currentProposal,
+      activeProfileId: context.activeProfileId,
+      confirmedSensitive,
+    });
+    const oldPanel = targetPanel.querySelector('[data-profile-apply-readiness-panel]');
+    oldPanel?.remove();
+    const readinessPanel = renderProfileApplyReadinessPanel(result, currentProposal, context, confirmedSensitive, (nextConfirmedSensitive) => {
+      renderApplyReadiness(targetPanel, nextConfirmedSensitive);
+    });
+    const disabledApply = targetPanel.querySelector(':scope > button[disabled]');
+    if (disabledApply) {
+      targetPanel.insertBefore(readinessPanel, disabledApply);
+    } else {
+      targetPanel.appendChild(readinessPanel);
+    }
+  };
+
   const btnPreview = document.createElement('button');
   btnPreview.type = 'button';
   btnPreview.className = 'job-chat-action-btn';
@@ -927,6 +1118,7 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
     const diff = buildProfileProposalDiff(currentProposal, buildJobChatContext());
     panel = renderProfileDiffPreviewPanel(diff, currentProposal, {
       onEditValueChange: handleEditedProposalValue,
+      onReviewApplyRequirements: renderApplyReadiness,
     });
     card.insertBefore(panel, buttons);
     btnPreview.textContent = 'Hide Preview';

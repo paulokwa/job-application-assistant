@@ -56,6 +56,9 @@ const skillsResult = validateAndApplyProfileProposal({
 });
 
 assert.equal(skillsResult.ok, true);
+assert.equal(skillsResult.blocked, false);
+assert.equal(skillsResult.patchSummary.section, 'skills');
+assert.deepEqual(skillsResult.patchSummary.addedSkills, ['Appeals coordination', 'Case notes']);
 assert.deepEqual(skillsResult.beforeProfile.skills, ['Claims review', 'Documentation']);
 assert.deepEqual(skillsResult.afterProfile.skills, ['Claims review', 'Documentation', 'Appeals coordination', 'Case notes']);
 assert.deepEqual(baseProfile, skillsProfileBefore);
@@ -92,6 +95,12 @@ const summaryResult = validateAndApplyProfileProposal({
 assert.equal(summaryResult.ok, true);
 assert.equal(summaryResult.afterProfile.summary, 'Updated summary only.');
 assert.deepEqual(summaryResult.afterProfile.summaries, baseProfile.summaries);
+assert.deepEqual(summaryResult.patchSummary, {
+  section: 'summary',
+  action: 'update',
+  before: 'Old summary.',
+  after: 'Updated summary only.',
+});
 
 const certificationResult = validateAndApplyProfileProposal({
   profile: baseProfile,
@@ -108,6 +117,11 @@ const certificationResult = validateAndApplyProfileProposal({
 });
 
 assert.equal(certificationResult.ok, true);
+assert.deepEqual(certificationResult.patchSummary.certification, {
+  name: 'Claims Management Certificate',
+  issuer: 'Claims College',
+  year: '2024',
+});
 assert.deepEqual(certificationResult.afterProfile.certifications.at(-1), {
   name: 'Claims Management Certificate',
   issuer: 'Claims College',
@@ -148,6 +162,8 @@ const experienceResult = validateAndApplyProfileProposal({
 });
 
 assert.equal(experienceResult.ok, true);
+assert.equal(experienceResult.patchSummary.section, 'experience');
+assert.equal(experienceResult.patchSummary.experience.jobTitle, 'Senior Claims Analyst');
 assert.deepEqual(experienceResult.afterProfile.experience.at(-1), {
   jobTitle: 'Senior Claims Analyst',
   employer: 'Blue Cross',
@@ -262,6 +278,7 @@ const sensitiveNeedsConfirmation = validateAndApplyProfileProposal({
 assert.equal(sensitiveNeedsConfirmation.ok, false);
 assert.equal(sensitiveNeedsConfirmation.blocked, false);
 assert.equal(sensitiveNeedsConfirmation.needsConfirmation, true);
+assert.equal(sensitiveNeedsConfirmation.afterProfile, null);
 
 const sensitiveConfirmed = validateAndApplyProfileProposal({
   profile: baseProfile,
@@ -271,6 +288,7 @@ const sensitiveConfirmed = validateAndApplyProfileProposal({
 });
 
 assert.equal(sensitiveConfirmed.ok, true);
+assert.equal(sensitiveConfirmed.needsConfirmation, false);
 assert.equal(sensitiveConfirmed.afterProfile.summary, 'Add my disability advocacy experience.');
 
 const activeProfileMismatch = validateAndApplyProfileProposal({
