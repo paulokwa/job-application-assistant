@@ -334,4 +334,82 @@ test.describe('profile apply smoke', () => {
     assertNoConsoleErrors(errors);
     await page.close();
   });
+
+  test('duplicate certification blocked', async () => {
+    const page = await context.newPage();
+    const errors = collectErrors(page);
+    await page.goto(extensionPageUrl(extensionId));
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+    await seedStorage(page, baseSeed({
+      certifications: [{ name: 'First Aid', issuer: 'Red Cross', year: '2024' }],
+    }));
+    await page.reload();
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+
+    const before = await getStoredProfile(page);
+    expect(before.certifications).toHaveLength(1);
+    expect(before.certifications[0].name).toBe('First Aid');
+
+    await fillJobAndOpenChat(page);
+    await sendChatMessage(page, 'Add a certification called First Aid from Red Cross, 2024.');
+    await page.waitForSelector('.job-chat-profile-suggestion', { timeout: 30000 });
+
+    const card = page.locator('.job-chat-profile-suggestion');
+    await expect(card.locator('.job-chat-profile-suggestion-title')).toHaveText('Suggested Profile Update');
+
+    await openApplyRequirements(page);
+
+    // Verify blocked state
+    const readinessPanel = page.locator('[data-profile-apply-readiness-panel]');
+    await expect(readinessPanel.locator('.job-chat-profile-apply-status--blocked')).toBeVisible();
+
+    // Verify no active Apply button
+    const enabledApplyBtn = readinessPanel.locator('button:not([disabled])');
+    await expect(enabledApplyBtn).toHaveCount(0);
+
+    // Verify profile unchanged
+    const after = await getStoredProfile(page);
+    expect(after.certifications).toHaveLength(1);
+
+    assertNoConsoleErrors(errors);
+    await page.close();
+  });
+
+  test('experience add still disabled', async () => {
+    const page = await context.newPage();
+    const errors = collectErrors(page);
+    await page.goto(extensionPageUrl(extensionId));
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+    await seedStorage(page, baseSeed());
+    await page.reload();
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+
+    const before = await getStoredProfile(page);
+    const expCountBefore = (before.experience || []).length;
+
+    await fillJobAndOpenChat(page);
+    await sendChatMessage(page, 'Add my NTT Data Customer Care Representative role to my profile. I managed healthcare provider inquiries and documented provider issues.');
+    await page.waitForSelector('.job-chat-profile-suggestion', { timeout: 30000 });
+
+    const card = page.locator('.job-chat-profile-suggestion');
+    await expect(card.locator('.job-chat-profile-suggestion-title')).toHaveText('Suggested Profile Update');
+
+    await openApplyRequirements(page);
+
+    // Verify Apply is NOT active for experience (still disabled)
+    const readinessPanel = page.locator('[data-profile-apply-readiness-panel]');
+    const enabledApplyBtn = readinessPanel.locator('button:not([disabled])');
+    await expect(enabledApplyBtn).toHaveCount(0);
+
+    // Verify disabled button says "Apply coming later."
+    const disabledApplyBtn = readinessPanel.locator('button[disabled]');
+    await expect(disabledApplyBtn).toHaveText('Apply coming later.');
+
+    // Verify profile unchanged
+    const after = await getStoredProfile(page);
+    expect((after.experience || []).length).toBe(expCountBefore);
+
+    assertNoConsoleErrors(errors);
+    await page.close();
+  });
 });
