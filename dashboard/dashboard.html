@@ -157,16 +157,21 @@
       </section>
 
       <!-- Application Form Card -->
-      <section class="card" id="card-application-form">
+      <section class="card autofill-card is-collapsed" id="card-application-form">
         <div class="card-header">
-          <span class="card-title">Application Helper — optional</span>
+          <span class="card-title">Application Autofill &mdash; optional</span>
+          <button id="btn-toggle-autofill-tools" class="autofill-toggle" type="button" aria-expanded="false" aria-controls="autofill-tools-body">
+            Show autofill tools
+          </button>
         </div>
-        <p class="autofill-helper">Use this on application pages with repetitive fields. The helper never submits the form.</p>
-        <p id="autofill-no-profile" class="autofill-no-profile hidden" role="status">Select a profile before using autofill.</p>
-        <p id="autofill-status-text" class="autofill-status-text">No form fields scanned yet.</p>
-        <div class="autofill-actions">
-          <button id="btn-scan-form-fields" class="btn-scan" type="button" title="Scan the current page for application form fields" aria-label="Scan form fields on current page">Scan form fields</button>
-          <button id="btn-review-autofill" class="btn-primary btn-sm" type="button" disabled aria-label="Review and autofill detected form fields">Review &amp; Autofill</button>
+        <p id="autofill-helper-copy" class="autofill-helper">Fill repetitive application form fields on the current page. The helper never submits the form.</p>
+        <div id="autofill-tools-body" class="autofill-tools-body" hidden>
+          <p id="autofill-no-profile" class="autofill-no-profile hidden" role="status">Select a profile before using autofill.</p>
+          <p id="autofill-status-text" class="autofill-status-text">No form fields scanned yet.</p>
+          <div class="autofill-actions">
+            <button id="btn-scan-form-fields" class="btn-scan" type="button" title="Scan the current page for application form fields" aria-label="Scan form fields on current page">Scan form fields</button>
+            <button id="btn-review-autofill" class="btn-primary btn-sm" type="button" disabled aria-label="Review and autofill detected form fields">Review &amp; Autofill</button>
+          </div>
         </div>
       </section>
 
@@ -175,6 +180,7 @@
         <div class="card-header">
           <span class="card-title"><span class="step-badge" aria-hidden="true">3</span> Generate</span>
         </div>
+        <p id="output-placeholder" class="output-placeholder hidden">Generate a resume or cover letter first. Preview, refine, ATS check, export, and email tools will unlock afterward.</p>
         <div class="draft-settings" id="draft-settings" aria-label="Draft settings">
           <div class="draft-settings-header">
             <span class="ctrl-section-label">Draft Settings</span>
@@ -222,8 +228,6 @@
         </div>
         <button id="btn-discuss-job" class="btn-discuss-job" type="button" title="Discuss this job application strategy with AI">💬 Discuss this job</button>
       </section>
-
-      <p id="output-placeholder" class="output-placeholder hidden">Generate a resume or cover letter to unlock preview, refine, ATS check, export, and email tools.</p>
 
     </div><!-- /left-col -->
 

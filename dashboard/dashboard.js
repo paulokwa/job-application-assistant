@@ -240,6 +240,7 @@ const state = {
     rawContent: '',
     aiJobInfoAttemptedFor: '',
   },
+  autofillToolsExpanded: false,
   autofillFields:  [],
   autofillMatches: [],
   jobChat: { messages: [], jobSignature: '' },
@@ -362,6 +363,10 @@ const dom = {
   btnAiFitCheck:      $('btn-ai-fit-check'),
   btnDiscussJob:      $('btn-discuss-job'),
   btnAiJobInfo:       $('btn-ai-job-info'),
+  applicationFormCard: $('card-application-form'),
+  btnToggleAutofillTools: $('btn-toggle-autofill-tools'),
+  autofillToolsBody:  $('autofill-tools-body'),
+  autofillHelperCopy: $('autofill-helper-copy'),
   btnScanFormFields:  $('btn-scan-form-fields'),
   btnReviewAutofill:  $('btn-review-autofill'),
   autofillNoProfile:    $('autofill-no-profile'),
@@ -1824,6 +1829,19 @@ function withCurrentSourceTab(sessionPayload) {
   };
 }
 
+function setAutofillToolsExpanded(expanded) {
+  state.autofillToolsExpanded = Boolean(expanded);
+  const isExpanded = state.autofillToolsExpanded;
+  dom.autofillToolsBody.hidden = !isExpanded;
+  dom.btnToggleAutofillTools.setAttribute('aria-expanded', String(isExpanded));
+  dom.btnToggleAutofillTools.textContent = isExpanded ? 'Hide autofill tools' : 'Show autofill tools';
+  dom.autofillHelperCopy.textContent = isExpanded
+    ? 'Use this on application pages with repetitive fields. The helper never submits the form.'
+    : 'Fill repetitive application form fields on the current page. The helper never submits the form.';
+  dom.applicationFormCard.classList.toggle('is-expanded', isExpanded);
+  dom.applicationFormCard.classList.toggle('is-collapsed', !isExpanded);
+}
+
 function refreshAutofillCard() {
   const hasProfile = state.settings?.provider === 'mock' || !!state.profile?.personalInfo?.fullName;
   const hasMatches = (state.autofillMatches || []).length > 0;
@@ -2939,6 +2957,9 @@ function bindEvents() {
   dom.btnAiJobInfo.addEventListener('click', runAiJobInfoExtraction);
 
   // Application Form
+  dom.btnToggleAutofillTools.addEventListener('click', () => {
+    setAutofillToolsExpanded(!state.autofillToolsExpanded);
+  });
   dom.btnScanFormFields.addEventListener('click', scanFormFieldsOnPage);
   dom.btnReviewAutofill.addEventListener('click', openAutofillReview);
 
@@ -3209,14 +3230,7 @@ function bindDraftSettingsControls() {
 
 function openSettingsSection(section = 'provider') {
   dom.settingsView.classList.add('visible');
-  const sectionTitles = {
-    provider: 'AI Provider',
-    documents: 'Documents',
-    profiles: 'Manage Profiles',
-    profile: 'My Profile',
-    feedback: 'Help & Feedback',
-  };
-  const overlayTitle = sectionTitles[section] || 'Settings';
+  const overlayTitle = 'Settings';
   dom.settingsOverlayTitle.textContent = overlayTitle;
   dom.settingsView.setAttribute('aria-label', overlayTitle);
 
@@ -5792,8 +5806,8 @@ const TOUR_STEPS = [
   },
   {
     target: '#card-application-form',
-    title: 'Application Helper',
-    body: 'Use this only on application pages with repetitive form fields. It is optional and always asks you to review before anything is filled.',
+    title: 'Application Autofill',
+    body: 'Use this optional helper on application pages with repetitive form fields. It never submits the form and always asks you to review before anything is filled.',
   },
   {
     target: '#card-generate',
