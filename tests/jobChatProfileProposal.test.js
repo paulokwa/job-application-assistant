@@ -1,15 +1,22 @@
 import assert from 'node:assert/strict';
 import {
   buildProfileProposalDiff,
+  canEditProfileUpdateProposal,
   formatProfileUpdateProposalForCopy,
   hasExplicitProfileUpdateIntent,
   INCOMPLETE_EXPERIENCE_WARNING,
+  PROFILE_PROPOSAL_EDIT_UNSUPPORTED_MESSAGE,
   TARGET_UNRESOLVED_WARNING,
   sendJobChatProfileUpdateProposal,
+  validateEditedProfileUpdateProposal,
   validateProfileUpdateProposal,
 } from '../modules/jobChat.js';
 
 const sourceMessage = 'Add my Sun Life Claims Analyst role to my profile';
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
 assert.equal(hasExplicitProfileUpdateIntent(sourceMessage), true);
 assert.equal(hasExplicitProfileUpdateIntent('Update my skills to include dental claims processing'), true);
@@ -352,5 +359,120 @@ const unresolvedRemoveDiff = buildProfileProposalDiff(unresolvedRemove, {
 
 assert.equal(unresolvedRemoveDiff.targetResolved, false);
 assert.equal(unresolvedRemoveDiff.warnings.includes(TARGET_UNRESOLVED_WARNING), true);
+
+const phase2cProfile = {
+  experience: [],
+  summary: 'Old summary',
+  skills: ['Existing skill'],
+  certifications: [],
+  metadata: { lockedSections: {} },
+};
+const phase2cProfileBefore = clone(phase2cProfile);
+const originalExperienceProposal = clone(structuredExperienceAdd);
+const editedExperienceResult = validateEditedProfileUpdateProposal(structuredExperienceAdd, {
+  jobTitle: 'Senior Claims Analyst',
+  employer: 'Sun Life',
+  location: 'Halifax, NS',
+  dates: '2021 - 2023',
+  bulletPoints: ['Reviewed complex claims', 'Prepared appeal documentation'],
+}, { profile: phase2cProfile });
+
+assert.ok(editedExperienceResult.proposal);
+assert.equal(editedExperienceResult.proposal.proposedValue.jobTitle, 'Senior Claims Analyst');
+assert.equal(structuredExperienceAdd.proposedValue.jobTitle, originalExperienceProposal.proposedValue.jobTitle);
+assert.deepEqual(phase2cProfile, phase2cProfileBefore);
+
+const editedExperienceDiff = buildProfileProposalDiff(editedExperienceResult.proposal, { profile: phase2cProfile });
+assert.equal(editedExperienceDiff.after.jobTitle, 'Senior Claims Analyst');
+assert.equal(editedExperienceDiff.after.location, 'Halifax, NS');
+assert.equal(editedExperienceDiff.fieldChanges.some(change => change.field === 'jobTitle' && change.changeType === 'added'), true);
+
+const completedExperienceResult = validateEditedProfileUpdateProposal(validProposal, {
+  jobTitle: 'Claims Analyst',
+  employer: 'Sun Life',
+  location: 'Halifax, NS',
+  dates: '',
+  bulletPoints: [],
+}, { profile: phase2cProfile });
+assert.ok(completedExperienceResult.proposal);
+assert.equal(completedExperienceResult.proposal.warnings.includes(INCOMPLETE_EXPERIENCE_WARNING), false);
+
+const incompleteExperienceResult = validateEditedProfileUpdateProposal(completedExperienceResult.proposal, {
+  jobTitle: 'Claims Analyst',
+  employer: 'Sun Life',
+  location: '',
+  dates: '',
+  bulletPoints: [],
+}, { profile: phase2cProfile });
+assert.ok(incompleteExperienceResult.proposal);
+assert.equal(incompleteExperienceResult.proposal.warnings.includes(INCOMPLETE_EXPERIENCE_WARNING), true);
+
+const editedSummaryResult = validateEditedProfileUpdateProposal(summaryUpdate, { text: 'Updated local summary only.' }, {
+  profile: phase2cProfile,
+});
+assert.ok(editedSummaryResult.proposal);
+assert.equal(editedSummaryResult.proposal.proposedValue.text, 'Updated local summary only.');
+const editedSummaryDiff = buildProfileProposalDiff(editedSummaryResult.proposal, { profile: phase2cProfile });
+assert.equal(editedSummaryDiff.before, 'Old summary');
+assert.equal(editedSummaryDiff.after, 'Updated local summary only.');
+assert.equal(phase2cProfile.summary, 'Old summary');
+
+const skillProposalForEdit = validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'skills',
+  action: 'add',
+  proposedValue: ['New skill'],
+  warnings: [],
+}, 'Update my skills');
+const duplicateSkillEdit = validateEditedProfileUpdateProposal(skillProposalForEdit, ['Existing skill'], {
+  profile: phase2cProfile,
+});
+assert.ok(duplicateSkillEdit.proposal);
+assert.match(duplicateSkillEdit.proposal.warnings.join('\n'), /already appears/i);
+const uniqueSkillEdit = validateEditedProfileUpdateProposal(duplicateSkillEdit.proposal, ['Different skill'], {
+  profile: phase2cProfile,
+});
+assert.ok(uniqueSkillEdit.proposal);
+assert.doesNotMatch(uniqueSkillEdit.proposal.warnings.join('\n'), /already appears/i);
+
+const certProposalForEdit = validateProfileUpdateProposal({
+  ...validProposal,
+  section: 'certifications',
+  action: 'add',
+  proposedValue: { name: 'Claims Fundamentals' },
+  warnings: [],
+}, 'Add certification to my profile');
+const editedCert = validateEditedProfileUpdateProposal(certProposalForEdit, {
+  name: 'Claims Fundamentals',
+  issuer: 'Insurance Institute',
+  year: '2024',
+}, { profile: phase2cProfile });
+assert.ok(editedCert.proposal);
+assert.deepEqual(editedCert.proposal.proposedValue, {
+  name: 'Claims Fundamentals',
+  issuer: 'Insurance Institute',
+  year: '2024',
+});
+
+assert.equal(canEditProfileUpdateProposal(editedExperienceResult.proposal), true);
+assert.equal(canEditProfileUpdateProposal(unresolvedUpdate), false);
+const unsupportedEdit = validateEditedProfileUpdateProposal(unresolvedUpdate, { jobTitle: 'Updated Role' }, {
+  profile: phase2cProfile,
+});
+assert.equal(unsupportedEdit.proposal, null);
+assert.equal(unsupportedEdit.unsupportedMessage, PROFILE_PROPOSAL_EDIT_UNSUPPORTED_MESSAGE);
+
+const editedCopyText = formatProfileUpdateProposalForCopy(editedExperienceResult.proposal);
+assert.match(editedCopyText, /Senior Claims Analyst/);
+assert.match(editedCopyText, /Reviewed complex claims/);
+assert.doesNotMatch(editedCopyText, /"jobTitle"/);
+
+const unsafeEditedExperience = validateEditedProfileUpdateProposal(editedExperienceResult.proposal, {
+  jobTitle: 'Claims Analyst',
+  employer: 'Sun Life',
+  metadata: { lockedSections: { experience: false } },
+}, { profile: phase2cProfile });
+assert.equal(unsafeEditedExperience.proposal, null);
+assert.deepEqual(phase2cProfile, phase2cProfileBefore);
 
 console.log('jobChatProfileProposal checks passed');

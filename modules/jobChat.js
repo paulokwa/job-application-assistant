@@ -90,6 +90,8 @@ export const INCOMPLETE_EXPERIENCE_WARNING = 'This suggestion is missing details
 export const LOCKED_SECTION_WARNING = 'This profile section is locked. Unlock it in Settings before applying changes in a future version.';
 export const TARGET_UNRESOLVED_WARNING = 'Target not resolved. This preview cannot identify the exact existing profile item that would change.';
 export const DIFF_PREVIEW_NOTICE = 'This is a preview only. It has not changed your saved profile.';
+export const PROFILE_PROPOSAL_EDIT_UNSUPPORTED_MESSAGE = 'Editing this section will be supported in a later version.';
+export const PROFILE_PROPOSAL_EDIT_INVALID_MESSAGE = 'Edited suggestion is missing required fields or includes unsupported profile keys.';
 
 const DUPLICATE_WARNINGS = {
   skills: 'This skill already appears in the active profile.',
@@ -175,6 +177,16 @@ const SECTION_SCHEMAS = {
     requireAnyValue: true,
   },
 };
+
+const AUTO_PROFILE_PROPOSAL_WARNINGS = new Set([
+  INCOMPLETE_EXPERIENCE_WARNING,
+  LOCKED_SECTION_WARNING,
+  TARGET_UNRESOLVED_WARNING,
+  ...Object.values(DUPLICATE_WARNINGS),
+  'Removal suggestions are read-only in this phase. Review the profile manually before deleting anything.',
+  'This may include sensitive health-related information. Review carefully before adding it to job application materials.',
+  'This suggestion may include sensitive personal information. Review carefully before using it in job application materials.',
+]);
 
 const SYSTEM_PROMPT = [
   'You are an application strategy advisor helping a job seeker decide how to approach a specific job posting.',
@@ -426,6 +438,49 @@ function validateSectionSpecificShape(proposal) {
   }
 
   return false;
+}
+
+function cloneProposalValue(value) {
+  if (value == null) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function preservedManualWarnings(warnings = []) {
+  return normalizeStringArray(warnings).filter(warning => !AUTO_PROFILE_PROPOSAL_WARNINGS.has(warning));
+}
+
+export function canEditProfileUpdateProposal(proposal = {}) {
+  if (!proposal || typeof proposal !== 'object') return false;
+  if (proposal.section === 'skills') return true;
+  if (proposal.section === 'summary') return true;
+  if (proposal.section === 'experience' && proposal.action === 'add') return true;
+  if (proposal.section === 'certifications' && proposal.action === 'add') return true;
+  return false;
+}
+
+export function validateEditedProfileUpdateProposal(proposal, proposedValue, context = {}) {
+  if (!canEditProfileUpdateProposal(proposal)) {
+    return {
+      proposal: null,
+      unsupportedMessage: PROFILE_PROPOSAL_EDIT_UNSUPPORTED_MESSAGE,
+      validationMessage: '',
+    };
+  }
+
+  const candidate = {
+    ...proposal,
+    proposedValue: cloneProposalValue(proposedValue),
+    warnings: preservedManualWarnings(proposal.warnings),
+    sensitiveFields: [],
+  };
+  const sourceUserMessage = context.sourceUserMessage || proposal.sourceUserMessage || '';
+  const validated = validateProfileUpdateProposal(candidate, sourceUserMessage, context);
+
+  return {
+    proposal: validated,
+    unsupportedMessage: '',
+    validationMessage: validated ? '' : PROFILE_PROPOSAL_EDIT_INVALID_MESSAGE,
+  };
 }
 
 function isIncompleteExperienceAdd(proposal) {

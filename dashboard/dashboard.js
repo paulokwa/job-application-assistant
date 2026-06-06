@@ -23,7 +23,15 @@ import {
 import { getSpacingCss, renderDocument, renderMergedDocument } from '../modules/renderer.js';
 import { buildFilename } from '../modules/template.js';
 import { mapError } from '../modules/errorMapper.js';
-import { buildProfileProposalDiff, formatProfileUpdateProposalForCopy, sendJobChatMessage, sendJobChatProfileUpdateProposal } from '../modules/jobChat.js';
+import {
+  buildProfileProposalDiff,
+  canEditProfileUpdateProposal,
+  formatProfileUpdateProposalForCopy,
+  PROFILE_PROPOSAL_EDIT_UNSUPPORTED_MESSAGE,
+  sendJobChatMessage,
+  sendJobChatProfileUpdateProposal,
+  validateEditedProfileUpdateProposal,
+} from '../modules/jobChat.js';
 import { esc } from '../modules/html.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -578,7 +586,169 @@ function formatDiffFieldChanges(changes = []) {
   }).join('\n\n');
 }
 
-function renderProfileDiffPreviewPanel(diff) {
+function proposalTextValue(value) {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && !Array.isArray(value) && typeof value.text === 'string') return value.text;
+  return '';
+}
+
+function proposalStringListValue(value) {
+  if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean);
+  if (typeof value === 'string') return value.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean);
+  return [];
+}
+
+function renderProfileSuggestionWarnings(host, proposal) {
+  host.innerHTML = '';
+  const warnings = [...(proposal.warnings || [])];
+  if (proposal.sensitiveFields?.length) {
+    warnings.push('Sensitive data warning: this may include protected or sensitive personal details. Review carefully before using it in job application materials.');
+  }
+  if (!warnings.length) return;
+
+  const list = document.createElement('ul');
+  list.className = 'job-chat-profile-suggestion-warnings';
+  warnings.forEach(warning => {
+    const item = document.createElement('li');
+    item.textContent = warning;
+    list.appendChild(item);
+  });
+  host.appendChild(list);
+}
+
+function renderProfileDiffWarnings(host, diff) {
+  host.innerHTML = '';
+  if (!diff.warnings?.length && !diff.sensitiveFields?.length) return;
+
+  const warnings = document.createElement('ul');
+  warnings.className = 'job-chat-profile-suggestion-warnings';
+  [...(diff.warnings || []), ...(diff.sensitiveFields || []).map(field => `Sensitive data review: ${field}`)].forEach(warning => {
+    const item = document.createElement('li');
+    item.textContent = warning;
+    warnings.appendChild(item);
+  });
+  host.appendChild(warnings);
+}
+
+function updateProfileDiffPreviewPanel(panel, diff) {
+  panel.querySelector('[data-profile-diff-meta]').textContent = [
+    diff.profileName ? `Profile: ${diff.profileName}` : '',
+    `Section: ${diff.sectionLabel}`,
+    `Action: ${diff.actionLabel}`,
+  ].filter(Boolean).join(' | ');
+  panel.querySelector('[data-profile-diff-before]').textContent = diff.before == null ? diff.beforeLabel : formatProposalValue(diff.before);
+  panel.querySelector('[data-profile-diff-after]').textContent = diff.after == null ? diff.afterLabel : formatProposalValue(diff.after);
+  panel.querySelector('[data-profile-diff-changes]').textContent = formatDiffFieldChanges(diff.fieldChanges);
+  panel.querySelector('[data-profile-diff-notice]').textContent = diff.readOnlyNotice;
+  renderProfileDiffWarnings(panel.querySelector('[data-profile-diff-warnings]'), diff);
+}
+
+function createProfileEditField(labelText, control) {
+  const label = document.createElement('label');
+  label.className = 'job-chat-profile-edit-field';
+  const text = document.createElement('span');
+  text.textContent = labelText;
+  label.append(text, control);
+  return label;
+}
+
+function createProfileEditTextInput(value = '') {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = String(value || '');
+  input.className = 'job-chat-profile-edit-input';
+  return input;
+}
+
+function createProfileEditTextarea(value = '', rows = 4) {
+  const textarea = document.createElement('textarea');
+  textarea.value = String(value || '');
+  textarea.rows = rows;
+  textarea.className = 'job-chat-profile-edit-textarea';
+  return textarea;
+}
+
+function renderProfileProposalEditFields(proposal, onChange) {
+  const editor = document.createElement('div');
+  editor.className = 'job-chat-profile-edit-fields hidden';
+
+  const status = document.createElement('p');
+  status.className = 'job-chat-profile-edit-status';
+
+  if (!canEditProfileUpdateProposal(proposal)) {
+    const unsupported = document.createElement('p');
+    unsupported.className = 'job-chat-profile-edit-unsupported';
+    unsupported.textContent = PROFILE_PROPOSAL_EDIT_UNSUPPORTED_MESSAGE;
+    editor.append(unsupported);
+    return { editor, status };
+  }
+
+  const wire = (controls, collect) => {
+    const handler = () => onChange(collect(), status);
+    controls.forEach(control => control.addEventListener('input', handler));
+    editor.append(...controls.map(item => item.field));
+  };
+
+  const value = proposal.proposedValue;
+  if (proposal.section === 'skills') {
+    const textarea = createProfileEditTextarea(proposalStringListValue(value).join('\n'), 5);
+    wire([{ field: createProfileEditField('Skills, one per line', textarea), addEventListener: textarea.addEventListener.bind(textarea) }], () =>
+      textarea.value.split(/\r?\n/).map(item => item.trim()).filter(Boolean)
+    );
+  } else if (proposal.section === 'summary') {
+    const textarea = createProfileEditTextarea(proposalTextValue(value), 6);
+    wire([{ field: createProfileEditField('Summary', textarea), addEventListener: textarea.addEventListener.bind(textarea) }], () => ({
+      text: textarea.value,
+    }));
+  } else if (proposal.section === 'experience' && proposal.action === 'add') {
+    const current = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const jobTitle = createProfileEditTextInput(current.jobTitle);
+    const employer = createProfileEditTextInput(current.employer);
+    const location = createProfileEditTextInput(current.location);
+    const dates = createProfileEditTextInput(current.dates || [current.startDate, current.endDate].filter(Boolean).join(' - '));
+    const bulletPoints = createProfileEditTextarea(proposalStringListValue(current.bulletPoints || current.responsibilities).join('\n'), 5);
+    const fields = [
+      createProfileEditField('Job title', jobTitle),
+      createProfileEditField('Employer', employer),
+      createProfileEditField('Location', location),
+      createProfileEditField('Dates', dates),
+      createProfileEditField('Bullet points / responsibilities', bulletPoints),
+    ];
+    const controls = [jobTitle, employer, location, dates, bulletPoints];
+    const handler = () => onChange({
+      jobTitle: jobTitle.value,
+      employer: employer.value,
+      location: location.value,
+      dates: dates.value,
+      bulletPoints: bulletPoints.value.split(/\r?\n/).map(item => item.trim()).filter(Boolean),
+    }, status);
+    controls.forEach(control => control.addEventListener('input', handler));
+    editor.append(...fields);
+  } else if (proposal.section === 'certifications' && proposal.action === 'add') {
+    const current = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const name = createProfileEditTextInput(current.name);
+    const issuer = createProfileEditTextInput(current.issuer);
+    const year = createProfileEditTextInput(current.year);
+    const fields = [
+      createProfileEditField('Name', name),
+      createProfileEditField('Issuer', issuer),
+      createProfileEditField('Year', year),
+    ];
+    const controls = [name, issuer, year];
+    const handler = () => onChange({
+      name: name.value,
+      issuer: issuer.value,
+      year: year.value,
+    }, status);
+    controls.forEach(control => control.addEventListener('input', handler));
+    editor.append(...fields);
+  }
+
+  editor.appendChild(status);
+  return { editor, status };
+}
+
+function renderProfileDiffPreviewPanel(diff, proposal, callbacks = {}) {
   const panel = document.createElement('div');
   panel.className = 'job-chat-profile-diff';
 
@@ -588,6 +758,7 @@ function renderProfileDiffPreviewPanel(diff) {
 
   const meta = document.createElement('p');
   meta.className = 'job-chat-profile-diff-meta';
+  meta.dataset.profileDiffMeta = 'true';
   meta.textContent = [
     diff.profileName ? `Profile: ${diff.profileName}` : '',
     `Section: ${diff.sectionLabel}`,
@@ -601,6 +772,7 @@ function renderProfileDiffPreviewPanel(diff) {
   before.className = 'job-chat-profile-diff-col';
   before.innerHTML = '<strong>Before</strong>';
   const beforePre = document.createElement('pre');
+  beforePre.dataset.profileDiffBefore = 'true';
   beforePre.textContent = diff.before == null ? diff.beforeLabel : formatProposalValue(diff.before);
   before.appendChild(beforePre);
 
@@ -608,6 +780,7 @@ function renderProfileDiffPreviewPanel(diff) {
   after.className = 'job-chat-profile-diff-col';
   after.innerHTML = '<strong>After</strong>';
   const afterPre = document.createElement('pre');
+  afterPre.dataset.profileDiffAfter = 'true';
   afterPre.textContent = diff.after == null ? diff.afterLabel : formatProposalValue(diff.after);
   after.appendChild(afterPre);
 
@@ -615,30 +788,42 @@ function renderProfileDiffPreviewPanel(diff) {
 
   const changes = document.createElement('pre');
   changes.className = 'job-chat-profile-diff-changes';
+  changes.dataset.profileDiffChanges = 'true';
   changes.textContent = formatDiffFieldChanges(diff.fieldChanges);
 
   panel.append(title, meta, grid, changes);
 
-  if (diff.warnings?.length || diff.sensitiveFields?.length) {
-    const warnings = document.createElement('ul');
-    warnings.className = 'job-chat-profile-suggestion-warnings';
-    [...(diff.warnings || []), ...(diff.sensitiveFields || []).map(field => `Sensitive data review: ${field}`)].forEach(warning => {
-      const item = document.createElement('li');
-      item.textContent = warning;
-      warnings.appendChild(item);
-    });
-    panel.appendChild(warnings);
-  }
+  const warningHost = document.createElement('div');
+  warningHost.dataset.profileDiffWarnings = 'true';
+  renderProfileDiffWarnings(warningHost, diff);
+  panel.appendChild(warningHost);
 
   const notice = document.createElement('p');
   notice.className = 'job-chat-profile-suggestion-notice';
+  notice.dataset.profileDiffNotice = 'true';
   notice.textContent = diff.readOnlyNotice;
   panel.appendChild(notice);
+
+  const editControls = document.createElement('div');
+  editControls.className = 'job-chat-profile-edit-controls';
+  const btnEdit = document.createElement('button');
+  btnEdit.type = 'button';
+  btnEdit.className = 'job-chat-action-btn';
+  btnEdit.textContent = 'Edit Suggestion';
+  const { editor } = renderProfileProposalEditFields(proposal, (nextValue, status) => {
+    callbacks.onEditValueChange?.(nextValue, status, panel);
+  });
+  btnEdit.addEventListener('click', () => {
+    const hidden = editor.classList.toggle('hidden');
+    btnEdit.textContent = hidden ? 'Edit Suggestion' : 'Hide Editor';
+  });
+  editControls.append(btnEdit);
+  panel.append(editControls, editor);
 
   const disabledApply = document.createElement('button');
   disabledApply.type = 'button';
   disabledApply.className = 'job-chat-action-btn';
-  disabledApply.textContent = 'Apply coming later';
+  disabledApply.textContent = 'Apply coming later.';
   disabledApply.disabled = true;
   panel.appendChild(disabledApply);
 
@@ -646,6 +831,7 @@ function renderProfileDiffPreviewPanel(diff) {
 }
 
 function renderProfileSuggestionCard(proposal, messageIndex) {
+  let currentProposal = proposal;
   const card = document.createElement('div');
   card.className = 'job-chat-profile-suggestion';
 
@@ -672,24 +858,13 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
 
   const preview = document.createElement('pre');
   preview.className = 'job-chat-profile-suggestion-preview';
-  preview.textContent = formatProposalValue(proposal.proposedValue);
+  preview.textContent = formatProposalValue(currentProposal.proposedValue);
 
   card.append(title, meta, summary, preview);
 
-  const warnings = [...(proposal.warnings || [])];
-  if (proposal.sensitiveFields?.length) {
-    warnings.push('Sensitive data warning: this may include protected or sensitive personal details. Review carefully before using it in job application materials.');
-  }
-  if (warnings.length) {
-    const list = document.createElement('ul');
-    list.className = 'job-chat-profile-suggestion-warnings';
-    warnings.forEach(warning => {
-      const item = document.createElement('li');
-      item.textContent = warning;
-      list.appendChild(item);
-    });
-    card.appendChild(list);
-  }
+  const warningsHost = document.createElement('div');
+  renderProfileSuggestionWarnings(warningsHost, currentProposal);
+  card.appendChild(warningsHost);
 
   const notice = document.createElement('p');
   notice.className = 'job-chat-profile-suggestion-notice';
@@ -705,10 +880,38 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
   btnCopy.textContent = 'Copy Suggestion';
   btnCopy.addEventListener('click', () => {
     navigator.clipboard
-      .writeText(formatProfileUpdateProposalForCopy(proposal))
+      .writeText(formatProfileUpdateProposalForCopy(currentProposal))
       .then(() => showToast('Profile suggestion copied'))
       .catch(() => showToast('Copy failed — try selecting and copying manually.'));
   });
+
+  const syncEditedProposal = (nextProposal, panel, status) => {
+    currentProposal = nextProposal;
+    if (messageIndex >= 0 && state.jobChat.messages[messageIndex]) {
+      state.jobChat.messages[messageIndex].profileProposal = nextProposal;
+    }
+    preview.textContent = formatProposalValue(currentProposal.proposedValue);
+    renderProfileSuggestionWarnings(warningsHost, currentProposal);
+    if (panel) {
+      updateProfileDiffPreviewPanel(panel, buildProfileProposalDiff(currentProposal, buildJobChatContext()));
+    }
+    if (status) {
+      status.textContent = 'Preview updated. Saved profile unchanged.';
+      status.classList.remove('job-chat-profile-edit-status--error');
+    }
+  };
+
+  const handleEditedProposalValue = (nextValue, status, panel) => {
+    const result = validateEditedProfileUpdateProposal(currentProposal, nextValue, buildJobChatContext());
+    if (!result.proposal) {
+      if (status) {
+        status.textContent = result.unsupportedMessage || result.validationMessage;
+        status.classList.add('job-chat-profile-edit-status--error');
+      }
+      return;
+    }
+    syncEditedProposal(result.proposal, panel, status);
+  };
 
   const btnPreview = document.createElement('button');
   btnPreview.type = 'button';
@@ -721,8 +924,10 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
       btnPreview.textContent = 'Preview Changes';
       return;
     }
-    const diff = buildProfileProposalDiff(proposal, buildJobChatContext());
-    panel = renderProfileDiffPreviewPanel(diff);
+    const diff = buildProfileProposalDiff(currentProposal, buildJobChatContext());
+    panel = renderProfileDiffPreviewPanel(diff, currentProposal, {
+      onEditValueChange: handleEditedProposalValue,
+    });
     card.insertBefore(panel, buttons);
     btnPreview.textContent = 'Hide Preview';
   });
