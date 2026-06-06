@@ -515,4 +515,135 @@ test.describe('profile apply smoke', () => {
     assertNoConsoleErrors(errors);
     await page.close();
   });
+
+  test('cancel confirmation dialog prevents apply', async () => {
+    const page = await context.newPage();
+    const errors = collectErrors(page);
+    await page.goto(extensionPageUrl(extensionId));
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+    await seedStorage(page, baseSeed());
+    await page.reload();
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+
+    const before = await getStoredProfile(page);
+    expect(before.skills).not.toContain('Appeals Coordination');
+
+    await fillJobAndOpenChat(page);
+    await sendChatMessage(page, 'Add Appeals Coordination to my profile skills.');
+    await page.waitForSelector('.job-chat-profile-suggestion', { timeout: 30000 });
+
+    const card = page.locator('.job-chat-profile-suggestion');
+
+    await openApplyRequirements(page);
+
+    const readinessPanel = page.locator('[data-profile-apply-readiness-panel]');
+    const applyBtn = readinessPanel.locator('button:not([disabled])');
+    await expect(applyBtn).toHaveText('Apply to Profile');
+
+    // Register dialog handler that DISMISSES the confirmation
+    let dialogShown = false;
+    page.on('dialog', async (dialog) => {
+      dialogShown = true;
+      await dialog.dismiss();
+    });
+    await applyBtn.click();
+    expect(dialogShown).toBe(true);
+
+    // Profile must be unchanged
+    const after = await getStoredProfile(page);
+    expect(after.skills).not.toContain('Appeals Coordination');
+
+    // No applied notice or undo button
+    await expect(card.locator('.job-chat-undo-btn')).toHaveCount(0);
+    await expect(card.locator('.job-chat-profile-suggestion-notice--applied')).toHaveCount(0);
+
+    assertNoConsoleErrors(errors);
+    await page.close();
+  });
+
+  test('locked skills section blocks apply', async () => {
+    const page = await context.newPage();
+    const errors = collectErrors(page);
+    await page.goto(extensionPageUrl(extensionId));
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+    await seedStorage(page, baseSeed({
+      metadata: { lockedSections: { skills: true } },
+    }));
+    await page.reload();
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+
+    const before = await getStoredProfile(page);
+
+    await fillJobAndOpenChat(page);
+    await sendChatMessage(page, 'Add Appeals Coordination to my profile skills.');
+    await page.waitForSelector('.job-chat-profile-suggestion', { timeout: 30000 });
+
+    await openApplyRequirements(page);
+
+    const readinessPanel = page.locator('[data-profile-apply-readiness-panel]');
+    // Verify blocked state
+    await expect(readinessPanel.locator('.job-chat-profile-apply-status--blocked')).toBeVisible();
+
+    // No active Apply button
+    const enabledApplyBtn = readinessPanel.locator('button:not([disabled])');
+    await expect(enabledApplyBtn).toHaveCount(0);
+
+    // Profile unchanged
+    const after = await getStoredProfile(page);
+    expect(after.skills).toEqual(before.skills);
+
+    assertNoConsoleErrors(errors);
+    await page.close();
+  });
+
+  test('stale fingerprint blocks apply', async () => {
+    const page = await context.newPage();
+    const errors = collectErrors(page);
+    await page.goto(extensionPageUrl(extensionId));
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+    await seedStorage(page, baseSeed());
+    await page.reload();
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+
+    await fillJobAndOpenChat(page);
+    await sendChatMessage(page, 'Add Appeals Coordination to my profile skills.');
+    await page.waitForSelector('.job-chat-profile-suggestion', { timeout: 30000 });
+
+    await openApplyRequirements(page);
+
+    const readinessPanel = page.locator('[data-profile-apply-readiness-panel]');
+    const applyBtn = readinessPanel.locator('button:not([disabled])');
+    await expect(applyBtn).toHaveText('Apply to Profile');
+
+    // Before clicking Apply, mutate profile in storage to break the fingerprint
+    await page.evaluate(async () => {
+      const data = await new Promise((r) => chrome.storage.local.get('profile_ptest', r));
+      const p = data.profile_ptest;
+      p.skills = [...(p.skills || []), 'Tampered skill'];
+      await new Promise((r) => chrome.storage.local.set({ profile_ptest: p }, r));
+    });
+
+    // Click Apply — fingerprint should be stale, save blocked
+    page.on('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+    await applyBtn.click();
+
+    // Verify error/block toast or that 'Appeals Coordination' was NOT added
+    // The toast should show the fingerprint error
+    const toast = page.locator('#toast');
+    await expect(toast).toContainText(/Profile has changed|Failed to save/, { timeout: 8000 });
+
+    // Profile should NOT have Appeals Coordination from this apply
+    const stored = await page.evaluate(async () => {
+      const data = await chrome.storage.local.get('profile_ptest');
+      return data.profile_ptest;
+    });
+    expect(stored.skills).not.toContain('Appeals Coordination');
+    // Tampered skill should remain
+    expect(stored.skills).toContain('Tampered skill');
+
+    assertNoConsoleErrors(errors);
+    await page.close();
+  });
 });
