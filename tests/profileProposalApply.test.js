@@ -470,11 +470,13 @@ assert.equal(jobChatValidatedProposal.baseProfileFingerprint, profileProposalFin
 assert.equal(isApplySectionSupported('skills', 'add'), true);
 assert.equal(isApplySectionSupported('summary', 'update'), true);
 assert.equal(isApplySectionSupported('certifications', 'add'), true);
-assert.equal(isApplySectionSupported('experience', 'add'), false);
+assert.equal(isApplySectionSupported('experience', 'add'), true);
 assert.equal(isApplySectionSupported('skills', 'remove'), false);
 assert.equal(isApplySectionSupported('summary', 'add'), false);
 assert.equal(isApplySectionSupported('certifications', 'remove'), false);
 assert.equal(isApplySectionSupported('certifications', 'update'), false);
+assert.equal(isApplySectionSupported('experience', 'update'), false);
+assert.equal(isApplySectionSupported('experience', 'remove'), false);
 assert.equal(isApplySectionSupported('education', 'add'), false);
 assert.equal(isApplySectionSupported('projects', 'update'), false);
 assert.equal(isApplySectionSupported('', 'add'), false);
@@ -520,8 +522,8 @@ assert.equal(eligibleCertResult.patchSummary.certification.name, 'First Aid');
 assert.equal(eligibleCertResult.patchSummary.certification.issuer, 'Red Cross');
 assert.equal(eligibleCertResult.patchSummary.certification.year, '2024');
 
-// Experience add: valid but NOT eligible for real apply (not yet enabled)
-const notYetExpResult = validateAndApplyProfileProposal({
+// Experience add: valid and eligible for real apply
+const eligibleExpResult = validateAndApplyProfileProposal({
   profile: baseProfile,
   proposal: proposal({
     section: 'experience',
@@ -535,8 +537,11 @@ const notYetExpResult = validateAndApplyProfileProposal({
   }),
   activeProfileId: 'p1',
 });
-assert.equal(notYetExpResult.ok, true);
-assert.equal(isApplySectionSupported(notYetExpResult.section, notYetExpResult.action), false);
+assert.equal(eligibleExpResult.ok, true);
+assert.equal(isApplySectionSupported(eligibleExpResult.section, eligibleExpResult.action), true);
+assert.equal(eligibleExpResult.patchSummary.section, 'experience');
+assert.equal(eligibleExpResult.patchSummary.experience.jobTitle, 'Claims Support');
+assert.equal(eligibleExpResult.patchSummary.experience.employer, 'NTT Data');
 
 // Duplicate skill: blocked, not eligible
 const dupBlocked = validateAndApplyProfileProposal({
@@ -1027,6 +1032,138 @@ assert.match(noNameResult.reasons.join('\n'), /Proposal failed profile update va
 
 // Reset storage
 storageStore.set('profile_pcert', certProfile);
+
+// ---- Experience apply integration tests (mocked chrome.storage) ----
+
+const expProfileId = 'pexp';
+const expProfile = normalizeResumeContent({
+  summary: 'Experienced professional.',
+  skills: ['Claims review'],
+  certifications: [],
+  experience: [{
+    jobTitle: 'Claims Analyst',
+    employer: 'Sun Life',
+    dates: '2020 - 2022',
+    bulletPoints: ['Reviewed claims.'],
+  }],
+  metadata: { lockedSections: {} },
+});
+const expAfterProfile = normalizeResumeContent({
+  ...expProfile,
+  experience: [...expProfile.experience, {
+    jobTitle: 'Customer Care Rep',
+    employer: 'NTT Data',
+    location: 'Remote',
+    dates: '2022 - 2024',
+    startDate: '2022',
+    endDate: '2024',
+    bulletPoints: ['Handled provider inquiries', 'Documented issues'],
+  }],
+});
+
+storageStore.set('profileIndex', [{ id: expProfileId, name: 'Exp Test' }]);
+storageStore.set('activeProfileId', expProfileId);
+storageStore.set('profile_pexp', expProfile);
+
+const expBeforeFp = undoFp(expProfile);
+
+// Test: complete experience add succeeds and saves afterProfile
+const expApplyResult = await undoGuardedApply(expAfterProfile, expProfileId, expBeforeFp);
+assert.equal(expApplyResult.ok, true);
+const expStored = normalizeResumeContent(storageStore.get('profile_pexp'));
+assert.equal(expStored.experience.length, 2);
+const newExp = expStored.experience[1];
+assert.equal(newExp.jobTitle, 'Customer Care Rep');
+assert.equal(newExp.employer, 'NTT Data');
+assert.equal(newExp.location, 'Remote');
+assert.equal(newExp.dates, '2022 - 2024');
+assert.deepEqual(newExp.bulletPoints, ['Handled provider inquiries', 'Documented issues']);
+
+// Test: experience apply does not modify unrelated sections
+assert.equal(expStored.summary, 'Experienced professional.');
+assert.deepEqual(expStored.skills, ['Claims review']);
+assert.deepEqual(expStored.certifications, []);
+
+// Test: undo restores previous experience
+const expSnapshot = {
+  profileId: expProfileId,
+  beforeProfile: expProfile,
+  beforeProfileFingerprint: expBeforeFp,
+  afterProfileFingerprint: undoFp(expAfterProfile),
+  section: 'experience',
+  action: 'add',
+  summary: 'Added role',
+  appliedAt: Date.now(),
+};
+const expUndoResult = await undoGuardedApply(expSnapshot.beforeProfile, expProfileId, expSnapshot.afterProfileFingerprint);
+assert.equal(expUndoResult.ok, true);
+const expRestored = normalizeResumeContent(storageStore.get('profile_pexp'));
+assert.equal(expRestored.experience.length, 1);
+
+// Test: incomplete experience blocked (no details)
+const incompleteExpResult = undoValidate({
+  profile: expProfile,
+  proposal: proposal({
+    section: 'experience',
+    action: 'add',
+    proposedValue: { jobTitle: 'Analyst', employer: 'Corp' },
+    targetProfileId: expProfileId,
+  }, expProfile),
+  activeProfileId: expProfileId,
+});
+assert.equal(incompleteExpResult.ok, false);
+assert.equal(incompleteExpResult.blocked, true);
+assert.match(incompleteExpResult.reasons.join('\n'), /Incomplete experience/i);
+
+// Test: duplicate experience blocked
+const dupExpResult = undoValidate({
+  profile: expProfile,
+  proposal: proposal({
+    section: 'experience',
+    action: 'add',
+    proposedValue: {
+      jobTitle: 'Claims Analyst',
+      employer: 'Sun Life',
+      dates: '2020 - 2022',
+      bulletPoints: ['Duplicate attempt'],
+    },
+    targetProfileId: expProfileId,
+  }, expProfile),
+  activeProfileId: expProfileId,
+});
+assert.equal(dupExpResult.ok, false);
+assert.equal(dupExpResult.blocked, true);
+assert.match(dupExpResult.reasons.join('\n'), /Duplicate experience/i);
+
+// Test: update and remove actions still blocked
+const expUpdateResult = undoValidate({
+  profile: expProfile,
+  proposal: proposal({
+    section: 'experience',
+    action: 'update',
+    proposedValue: { jobTitle: 'Updated Role' },
+    targetProfileId: expProfileId,
+  }, expProfile),
+  activeProfileId: expProfileId,
+});
+assert.equal(expUpdateResult.ok, false);
+assert.match(expUpdateResult.reasons.join('\n'), /Unsupported action/i);
+
+const expRemoveResult = undoValidate({
+  profile: expProfile,
+  proposal: proposal({
+    section: 'experience',
+    action: 'remove',
+    proposedValue: null,
+    targetProfileId: expProfileId,
+  }, expProfile),
+  activeProfileId: expProfileId,
+});
+assert.equal(expRemoveResult.ok, false);
+assert.match(expRemoveResult.reasons.join('\n'), /Unsupported action/i);
+
+// Reset storage
+storageStore.set('profile_pexp', expProfile);
 
 // ---- Stale marker logic ----
 

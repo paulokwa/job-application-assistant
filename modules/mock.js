@@ -454,7 +454,7 @@ function mockExtractExperience(message) {
       location: '',
       startDate: '',
       endDate: '',
-      bulletPoints: [],
+      bulletPoints: extractBulletPoints(message),
     };
   }
   return {
@@ -463,8 +463,15 @@ function mockExtractExperience(message) {
     location: '',
     startDate: '',
     endDate: '',
-    bulletPoints: [],
+    bulletPoints: extractBulletPoints(message),
   };
+}
+
+function extractBulletPoints(message) {
+  const sentences = message.split(/\.\s+/).slice(1);
+  return sentences
+    .map(s => s.replace(/^I\s+/i, '').trim())
+    .filter(s => s.length > 3 && !/^(add|include|update|remove|profile)\b/i.test(s));
 }
 
 export function generateMockJobChatProfileUpdateProposal(context, userMessage) {
