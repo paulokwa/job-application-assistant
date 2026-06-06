@@ -34,9 +34,26 @@ Included so far:
   - Clear removes only the current tab's job session and draft restore data.
   - Scanning a different job in the same tab clears that tab's stale generated draft restore data.
 
+- **Job Chat Profile Proposal Apply Pipeline**
+  - Read-only profile suggestion cards from Job Chat
+  - Proposal validation and diff preview
+  - Edit suggestion before applying
+  - Guarded Apply with fingerprint and active-profile checks
+  - Apply supported for: skills add, summary update, certifications add, experience add
+  - One-step Undo with snapshot (in-memory + chrome.storage.session backup, 15-min TTL)
+  - Stale markers for generated outputs after profile change
+  - Update/remove actions intentionally blocked; personalInfo/education/projects/customSections not yet enabled
+
+- **Playwright Smoke Tests**
+  - 11 smoke tests covering apply, undo, safety paths (duplicate, locked, stale, cancel)
+  - npm test scripts: `test:unit`, `test:smoke`, `test:smoke:headed`
+
+- **Certification Mock Parsing**
+  - Certification proposals parse name, issuer, and year from messages
+
 Not yet confirmed for v4.0:
 
-- Any additional feature work.
+- Any additional feature work beyond what is already committed.
 - Any new permissions.
 - Any Chrome Web Store listing copy changes beyond describing the confirmed release scope.
 
@@ -100,6 +117,19 @@ Not yet confirmed for v4.0:
 - Scanning or loading a different job clears previous Job Chat messages for that dashboard.
 - Chat-to-Refine actions prefill Refine only and do not auto-apply or generate.
 
+**Profile proposal apply**
+- Job Chat -> profile suggestion card renders for skills add
+- Apply skill add -> confirm -> profile updated -> undo restores
+- Apply summary update -> summaries[] preserved -> undo restores
+- Apply certification add -> name/issuer/year saved -> undo restores
+- Apply experience add -> jobTitle/employer/bulletPoints saved
+- Undo -> profile restored, button removed
+- Stale notice appears when drafts/Fit Analysis exist + profile changed
+- Duplicate blocked (skill, cert, experience) -> Apply disabled, profile unchanged
+- Locked section blocked -> Apply disabled
+- Stale fingerprint blocked -> error toast, profile unchanged
+- Cancel confirmation -> profile unchanged, no undo button
+
 **Application Pack Actions**
 - Recruiter message opens from a saved job and generates review-first copy.
 - Follow-up message opens from a saved job and remains status-aware.
@@ -130,12 +160,40 @@ node --check jobs/jobs.js
 node --check history/history.js
 node --check settings/settings.js
 node --check content.js
-node tests/autofillMatcher.test.js
-node tests/pdfImport.test.js
+npm run test:unit
+npm run test:smoke
 git diff --check
 ```
 
+Note: On Windows, running `npm run test:smoke` immediately followed by `npm test` may hit an EPERM lock on `.pw-ext-smoke-data`. The smoke test cleanup retries up to 3 times with a 1-second delay. If the issue persists, run `test:unit` and `test:smoke` separately.
+
 Add any new tests required by v4.0 scope before packaging.
+
+## Packaging Exclusions
+
+The Chrome Web Store zip **must exclude** the following:
+
+| Path | Reason |
+|---|---|
+| `node_modules/` | Dev dependencies (Playwright, etc.) — not runtime |
+| `tests/` | Unit tests, smoke tests, fixtures — not runtime |
+| `test-results/` | Playwright test artifacts |
+| `.pw-ext-smoke-data/` | Playwright persistent context data |
+| `package.json` | Dev-only manifest; may confuse CWS review |
+| `package-lock.json` | Dev lockfile |
+| `.git/` | Git repository |
+| `.github/` | CI config (if present) |
+| `.claude/` | AI coding agent files |
+| `*.md` planning docs | AGENTS.md, START_HERE.md, ROADMAP.md, etc. (keep README.md and PRIVACY.md if they are store-facing) |
+| `docs/` | Internal planning docs |
+| `*.zip`, `*.crx`, `*.pem` | Previous build artifacts |
+
+**Do not zip the repository root directly.** Only include runtime files required by the extension.
+
+Runtime files/folders to include:
+- `background.js`, `content.js`, `manifest.json`
+- `dashboard/`, `settings/`, `jobs/`, `history/`, `modules/`, `templates/`, `lib/`, `icons/`
+- `PRIVACY.md`, `README.md` (if store-facing)
 
 ## Packaging Steps
 
@@ -156,6 +214,11 @@ Do not start these until the user explicitly confirms v4.0 release scope and pac
 
 ## Listing / Privacy Check
 
+- Profile Apply is local-only — all profile changes are through `chrome.storage.local` only.
+- No new permissions were added for profile apply (manifest unchanged from v3.0.0).
+- No new external data sharing — Job Chat already sends profile data for AI responses; Apply does not add new external endpoints.
+- Existing privacy wording in `PRIVACY.md` still covers profile data and local storage.
+- Store listing should eventually mention: "Job Chat can suggest and apply reviewed profile updates locally — you confirm changes before your profile is modified."
 - Do not mention Direct PDF Download as a shipped feature unless it is explicitly reintroduced in a future release.
 - If describing tab-scoped restore, frame it as reliability/state isolation: multiple job tabs keep their own active job and draft context.
 - Do not imply automatic application submission or automatic email sending.

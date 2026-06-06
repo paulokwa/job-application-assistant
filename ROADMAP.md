@@ -147,6 +147,32 @@ Treat it as a link collector first, not guaranteed full job-description extracti
 
 ## Completed Roadmap Items
 
+### Job Chat Profile Proposal Apply Pipeline
+
+Status: **Complete for v4.0 development** (2026-06-06).
+
+Completed scope:
+
+- Read-only profile suggestion cards rendered in Job Chat
+- Profile proposal validation via `validateProfileUpdateProposal`
+- Diff preview showing before/after profile section values
+- Edit suggestion before applying — skills, summary, certifications, experience
+- Guarded Apply with `validateAndApplyProfileProposal` + fingerprint and active-profile checks
+- Real Apply enabled for: skills add, summary update, certifications add, experience add
+- One-step Undo with in-memory snapshot + `chrome.storage.session` backup (15-min TTL)
+- Stale markers for generated outputs (resume, cover letter, Fit Analysis) after profile change
+- Sensitive content warnings and confirmation checkbox
+- Locked-section blocking, duplicate blocking, cancel-confirmation blocking
+- 5 Node unit test files + 11 Playwright smoke tests covering apply, undo, and safety paths
+- npm test scripts: `test:unit`, `test:smoke`, `test:smoke:headed`, `test`
+- Update/remove actions intentionally blocked; personalInfo/education/projects/customSections not yet enabled
+
+### Certification Mock Parsing
+
+Status: **Complete for v4.0 development** (2026-06-06).
+
+- Mock mode now parses certification name, issuer, and year from messages like "Add a certification called First Aid from Red Cross, 2024."
+
 ### Tab-Scoped Job Sessions And Draft Restore
 
 Status: **Complete for v4.0 development** (2026-06-04).

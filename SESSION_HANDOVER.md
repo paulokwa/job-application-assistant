@@ -24,12 +24,20 @@ Status:
 - [DONE] v3.0 approved by Google (2026-06-04).
 - [DONE] v4.0 release checklist created.
 - [DONE] Tab-scoped job sessions and draft restore implemented for v4.0 development (2026-06-04). User tested locally and confirmed it seems to work well before commit/push.
+- [DONE] Job Chat profile proposal Apply pipeline completed for v4.0 development (2026-06-06):
+  - Guarded Apply for skills add, summary update, certifications add, experience add
+  - One-step Undo with fingerprint guard and session snapshot backup
+  - Stale markers for generated outputs after profile change
+  - 5 Node unit tests + 11 Playwright smoke tests via npm scripts
+  - Update/remove actions remain blocked; personalInfo/education/projects/customSections not yet enabled
+  - Packaging safety still gated — see RELEASE_V4_CHECKLIST.md for exclusion list
+- [DONE] npm test scripts added (test:unit, test:smoke, test:smoke:headed, test)
 - [WAITING] User confirms final v4.0 release scope.
 - [WAITING] `manifest.json` version bump to `4.0.0`.
 - [WAITING] Full v4.0 smoke testing.
 - [WAITING] User explicitly confirms v4.0 packaging/submission.
 
-Next planned work: continue v4.0 development and regression testing as explicitly requested. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
+Next planned work: stabilize for v4.0 release. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
 
 ## v3 Features Added Since v2.0
 

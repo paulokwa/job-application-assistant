@@ -149,14 +149,25 @@ function assertNoConsoleErrors(errors) {
   expect(realErrors).toEqual([]);
 }
 
+async function retryRmDir(dir, retries = 3, delayMs = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+      return;
+    } catch {
+      if (i < retries - 1) await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+}
+
 test.describe('profile apply smoke', () => {
   let context;
   let extensionId;
 
   test.beforeAll(async () => {
-    if (fs.existsSync(USER_DATA_DIR)) {
-      fs.rmSync(USER_DATA_DIR, { recursive: true, force: true });
-    }
+    await retryRmDir(USER_DATA_DIR);
     context = await chromium.launchPersistentContext(USER_DATA_DIR, {
       headless: false,
       args: [
@@ -171,9 +182,7 @@ test.describe('profile apply smoke', () => {
 
   test.afterAll(async () => {
     await context?.close();
-    if (fs.existsSync(USER_DATA_DIR)) {
-      fs.rmSync(USER_DATA_DIR, { recursive: true, force: true });
-    }
+    await retryRmDir(USER_DATA_DIR);
   });
 
   test('skills add apply + undo', async () => {
