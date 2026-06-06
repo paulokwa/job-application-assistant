@@ -469,10 +469,12 @@ assert.equal(jobChatValidatedProposal.baseProfileFingerprint, profileProposalFin
 
 assert.equal(isApplySectionSupported('skills', 'add'), true);
 assert.equal(isApplySectionSupported('summary', 'update'), true);
+assert.equal(isApplySectionSupported('certifications', 'add'), true);
 assert.equal(isApplySectionSupported('experience', 'add'), false);
-assert.equal(isApplySectionSupported('certifications', 'add'), false);
 assert.equal(isApplySectionSupported('skills', 'remove'), false);
 assert.equal(isApplySectionSupported('summary', 'add'), false);
+assert.equal(isApplySectionSupported('certifications', 'remove'), false);
+assert.equal(isApplySectionSupported('certifications', 'update'), false);
 assert.equal(isApplySectionSupported('education', 'add'), false);
 assert.equal(isApplySectionSupported('projects', 'update'), false);
 assert.equal(isApplySectionSupported('', 'add'), false);
@@ -502,8 +504,8 @@ const eligibleSummaryResult = validateAndApplyProfileProposal({
 assert.equal(eligibleSummaryResult.ok, true);
 assert.equal(isApplySectionSupported(eligibleSummaryResult.section, eligibleSummaryResult.action), true);
 
-// Certification add: valid but NOT eligible for real apply (Phase 2D-3 scope)
-const notYetCertResult = validateAndApplyProfileProposal({
+// Certification add: valid and eligible for real apply
+const eligibleCertResult = validateAndApplyProfileProposal({
   profile: baseProfile,
   proposal: proposal({
     section: 'certifications',
@@ -512,10 +514,13 @@ const notYetCertResult = validateAndApplyProfileProposal({
   }),
   activeProfileId: 'p1',
 });
-assert.equal(notYetCertResult.ok, true);
-assert.equal(isApplySectionSupported(notYetCertResult.section, notYetCertResult.action), false);
+assert.equal(eligibleCertResult.ok, true);
+assert.equal(isApplySectionSupported(eligibleCertResult.section, eligibleCertResult.action), true);
+assert.equal(eligibleCertResult.patchSummary.certification.name, 'First Aid');
+assert.equal(eligibleCertResult.patchSummary.certification.issuer, 'Red Cross');
+assert.equal(eligibleCertResult.patchSummary.certification.year, '2024');
 
-// Experience add: valid but NOT eligible for real apply (Phase 2D-3 scope)
+// Experience add: valid but NOT eligible for real apply (not yet enabled)
 const notYetExpResult = validateAndApplyProfileProposal({
   profile: baseProfile,
   proposal: proposal({
@@ -933,6 +938,95 @@ const currentProfileTampered = await undoLoadProfile();
 const currentFp = undoFp(currentProfileTampered);
 assert.notEqual(currentFp, undoGetSnapshot(mockUndoState).afterProfileFingerprint);
 undoClearSnapshot(mockUndoState);
+
+// ---- Certification apply integration tests (mocked chrome.storage) ----
+
+const certProfileId = 'pcert';
+const certProfile = normalizeResumeContent({
+  summary: 'Experienced professional.',
+  skills: ['Claims review'],
+  certifications: [],
+  experience: [],
+  metadata: { lockedSections: {} },
+});
+const certAfterProfile = normalizeResumeContent({
+  ...certProfile,
+  certifications: [...certProfile.certifications, { name: 'First Aid', issuer: 'Red Cross', year: '2024' }],
+});
+
+storageStore.set('profileIndex', [{ id: certProfileId, name: 'Cert Test' }]);
+storageStore.set('activeProfileId', certProfileId);
+storageStore.set('profile_pcert', certProfile);
+
+const certBeforeFp = undoFp(certProfile);
+
+// Test: certification add succeeds and saves afterProfile
+const certApplyResult = await undoGuardedApply(certAfterProfile, certProfileId, certBeforeFp);
+assert.equal(certApplyResult.ok, true);
+const certStored = normalizeResumeContent(storageStore.get('profile_pcert'));
+assert.equal(certStored.certifications.length, 1);
+assert.equal(certStored.certifications[0].name, 'First Aid');
+assert.equal(certStored.certifications[0].issuer, 'Red Cross');
+assert.equal(certStored.certifications[0].year, '2024');
+
+// Test: certification apply does not modify unrelated sections
+assert.equal(certStored.summary, 'Experienced professional.');
+assert.deepEqual(certStored.skills, ['Claims review']);
+assert.deepEqual(certStored.experience, []);
+
+// Test: undo restores previous certifications
+const certSnapshot = {
+  profileId: certProfileId,
+  beforeProfile: certProfile,
+  beforeProfileFingerprint: certBeforeFp,
+  afterProfileFingerprint: undoFp(certAfterProfile),
+  section: 'certifications',
+  action: 'add',
+  summary: 'Added cert',
+  appliedAt: Date.now(),
+};
+const certUndoResult = await undoGuardedApply(certSnapshot.beforeProfile, certProfileId, certSnapshot.afterProfileFingerprint);
+assert.equal(certUndoResult.ok, true);
+const certRestored = normalizeResumeContent(storageStore.get('profile_pcert'));
+assert.deepEqual(certRestored.certifications, []);
+
+// Test: duplicate certification blocked
+const dupCertProfile = normalizeResumeContent({
+  ...certProfile,
+  certifications: [{ name: 'First Aid', issuer: 'Red Cross', year: '2024' }],
+});
+storageStore.set('profile_pcert', dupCertProfile);
+
+const dupCertResult = undoValidate({
+  profile: dupCertProfile,
+  proposal: proposal({
+    section: 'certifications',
+    action: 'add',
+    proposedValue: { name: 'first aid', issuer: 'Red Cross', year: '2024' },
+    targetProfileId: certProfileId,
+  }, dupCertProfile),
+  activeProfileId: certProfileId,
+});
+assert.equal(dupCertResult.ok, false);
+assert.equal(dupCertResult.blocked, true);
+assert.match(dupCertResult.reasons.join('\n'), /Duplicate certification/i);
+
+// Test: missing certification name blocked
+const noNameResult = undoValidate({
+  profile: certProfile,
+  proposal: proposal({
+    section: 'certifications',
+    action: 'add',
+    proposedValue: { issuer: 'Red Cross', year: '2024' },
+    targetProfileId: certProfileId,
+  }, certProfile),
+  activeProfileId: certProfileId,
+});
+assert.equal(noNameResult.ok, false);
+assert.match(noNameResult.reasons.join('\n'), /Proposal failed profile update validation/i);
+
+// Reset storage
+storageStore.set('profile_pcert', certProfile);
 
 // ---- Stale marker logic ----
 

@@ -296,4 +296,42 @@ test.describe('profile apply smoke', () => {
     assertNoConsoleErrors(errors);
     await page.close();
   });
+
+  test('certification add apply + undo', async () => {
+    const page = await context.newPage();
+    const errors = collectErrors(page);
+    await page.goto(extensionPageUrl(extensionId));
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+    await seedStorage(page, baseSeed());
+    await page.reload();
+    await page.waitForSelector('#field-job-title', { timeout: 15000 });
+
+    await fillJobAndOpenChat(page);
+    await sendChatMessage(page, 'Add a certification called First Aid from Red Cross, 2024.');
+    await page.waitForSelector('.job-chat-profile-suggestion', { timeout: 30000 });
+
+    const card = page.locator('.job-chat-profile-suggestion');
+    await expect(card.locator('.job-chat-profile-suggestion-title')).toHaveText('Suggested Profile Update');
+
+    const before = await getStoredProfile(page);
+    expect(before.certifications || []).toHaveLength(0);
+
+    await openApplyRequirements(page);
+    await applyAndConfirm(page);
+
+    const after = await getStoredProfile(page);
+    expect(after.certifications).toBeDefined();
+    expect(after.certifications.length).toBeGreaterThanOrEqual(1);
+    expect(after.certifications[0].name).toBe('First Aid');
+    expect(after.certifications[0].issuer).toBe('Red Cross');
+    expect(after.certifications[0].year).toBe('2024');
+
+    await clickUndoAndVerifyRestore(page, card);
+
+    const restored = await getStoredProfile(page);
+    expect(restored.certifications || []).toHaveLength(0);
+
+    assertNoConsoleErrors(errors);
+    await page.close();
+  });
 });

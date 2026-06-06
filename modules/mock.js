@@ -486,7 +486,14 @@ export function generateMockJobChatProfileUpdateProposal(context, userMessage) {
   } else if (section === 'education') {
     proposedValue = { credential: message.replace(/\b(add|include|education|degree|diploma|profile)\b/gi, '').trim() };
   } else if (section === 'certifications') {
-    proposedValue = { name: message.replace(/\b(add|include|certification|certificate|license|licence|profile)\b/gi, '').trim() };
+    const certNameMatch = message.match(/\b(?:called|named|for)\s+(.+?)(?:\s+(?:from|by|issued by|through|at)\s+|\s*,\s*\d{4}|$)/i);
+    const issuerMatch = message.match(/\b(?:from|by|issued by|through|at)\s+(.+?)(?:\s*,\s*\d{4}|$)/i);
+    const yearMatch = message.match(/\b(20\d{2}|19\d{2})\b/);
+    proposedValue = {
+      name: (certNameMatch?.[1] || message.replace(/\b(add|include|certification|certificate|license|licence|profile)\b/gi, '').trim()).trim(),
+      issuer: (issuerMatch?.[1] || '').trim(),
+      year: (yearMatch?.[1] || '').trim(),
+    };
   } else if (section === 'projects') {
     proposedValue = { name: message.replace(/\b(add|include|remove|delete|drop|project|profile)\b/gi, '').trim() };
   } else if (section === 'customSections') {

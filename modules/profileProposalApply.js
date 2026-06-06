@@ -11,6 +11,7 @@ const SUPPORTED_ACTIONS = {
 const APPLY_SUPPORTED_SECTIONS = {
   skills: new Set(['add']),
   summary: new Set(['update']),
+  certifications: new Set(['add']),
 };
 
 export function isApplySectionSupported(section, action) {
