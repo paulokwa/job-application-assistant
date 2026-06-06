@@ -3233,6 +3233,18 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   color: var(--color-warning);
 }
 
+.profile-stale-notice {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid oklch(from var(--color-warning) l c h / 0.35);
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-subtle);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .job-chat-profile-suggestion-buttons {
   display: flex;
   flex-wrap: wrap;

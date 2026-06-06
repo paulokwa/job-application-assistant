@@ -934,6 +934,56 @@ const currentFp = undoFp(currentProfileTampered);
 assert.notEqual(currentFp, undoGetSnapshot(mockUndoState).afterProfileFingerprint);
 undoClearSnapshot(mockUndoState);
 
+// ---- Stale marker logic ----
+
+function buildStaleAffected({ hasResume, hasCoverLetter, hasFitCheck }) {
+  const affected = [];
+  if (hasResume) affected.push('resume');
+  if (hasCoverLetter) affected.push('coverLetter');
+  if (hasFitCheck) affected.push('fitAnalysis');
+  return affected;
+}
+
+// Test 1: no generated output means no stale markers
+assert.deepEqual(buildStaleAffected({ hasResume: false, hasCoverLetter: false, hasFitCheck: false }), []);
+
+// Test 2: resume-only draft marks only resume
+const resumeOnly = buildStaleAffected({ hasResume: true, hasCoverLetter: false, hasFitCheck: false });
+assert.deepEqual(resumeOnly, ['resume']);
+
+// Test 3: cover-letter-only marks only coverLetter
+const clOnly = buildStaleAffected({ hasResume: false, hasCoverLetter: true, hasFitCheck: false });
+assert.deepEqual(clOnly, ['coverLetter']);
+
+// Test 4: fit check only
+const fitOnly = buildStaleAffected({ hasResume: false, hasCoverLetter: false, hasFitCheck: true });
+assert.deepEqual(fitOnly, ['fitAnalysis']);
+
+// Test 5: all three present
+const allThree = buildStaleAffected({ hasResume: true, hasCoverLetter: true, hasFitCheck: true });
+assert.deepEqual(allThree, ['resume', 'coverLetter', 'fitAnalysis']);
+
+// Test 6: resume + fit check, no cover letter
+const resumeFit = buildStaleAffected({ hasResume: true, hasCoverLetter: false, hasFitCheck: true });
+assert.deepEqual(resumeFit, ['resume', 'fitAnalysis']);
+
+// Test 7: clearing a marker removes it
+const remainingAfterResume = resumeFit.filter(a => a !== 'resume');
+assert.deepEqual(remainingAfterResume, ['fitAnalysis']);
+
+// Test 8: clearing all markers leaves empty
+const all = ['resume', 'coverLetter', 'fitAnalysis'];
+const afterClearResume = all.filter(a => a !== 'resume');
+assert.deepEqual(afterClearResume, ['coverLetter', 'fitAnalysis']);
+const afterClearAll = afterClearResume.filter(a => a !== 'coverLetter').filter(a => a !== 'fitAnalysis');
+assert.deepEqual(afterClearAll, []);
+
+// Test 9: no stale behavior for unsupported sections (experience, certs not in affected)
+const unsupportedCheck = buildStaleAffected({ hasResume: true, hasCoverLetter: true, hasFitCheck: true });
+assert.ok(!unsupportedCheck.includes('experience'));
+assert.ok(!unsupportedCheck.includes('certifications'));
+assert.ok(!unsupportedCheck.includes('summary'));
+
 // Cleanup mock
 delete global.chrome;
 

@@ -139,6 +139,67 @@ function renderUndoButton(onUndo) {
   return container;
 }
 
+function setProfileChangeStaleMarkers(reason) {
+  const affected = [];
+  if (state.drafts.resume) affected.push('resume');
+  if (state.drafts['cover-letter']) affected.push('coverLetter');
+  if (state.lastFitCheck) affected.push('fitAnalysis');
+  if (affected.length === 0) return;
+
+  const profileId = state.profile ? profileProposalFingerprint(state.profile) : '';
+  state.profileChangeStale = {
+    profileId,
+    changedAt: Date.now(),
+    reason,
+    affected,
+  };
+  renderStaleNotice();
+}
+
+function clearStaleMarkerForType(type) {
+  if (!state.profileChangeStale) return;
+  state.profileChangeStale.affected = state.profileChangeStale.affected.filter(a => a !== type);
+  if (state.profileChangeStale.affected.length === 0) {
+    state.profileChangeStale = null;
+    removeStaleNotice();
+  } else {
+    renderStaleNotice();
+  }
+}
+
+function clearAllStaleMarkers() {
+  state.profileChangeStale = null;
+  removeStaleNotice();
+}
+
+function renderStaleNotice() {
+  removeStaleNotice();
+  if (!state.profileChangeStale) return;
+
+  const reasonText = state.profileChangeStale.reason === 'undo' ? 'changed and then undone' : 'updated';
+  const affected = state.profileChangeStale.affected;
+  const labelList = [
+    ...(affected.includes('resume') ? ['resume'] : []),
+    ...(affected.includes('coverLetter') ? ['cover letter'] : []),
+    ...(affected.includes('fitAnalysis') ? ['fit analysis'] : []),
+  ].join(', ');
+
+  const notice = document.createElement('div');
+  notice.className = 'profile-stale-notice';
+  notice.id = 'profile-stale-notice';
+  notice.textContent = `Your profile was ${reasonText}. Existing ${labelList} may not reflect the latest profile.`;
+
+  const card = document.getElementById('card-drafts');
+  if (card) {
+    card.insertBefore(notice, card.firstChild);
+  }
+}
+
+function removeStaleNotice() {
+  const existing = document.getElementById('profile-stale-notice');
+  existing?.remove();
+}
+
 const urlParams = new URLSearchParams(window.location.search);
 const dashboardMode = urlParams.get('mode') === 'full' ? 'full' : 'panel';
 const sourceTabId = parsePositiveInt(urlParams.get('sourceTabId'));
@@ -183,6 +244,7 @@ const state = {
   autofillMatches: [],
   jobChat: { messages: [], jobSignature: '' },
   profileUndoSnapshot: null,
+  profileChangeStale: null,
 };
 
 let currentAbortController = null;
@@ -1230,6 +1292,7 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
     }
 
     invalidateProfileApplyReadinessPanel(card);
+    setProfileChangeStaleMarkers('apply');
   };
 
   const undoHandler = async () => {
@@ -1275,6 +1338,8 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
     }
     const undoButton = card.querySelector('.job-chat-profile-undo');
     undoButton?.remove();
+
+    setProfileChangeStaleMarkers('undo');
   };
 
   const renderApplyReadiness = (targetPanel, confirmedSensitive = false) => {
@@ -1541,6 +1606,7 @@ async function clearGeneratedOutputForJobChange() {
   updateManualEditNotice();
   refreshExportButtons();
   updateOutputPanelVisibility();
+  clearAllStaleMarkers();
   await removeScopedSavedDraft();
 }
 
@@ -2381,6 +2447,7 @@ async function runFitCheckAI(profileId) {
 
     const cardAiMatch = toFitCheckCardAiMatch(result);
     fc.aiMatchesByProfile[profileId] = cardAiMatch;
+    clearStaleMarkerForType('fitAnalysis');
     await sendAiFitCheckCard({ profileId, aiMatch: cardAiMatch });
   } catch (err) {
     if (err?.name === 'AbortError') return;
@@ -3228,6 +3295,7 @@ async function runGeneration(mode) {
       if (parsed) {
         state.drafts[type] = parsed;
         await clearEditedHtml(type);
+        clearStaleMarkerForType(type);
       } else {
         throw new Error(`AI returned invalid content format for ${type}.`);
       }
@@ -5543,6 +5611,7 @@ async function switchToProfile(profileId) {
   }
 
   clearUndoSnapshot();
+  clearAllStaleMarkers();
 
   state.profile = await switchProfile(profileId);
   await refreshSourceResumeState();
