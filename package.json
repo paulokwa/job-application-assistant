@@ -1,0 +1,29 @@
+{
+  "name": "job-page-draft-assistant",
+  "version": "1.0.0",
+  "description": "A Chrome extension that helps you create tailored resumes and cover letters directly from any job posting page.",
+  "main": "background.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulokwa/job-application-assistant.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/paulokwa/job-application-assistant/issues"
+  },
+  "homepage": "https://github.com/paulokwa/job-application-assistant#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

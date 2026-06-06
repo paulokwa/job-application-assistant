@@ -42,6 +42,8 @@ config.local.json
 # ── Test / coverage ───────────────────────────────────────────────────────────
 coverage/
 .nyc_output/
+test-results/
+.pw-ext-smoke-data/
 
 # ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
