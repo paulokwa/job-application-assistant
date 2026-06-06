@@ -34,6 +34,7 @@ import {
 } from '../modules/jobChat.js';
 import { isApplySectionSupported, profileProposalFingerprint, validateAndApplyProfileProposal } from '../modules/profileProposalApply.js';
 import { esc } from '../modules/html.js';
+import { normalizeProfileDatePart } from '../modules/schema.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
 // Support/Ko-fi URL — used by the header button.
@@ -5728,8 +5729,8 @@ function normalizeResumeDraft(parsed) {
     jobTitle: String(exp?.jobTitle || ''),
     employer: String(exp?.employer || ''),
     location: String(exp?.location || ''),
-    startDate: String(exp?.startDate || ''),
-    endDate: String(exp?.endDate || ''),
+    startDate: normalizeProfileDatePart(exp?.startDate || ''),
+    endDate: normalizeProfileDatePart(exp?.endDate || ''),
     bulletPoints: toStringArray(exp?.bulletPoints || exp?.bullets || exp?.responsibilities),
   }));
 

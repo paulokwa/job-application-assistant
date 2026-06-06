@@ -155,8 +155,66 @@ export function normalizeCertificationEntry(cert = {}) {
 }
 
 function splitDateRange(dates = '') {
-  const parts = String(dates || '').split(/\s*\p{Dash}\s*/u);
+  const parts = String(dates || '').split(/\s*(?:\p{Dash}|\bto\b)\s*/u);
   return [parts[0]?.trim() || '', parts[1]?.trim() || ''];
+}
+
+const MONTH_ALIASES = new Map([
+  ['jan', 'Jan'], ['january', 'Jan'],
+  ['feb', 'Feb'], ['february', 'Feb'],
+  ['mar', 'Mar'], ['march', 'Mar'],
+  ['apr', 'Apr'], ['april', 'Apr'],
+  ['may', 'May'],
+  ['jun', 'Jun'], ['june', 'Jun'],
+  ['jul', 'Jul'], ['july', 'Jul'],
+  ['aug', 'Aug'], ['august', 'Aug'],
+  ['sep', 'Sep'], ['sept', 'Sep'], ['september', 'Sep'],
+  ['oct', 'Oct'], ['october', 'Oct'],
+  ['nov', 'Nov'], ['november', 'Nov'],
+  ['dec', 'Dec'], ['december', 'Dec'],
+]);
+
+const MONTH_DATE_RE = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(?:(?:\d{1,2})(?:st|nd|rd|th)?[,]?\s*)?(\d{4})\b/i;
+
+export function normalizeProfileDatePart(value = '') {
+  const raw = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!raw) return '';
+  if (/^(present|current|now|ongoing)$/i.test(raw)) return 'Present';
+  if (/^\d{4}$/.test(raw)) return raw;
+
+  const monthMatch = raw.match(MONTH_DATE_RE);
+  if (!monthMatch) return raw;
+
+  const month = MONTH_ALIASES.get(monthMatch[1].toLowerCase().replace(/\.$/, ''));
+  return month ? `${month} ${monthMatch[2]}` : raw;
+}
+
+export function normalizeExperienceDateRange(value = '') {
+  const raw = String(value || '').trim().replace(/\s+/g, ' ');
+  if (!raw) return '';
+
+  const [start, end] = splitDateRange(raw);
+  if (end) {
+    return [normalizeProfileDatePart(start), normalizeProfileDatePart(end)]
+      .filter(Boolean)
+      .join(' - ');
+  }
+
+  return normalizeProfileDatePart(raw);
+}
+
+function normalizeExperienceDateFields(exp = {}) {
+  const rawDates = String(exp.dates || '').trim();
+  const [dateStart, dateEnd] = splitDateRange(rawDates);
+  const rawStart = String(exp.startDate || dateStart || '').trim();
+  const rawEnd = String(exp.endDate || dateEnd || '').trim();
+  const startDate = normalizeProfileDatePart(rawStart);
+  const endDate = normalizeProfileDatePart(rawEnd);
+  const dates = rawDates
+    ? normalizeExperienceDateRange(rawDates)
+    : [startDate, endDate].filter(Boolean).join(' - ');
+
+  return { dates, startDate, endDate };
 }
 
 /**
@@ -178,9 +236,7 @@ export function normalizeResumeContent(data = {}) {
       jobTitle: exp.jobTitle || exp.title || '',
       employer: exp.employer || exp.company || '',
       location: exp.location || '',
-      dates: exp.dates || '',
-      startDate: exp.startDate || splitDateRange(exp.dates)[0] || '',
-      endDate: exp.endDate || splitDateRange(exp.dates)[1] || '',
+      ...normalizeExperienceDateFields(exp),
       bulletPoints: Array.isArray(exp.bulletPoints) ? exp.bulletPoints : (exp.bullets ? exp.bullets.split('\n').map(b => b.trim().replace(/^[•\-\*]\s*/, '')) : []),
     })),
     education: (data.education || []).map(edu => ({

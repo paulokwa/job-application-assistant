@@ -14,7 +14,7 @@ import { callAI } from '../modules/provider.js';
 import { mapError } from '../modules/errorMapper.js';
 import { validateOllamaEndpoint } from '../modules/url.js';
 import { esc } from '../modules/html.js';
-import { normalizeCertificationEntry } from '../modules/schema.js';
+import { normalizeCertificationEntry, normalizeResumeContent } from '../modules/schema.js';
 import { mergeProfileFormData } from '../modules/profileRoundTrip.js';
 
 // ── State ─────────────────────────────────────────────────────────────────
@@ -602,6 +602,7 @@ async function attemptAutofill(statusEl) {
       if (locks[key]) skippedSections.push(SECTION_LABELS[key]);
     }
 
+    profile = normalizeResumeContent(profile);
     populateProfile(profile);
     await saveProfile(profile);
     renderSuccessStatus(statusEl, skippedSections);
@@ -1231,7 +1232,8 @@ function collectProfileFromForm() {
 }
 
 async function saveProfileData() {
-  profile = mergeProfileFormData(profile, collectProfileFromForm());
+  profile = normalizeResumeContent(mergeProfileFormData(profile, collectProfileFromForm()));
+  populateProfile(profile);
   await saveProfile(profile);
   const { activeId } = await loadProfiles();
   if (activeId && hasProfileContent(profile)) {

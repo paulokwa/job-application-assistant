@@ -130,8 +130,8 @@ export async function generateResume(jobData, profile, settings, sourceResumeTex
         jobTitle: "Original factual job title copied exactly from profile/source resume; do not use the target job title here",
         employer: "Original factual employer/company copied exactly from profile/source resume",
         location: "Original factual location copied exactly from profile/source resume; empty string if not provided",
-        startDate: "Original factual start date copied exactly from profile/source resume; empty string if not provided",
-        endDate: "Original factual end date copied exactly from profile/source resume; empty string if not provided",
+        startDate: "Original factual start date from profile/source resume, normalized to compact MMM YYYY or YYYY; omit day numbers; empty string if not provided",
+        endDate: "Original factual end date from profile/source resume, normalized to compact MMM YYYY, YYYY, or Present; empty string if not provided",
         bulletPoints: ["Accomplishment bullet 1", "Accomplishment bullet 2", "..."]
       }
     ],

@@ -170,6 +170,7 @@ export async function extractProfileFromResume(resumeText, settings) {
 Your goal is to extract information from the user's resume and output it STRICTLY as a JSON object matching the exact schema below.
 If a piece of information is missing, leave the string empty or the array empty.
 If the resume includes useful non-standard sections that do not fit the main fields, preserve them under customSections.
+For work experience dates, use one consistent compact format: "MMM YYYY - MMM YYYY" or "MMM YYYY - Present" (for example, "Jan 2024 - Present"). Remove day numbers and ordinal suffixes from dates. If only years are provided, keep the year-only range (for example, "2020 - 2022") and do not invent months.
 Do NOT include any markdown formatting, backticks, or explanation in your output. Just the raw JSON object.
 
 Schema:

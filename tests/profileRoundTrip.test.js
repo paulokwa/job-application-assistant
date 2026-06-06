@@ -157,9 +157,23 @@ assert.deepEqual(reloaded.projects, existing.projects);
 assert.deepEqual(reloaded.coverLetterProfile, existing.coverLetterProfile);
 assert.equal(reloaded.education[0].location, 'Dartmouth, NS');
 assert.deepEqual(reloaded.education[0].notes, ['Dean list']);
-assert.equal(reloaded.experience[0].startDate, 'January 2020');
-assert.equal(reloaded.experience[0].endDate, 'March 2022');
+assert.equal(reloaded.experience[0].dates, 'Jan 2020 - Mar 2022');
+assert.equal(reloaded.experience[0].startDate, 'Jan 2020');
+assert.equal(reloaded.experience[0].endDate, 'Mar 2022');
 assert.deepEqual(reloaded.metadata.lockedSections, { education: true });
 assert.deepEqual(reloaded.certifications, merged.certifications);
+
+const mixedDateProfile = normalizeResumeContent({
+  experience: [
+    { jobTitle: 'Claims Analyst', employer: 'NTT Data', dates: 'Jan 8th, 2024 - Present' },
+    { jobTitle: 'QA Tester', employer: 'Acme', dates: 'October 2023 - Nov 2023' },
+    { jobTitle: 'Coordinator', employer: 'Acme', dates: '2020 - 2022' },
+  ],
+});
+
+assert.equal(mixedDateProfile.experience[0].dates, 'Jan 2024 - Present');
+assert.equal(mixedDateProfile.experience[0].startDate, 'Jan 2024');
+assert.equal(mixedDateProfile.experience[1].dates, 'Oct 2023 - Nov 2023');
+assert.equal(mixedDateProfile.experience[2].dates, '2020 - 2022');
 
 console.log('profileRoundTrip checks passed');

@@ -54,7 +54,7 @@ export async function loadProfile() {
 export async function saveProfile(profile) {
   const { activeId } = await loadProfiles();
   if (!activeId) return;
-  await chrome.storage.local.set({ [profileKey(activeId)]: profile });
+  await chrome.storage.local.set({ [profileKey(activeId)]: normalizeResumeContent(profile) });
 }
 
 export async function switchProfile(id) {
