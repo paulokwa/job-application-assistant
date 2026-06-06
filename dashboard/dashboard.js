@@ -92,6 +92,53 @@ async function guardedProfileApply(afterProfile, expectedId, expectedFingerprint
   }
 }
 
+const UNDO_SNAPSHOT_SESSION_KEY = 'profileUndoSnapshot';
+const UNDO_SNAPSHOT_TTL_MS = 15 * 60 * 1000;
+
+function getUndoSnapshot() {
+  return state.profileUndoSnapshot || null;
+}
+
+async function loadUndoSnapshotFromStorage() {
+  if (state.profileUndoSnapshot) return state.profileUndoSnapshot;
+  try {
+    const data = await chrome.storage.session.get(UNDO_SNAPSHOT_SESSION_KEY);
+    const snapshot = data[UNDO_SNAPSHOT_SESSION_KEY];
+    if (!snapshot || Date.now() - snapshot.appliedAt > UNDO_SNAPSHOT_TTL_MS) {
+      chrome.storage.session.remove(UNDO_SNAPSHOT_SESSION_KEY).catch(() => {});
+      return null;
+    }
+    state.profileUndoSnapshot = snapshot;
+    return snapshot;
+  } catch {
+    return null;
+  }
+}
+
+function storeUndoSnapshot(snapshot) {
+  state.profileUndoSnapshot = snapshot;
+  chrome.storage.session.set({ [UNDO_SNAPSHOT_SESSION_KEY]: snapshot }).catch(() => {});
+}
+
+function clearUndoSnapshot() {
+  state.profileUndoSnapshot = null;
+  chrome.storage.session.remove(UNDO_SNAPSHOT_SESSION_KEY).catch(() => {});
+}
+
+function renderUndoButton(onUndo) {
+  const container = document.createElement('div');
+  container.className = 'job-chat-profile-undo';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'job-chat-action-btn job-chat-undo-btn';
+  btn.textContent = 'Undo profile update';
+  btn.addEventListener('click', onUndo);
+
+  container.appendChild(btn);
+  return container;
+}
+
 const urlParams = new URLSearchParams(window.location.search);
 const dashboardMode = urlParams.get('mode') === 'full' ? 'full' : 'panel';
 const sourceTabId = parsePositiveInt(urlParams.get('sourceTabId'));
@@ -135,6 +182,7 @@ const state = {
   autofillFields:  [],
   autofillMatches: [],
   jobChat: { messages: [], jobSignature: '' },
+  profileUndoSnapshot: null,
 };
 
 let currentAbortController = null;
@@ -1135,6 +1183,9 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
       return;
     }
 
+    const beforeProfile = result.beforeProfile;
+    const afterFingerprint = profileProposalFingerprint(result.afterProfile);
+
     const saveResult = await guardedProfileApply(
       result.afterProfile,
       context.activeProfileId,
@@ -1146,6 +1197,19 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
       return;
     }
 
+    const snapshot = {
+      profileId: context.activeProfileId,
+      profileName: context.profileName,
+      beforeProfile,
+      beforeProfileFingerprint: profileProposalFingerprint(beforeProfile),
+      afterProfileFingerprint: afterFingerprint,
+      section: result.section,
+      action: result.action,
+      summary: currentProposal.summary || '',
+      appliedAt: Date.now(),
+    };
+    storeUndoSnapshot(snapshot);
+
     state.profile = await loadProfile();
     showToast('Profile updated successfully.');
 
@@ -1156,7 +1220,61 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
       existingNotice.classList.add('job-chat-profile-suggestion-notice--applied');
     }
 
+    const existingUndo = card.querySelector('.job-chat-profile-undo');
+    existingUndo?.remove();
+    const undoEl = renderUndoButton(undoHandler);
+    if (existingNotice) {
+      existingNotice.after(undoEl);
+    } else {
+      card.appendChild(undoEl);
+    }
+
     invalidateProfileApplyReadinessPanel(card);
+  };
+
+  const undoHandler = async () => {
+    const snapshot = getUndoSnapshot();
+    if (!snapshot) {
+      showToast('Nothing to undo.');
+      return;
+    }
+
+    const context = buildJobChatContext();
+    if (context.activeProfileId !== snapshot.profileId) {
+      showToast('Cannot undo: the active profile has changed.');
+      return;
+    }
+
+    const currentProfile = await loadProfile();
+    const currentFingerprint = profileProposalFingerprint(currentProfile);
+    if (currentFingerprint !== snapshot.afterProfileFingerprint) {
+      showToast('Cannot undo: the profile has been modified since the last apply.');
+      return;
+    }
+
+    const saveResult = await guardedProfileApply(
+      snapshot.beforeProfile,
+      snapshot.profileId,
+      snapshot.afterProfileFingerprint,
+    );
+
+    if (!saveResult.ok) {
+      showToast(saveResult.error || 'Undo failed. Please try again.');
+      return;
+    }
+
+    state.profile = await loadProfile();
+    clearUndoSnapshot();
+    showToast('Profile update undone.');
+
+    card.dataset.profileApplied = 'false';
+    const existingNotice = card.querySelector('.job-chat-profile-suggestion-notice');
+    if (existingNotice) {
+      existingNotice.textContent = 'Profile update has been undone.';
+      existingNotice.classList.remove('job-chat-profile-suggestion-notice--applied');
+    }
+    const undoButton = card.querySelector('.job-chat-profile-undo');
+    undoButton?.remove();
   };
 
   const renderApplyReadiness = (targetPanel, confirmedSensitive = false) => {
@@ -5423,6 +5541,8 @@ async function switchToProfile(profileId) {
     closeProfileMenu();
     return;
   }
+
+  clearUndoSnapshot();
 
   state.profile = await switchProfile(profileId);
   await refreshSourceResumeState();

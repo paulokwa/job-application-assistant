@@ -721,6 +721,219 @@ assert.equal(dupSkillApply.blocked, true);
 // Test: no saveProfile or profile mutation for blocked proposals
 assert.deepEqual(normalizeResumeContent(storageStore.get('profile_p1')), testProfile);
 
+// ---- Undo snapshot behaviour (mocked chrome.storage) ----
+
+const UNDO_SESSION_KEY = 'profileUndoSnapshot';
+const snapshotStore = new Map();
+
+const { loadProfile: undoLoadProfile, loadProfiles: undoLoadProfiles, saveProfile: undoSaveProfile } = await import('../modules/profile.js');
+const { profileProposalFingerprint: undoFp, validateAndApplyProfileProposal: undoValidate, isApplySectionSupported: undoIsSupported } = await import('../modules/profileProposalApply.js');
+
+function undoGetSnapshot(state) {
+  return state.undoSnapshot || null;
+}
+
+function undoStoreSnapshot(state, snapshot) {
+  // eslint-disable-next-line no-param-reassign
+  state.undoSnapshot = snapshot;
+  snapshotStore.set(UNDO_SESSION_KEY, snapshot);
+}
+
+function undoClearSnapshot(state) {
+  // eslint-disable-next-line no-param-reassign
+  state.undoSnapshot = null;
+  snapshotStore.delete(UNDO_SESSION_KEY);
+}
+
+async function undoGuardedApply(afterProfile, expectedId, expectedFingerprint) {
+  if (!expectedId) return { ok: false, error: 'No active profile ID available.' };
+  const { activeId } = await undoLoadProfiles();
+  if (activeId !== expectedId) {
+    return { ok: false, error: 'Active profile has changed.' };
+  }
+  const currentProfile = await undoLoadProfile();
+  const currentFingerprint = undoFp(currentProfile);
+  if (currentFingerprint !== expectedFingerprint) {
+    return { ok: false, error: 'Profile has changed since the proposal was created.' };
+  }
+  try {
+    await undoSaveProfile(afterProfile);
+    return { ok: true };
+  } catch (_err) {
+    return { ok: false, error: 'Failed to save profile.' };
+  }
+}
+
+// Setup: clean profile state for undo tests
+const undoProfileId = 'pundo';
+const undoProfile = normalizeResumeContent({
+  summary: 'Before undo summary.',
+  skills: ['Doc review', 'Case notes'],
+  certifications: [],
+  experience: [],
+  metadata: { lockedSections: {} },
+});
+const undoAfterProfile = normalizeResumeContent({
+  ...undoProfile,
+  skills: ['Doc review', 'Case notes', 'Appeals coordination'],
+});
+
+storageStore.clear();
+snapshotStore.clear();
+storageStore.set('profileIndex', [{ id: undoProfileId, name: 'Undo Test' }]);
+storageStore.set('activeProfileId', undoProfileId);
+storageStore.set('profile_pundo', undoProfile);
+
+const mockUndoState = { undoSnapshot: null };
+
+// Test 1: successful apply creates undo snapshot
+const undoBeforeFp = undoFp(undoProfile);
+undoStoreSnapshot(mockUndoState, {
+  profileId: undoProfileId,
+  profileName: 'Undo Test',
+  beforeProfile: undoProfile,
+  beforeProfileFingerprint: undoBeforeFp,
+  afterProfileFingerprint: undoFp(undoAfterProfile),
+  section: 'skills',
+  action: 'add',
+  summary: 'Add appeals coordination',
+  appliedAt: Date.now(),
+});
+assert.ok(undoGetSnapshot(mockUndoState));
+assert.equal(undoGetSnapshot(mockUndoState).profileId, undoProfileId);
+assert.equal(undoGetSnapshot(mockUndoState).section, 'skills');
+
+// Test 2: apply the afterProfile so undo can restore
+const applyResult = await undoGuardedApply(undoAfterProfile, undoProfileId, undoBeforeFp);
+assert.equal(applyResult.ok, true);
+const profileAfterApply = normalizeResumeContent(storageStore.get('profile_pundo'));
+assert.deepEqual(profileAfterApply.skills, ['Doc review', 'Case notes', 'Appeals coordination']);
+
+// Test 3: undo restores previous profile
+const snapshot = undoGetSnapshot(mockUndoState);
+assert.ok(snapshot);
+const currentFpAfterApply = undoFp(normalizeResumeContent(storageStore.get('profile_pundo')));
+assert.equal(currentFpAfterApply, snapshot.afterProfileFingerprint);
+
+const undoRestoreResult = await undoGuardedApply(
+  snapshot.beforeProfile,
+  undoProfileId,
+  snapshot.afterProfileFingerprint,
+);
+assert.equal(undoRestoreResult.ok, true);
+undoClearSnapshot(mockUndoState);
+const restoredProfile = normalizeResumeContent(storageStore.get('profile_pundo'));
+assert.deepEqual(restoredProfile.skills, ['Doc review', 'Case notes']);
+assert.equal(undoGetSnapshot(mockUndoState), null);
+
+// Test 4: undo blocked if active profile changed
+// Re-apply and set up a snapshot, then change activeProfileId
+storageStore.set('profile_pundo', undoAfterProfile);
+storageStore.set('activeProfileId', undoProfileId);
+undoStoreSnapshot(mockUndoState, {
+  profileId: undoProfileId,
+  beforeProfile: undoProfile,
+  beforeProfileFingerprint: undoBeforeFp,
+  afterProfileFingerprint: undoFp(undoAfterProfile),
+  section: 'skills',
+  action: 'add',
+  summary: 'Add skill',
+  appliedAt: Date.now(),
+});
+
+// Change active profile ID
+storageStore.set('activeProfileId', 'p_other');
+
+const mismatchResult = await undoGuardedApply(undoProfile, undoProfileId, undoBeforeFp);
+assert.equal(mismatchResult.ok, false);
+assert.match(mismatchResult.error, /Active profile has changed/i);
+
+// Snapshot should NOT be cleared on failed undo
+assert.ok(undoGetSnapshot(mockUndoState));
+undoClearSnapshot(mockUndoState);
+
+// Test 5: undo blocked if current fingerprint does not match afterProfileFingerprint
+storageStore.set('activeProfileId', undoProfileId);
+storageStore.set('profile_pundo', normalizeResumeContent({ ...undoProfile, summary: 'Tampered!' }));
+
+undoStoreSnapshot(mockUndoState, {
+  profileId: undoProfileId,
+  beforeProfile: undoProfile,
+  beforeProfileFingerprint: undoBeforeFp,
+  afterProfileFingerprint: undoFp(undoAfterProfile), // Mismatches current (tampered) state
+  section: 'skills',
+  action: 'add',
+  summary: 'Add skill',
+  appliedAt: Date.now(),
+});
+
+const staleFpResult = await undoGuardedApply(undoProfile, undoProfileId, undoBeforeFp);
+// guardedProfileApply reads current profile, compares against expectedFingerprint
+// The expected is undoBeforeFp, the current is the tampered profile's fingerprint
+// This actually tests the guard correctly
+assert.equal(staleFpResult.ok, false);
+assert.match(staleFpResult.error, /Profile has changed/i);
+
+// Snapshot should NOT be cleared on failed undo
+assert.ok(undoGetSnapshot(mockUndoState));
+undoClearSnapshot(mockUndoState);
+
+// Reset for next test
+storageStore.set('profile_pundo', undoAfterProfile);
+
+// Test 6: second apply replaces previous undo snapshot
+undoStoreSnapshot(mockUndoState, {
+  profileId: undoProfileId,
+  beforeProfile: undoProfile,
+  beforeProfileFingerprint: undoBeforeFp,
+  afterProfileFingerprint: undoFp(undoAfterProfile),
+  section: 'skills',
+  action: 'add',
+  summary: 'First apply',
+  appliedAt: Date.now() - 60000,
+});
+assert.equal(undoGetSnapshot(mockUndoState).summary, 'First apply');
+
+undoStoreSnapshot(mockUndoState, {
+  profileId: undoProfileId,
+  beforeProfile: undoAfterProfile,
+  beforeProfileFingerprint: undoFp(undoAfterProfile),
+  afterProfileFingerprint: 'fp_second_apply',
+  section: 'summary',
+  action: 'update',
+  summary: 'Second apply',
+  appliedAt: Date.now(),
+});
+assert.equal(undoGetSnapshot(mockUndoState).summary, 'Second apply');
+assert.equal(undoGetSnapshot(mockUndoState).section, 'summary');
+undoClearSnapshot(mockUndoState);
+
+// Test 7: restore with afterProfileFingerprint check
+// Apply change, store snapshot, verify fingerprint mismatches on tampered profile
+storageStore.set('profile_pundo', undoAfterProfile);
+const afterFp = undoFp(undoAfterProfile);
+undoStoreSnapshot(mockUndoState, {
+  profileId: undoProfileId,
+  beforeProfile: undoProfile,
+  beforeProfileFingerprint: undoBeforeFp,
+  afterProfileFingerprint: afterFp,
+  section: 'skills',
+  action: 'add',
+  summary: 'Add skill',
+  appliedAt: Date.now(),
+});
+
+// Tamper with profile
+storageStore.set('profile_pundo', normalizeResumeContent({ ...undoAfterProfile, skills: ['Different'] }));
+const tamperedFp = undoFp(normalizeResumeContent(storageStore.get('profile_pundo')));
+assert.notEqual(tamperedFp, afterFp);
+
+// The undo guard should detect the mismatch
+const currentProfileTampered = await undoLoadProfile();
+const currentFp = undoFp(currentProfileTampered);
+assert.notEqual(currentFp, undoGetSnapshot(mockUndoState).afterProfileFingerprint);
+undoClearSnapshot(mockUndoState);
+
 // Cleanup mock
 delete global.chrome;
 

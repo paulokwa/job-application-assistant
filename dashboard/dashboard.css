@@ -3225,6 +3225,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   color: var(--color-success);
 }
 
+.job-chat-profile-undo {
+  margin-top: 8px;
+}
+
+.job-chat-undo-btn {
+  color: var(--color-warning);
+}
+
 .job-chat-profile-suggestion-buttons {
   display: flex;
   flex-wrap: wrap;

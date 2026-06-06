@@ -172,7 +172,33 @@ test.describe('profile apply smoke', () => {
     });
     expect(storedProfile.skills).toContain('Appeals Coordination');
 
-    // Step 13: Verify no console errors
+    // Step 13: Verify Undo button appears
+    const undoBtn = card.locator('.job-chat-undo-btn');
+    await expect(undoBtn).toHaveText('Undo profile update');
+    await expect(undoBtn).toBeVisible();
+
+    // Step 14: Click Undo and accept the confirm dialog
+    page.on('dialog', async (dialog) => {
+      await dialog.accept();
+    });
+    await undoBtn.click();
+
+    // Step 15: Verify undo success toast
+    await expect(page.locator('#toast')).toContainText('Profile update undone', { timeout: 8000 });
+
+    // Step 16: Verify storage is restored
+    const restoredProfile = await page.evaluate(async () => {
+      const data = await chrome.storage.local.get('profile_ptest');
+      return data.profile_ptest;
+    });
+    expect(restoredProfile.skills).not.toContain('Appeals Coordination');
+    expect(restoredProfile.skills).toContain('Claims review');
+    expect(restoredProfile.skills).toContain('Documentation');
+
+    // Step 17: Verify Undo button is removed
+    await expect(card.locator('.job-chat-undo-btn')).toHaveCount(0);
+
+    // Step 18: Verify no console errors
     const realErrors = errors.filter((e) => !e.includes('favicon') && !e.includes('Favicon'));
     expect(realErrors).toEqual([]);
 
