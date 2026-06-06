@@ -7,7 +7,7 @@ import { generateRecruiterMessage } from '../modules/recruiterMessage.js';
 import { generateFollowUpMessage } from '../modules/followUpMessage.js';
 import { generateApplicationAnswers, PRESET_QUESTIONS } from '../modules/applicationAnswers.js';
 import { extractJobInfoWithAI } from '../modules/jobInfoExtraction.js';
-import { loadProfile, loadProfileById, loadProfiles, switchProfile } from '../modules/profile.js';
+import { loadProfile, loadProfileById, loadProfiles, saveProfile, switchProfile } from '../modules/profile.js';
 import { analyzeFit } from '../modules/fitAnalysis.js';
 import { buildAutofillMatches } from '../modules/autofillMatcher.js';
 import { loadProviderSettings, saveProviderSettings } from '../modules/providerSettings.js';
@@ -32,7 +32,7 @@ import {
   sendJobChatProfileUpdateProposal,
   validateEditedProfileUpdateProposal,
 } from '../modules/jobChat.js';
-import { validateAndApplyProfileProposal } from '../modules/profileProposalApply.js';
+import { isApplySectionSupported, profileProposalFingerprint, validateAndApplyProfileProposal } from '../modules/profileProposalApply.js';
 import { esc } from '../modules/html.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────
@@ -72,6 +72,25 @@ const MAX_SYNC_FIELD_LENGTHS = {
   docType: 40,
 };
 const PROFILE_APPLY_CONFIRMATION_WARNING = 'This will update your saved profile and may affect future resumes, cover letters, job-fit analysis, and email drafts. Review carefully before applying.';
+
+async function guardedProfileApply(afterProfile, expectedId, expectedFingerprint) {
+  if (!expectedId) return { ok: false, error: 'No active profile ID available.' };
+  const { activeId } = await loadProfiles();
+  if (activeId !== expectedId) {
+    return { ok: false, error: 'Active profile has changed. Please close and reopen the Apply Requirements Review.' };
+  }
+  const currentProfile = await loadProfile();
+  const currentFingerprint = profileProposalFingerprint(currentProfile);
+  if (currentFingerprint !== expectedFingerprint) {
+    return { ok: false, error: 'Profile has changed since the proposal was created. Please review and try again.' };
+  }
+  try {
+    await saveProfile(afterProfile);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: `Failed to save profile: ${err.message}` };
+  }
+}
 
 const urlParams = new URLSearchParams(window.location.search);
 const dashboardMode = urlParams.get('mode') === 'full' ? 'full' : 'panel';
@@ -634,7 +653,7 @@ function appendProfileApplyList(host, titleText, values = [], emptyText = 'None.
   host.appendChild(section);
 }
 
-function renderProfileApplyReadinessPanel(result, proposal, context, confirmedSensitive = false, onSensitiveConfirmationChange) {
+function renderProfileApplyReadinessPanel(result, proposal, context, confirmedSensitive = false, onSensitiveConfirmationChange, onApply) {
   const panel = document.createElement('div');
   panel.className = 'job-chat-profile-apply-readiness';
   panel.dataset.profileApplyReadinessPanel = 'true';
@@ -696,13 +715,18 @@ function renderProfileApplyReadinessPanel(result, proposal, context, confirmedSe
   appendProfileApplyList(panel, 'Warnings', result.warnings || [], 'No warnings.');
   appendProfileApplyList(panel, 'Block reasons', result.reasons || [], result.ok ? 'No blocking reasons.' : 'No specific reason provided.');
 
+  const applySupported = isApplySectionSupported(result.section || proposal.section, result.action || proposal.action);
+  const applyReady = result.ok && applySupported;
+
   const eligibility = document.createElement('p');
   eligibility.className = 'job-chat-profile-apply-eligibility';
-  eligibility.textContent = result.ok
-    ? 'This proposal is currently eligible for a future Apply flow. Nothing has been saved.'
-    : result.needsConfirmation
-      ? 'This proposal needs sensitive-content confirmation before it could be eligible for a future Apply flow. Nothing has been saved.'
-      : 'This proposal is not currently eligible for a future Apply flow. Nothing has been saved.';
+  eligibility.textContent = applyReady
+    ? 'This proposal is ready to apply. Review carefully before proceeding. Nothing has been saved yet.'
+    : result.ok && !applySupported
+      ? 'This proposal is valid but this section is not yet enabled for Apply. Nothing has been saved.'
+      : result.needsConfirmation
+        ? 'This proposal needs sensitive-content confirmation before it could be eligible for a future Apply flow. Nothing has been saved.'
+        : 'This proposal is not currently eligible for a future Apply flow. Nothing has been saved.';
   panel.appendChild(eligibility);
 
   if (result.needsConfirmation || proposal.sensitiveFields?.length) {
@@ -718,12 +742,17 @@ function renderProfileApplyReadinessPanel(result, proposal, context, confirmedSe
     panel.appendChild(label);
   }
 
-  const disabledApply = document.createElement('button');
-  disabledApply.type = 'button';
-  disabledApply.className = 'job-chat-action-btn';
-  disabledApply.textContent = 'Apply coming later.';
-  disabledApply.disabled = true;
-  panel.appendChild(disabledApply);
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'button';
+  applyBtn.className = 'job-chat-action-btn';
+  if (applyReady && onApply) {
+    applyBtn.textContent = 'Apply to Profile';
+    applyBtn.addEventListener('click', () => onApply());
+  } else {
+    applyBtn.textContent = 'Apply coming later.';
+    applyBtn.disabled = true;
+  }
+  panel.appendChild(applyBtn);
 
   return panel;
 }
@@ -1083,7 +1112,55 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
     syncEditedProposal(result.proposal, panel, status);
   };
 
+  let applyConfirmedSensitive = false;
+
+  const applyHandler = async () => {
+    if (!confirm(PROFILE_APPLY_CONFIRMATION_WARNING)) return;
+
+    const context = buildJobChatContext();
+    const result = validateAndApplyProfileProposal({
+      profile: context.profile,
+      proposal: currentProposal,
+      activeProfileId: context.activeProfileId,
+      confirmedSensitive: applyConfirmedSensitive,
+    });
+
+    if (!result.ok || !result.afterProfile) {
+      showToast(result.reasons?.length ? result.reasons.join(' ') : 'Apply validation failed.');
+      return;
+    }
+
+    if (!isApplySectionSupported(result.section, result.action)) {
+      showToast('Apply is not yet supported for this section and action.');
+      return;
+    }
+
+    const saveResult = await guardedProfileApply(
+      result.afterProfile,
+      context.activeProfileId,
+      currentProposal.baseProfileFingerprint,
+    );
+
+    if (!saveResult.ok) {
+      showToast(saveResult.error || 'Failed to save profile.');
+      return;
+    }
+
+    state.profile = await loadProfile();
+    showToast('Profile updated successfully.');
+
+    card.dataset.profileApplied = 'true';
+    const existingNotice = card.querySelector('.job-chat-profile-suggestion-notice');
+    if (existingNotice) {
+      existingNotice.textContent = 'This suggestion has been applied to your saved profile.';
+      existingNotice.classList.add('job-chat-profile-suggestion-notice--applied');
+    }
+
+    invalidateProfileApplyReadinessPanel(card);
+  };
+
   const renderApplyReadiness = (targetPanel, confirmedSensitive = false) => {
+    applyConfirmedSensitive = confirmedSensitive;
     const context = buildJobChatContext();
     const result = validateAndApplyProfileProposal({
       profile: context.profile,
@@ -1093,9 +1170,13 @@ function renderProfileSuggestionCard(proposal, messageIndex) {
     });
     const oldPanel = targetPanel.querySelector('[data-profile-apply-readiness-panel]');
     oldPanel?.remove();
-    const readinessPanel = renderProfileApplyReadinessPanel(result, currentProposal, context, confirmedSensitive, (nextConfirmedSensitive) => {
-      renderApplyReadiness(targetPanel, nextConfirmedSensitive);
-    });
+    const readinessPanel = renderProfileApplyReadinessPanel(
+      result, currentProposal, context, confirmedSensitive,
+      (nextConfirmedSensitive) => {
+        renderApplyReadiness(targetPanel, nextConfirmedSensitive);
+      },
+      applyHandler,
+    );
     const disabledApply = targetPanel.querySelector(':scope > button[disabled]');
     if (disabledApply) {
       targetPanel.insertBefore(readinessPanel, disabledApply);

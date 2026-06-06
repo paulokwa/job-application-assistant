@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  isApplySectionSupported,
   profileProposalFingerprint,
   validateAndApplyProfileProposal,
 } from '../modules/profileProposalApply.js';
@@ -463,5 +464,264 @@ const jobChatValidatedProposal = validateProfileUpdateProposal({
 });
 
 assert.equal(jobChatValidatedProposal.baseProfileFingerprint, profileProposalFingerprint(baseProfile));
+
+// ---- isApplySectionSupported ----
+
+assert.equal(isApplySectionSupported('skills', 'add'), true);
+assert.equal(isApplySectionSupported('summary', 'update'), true);
+assert.equal(isApplySectionSupported('experience', 'add'), false);
+assert.equal(isApplySectionSupported('certifications', 'add'), false);
+assert.equal(isApplySectionSupported('skills', 'remove'), false);
+assert.equal(isApplySectionSupported('summary', 'add'), false);
+assert.equal(isApplySectionSupported('education', 'add'), false);
+assert.equal(isApplySectionSupported('projects', 'update'), false);
+assert.equal(isApplySectionSupported('', 'add'), false);
+assert.equal(isApplySectionSupported('skills', ''), false);
+
+// ---- Apply eligibility checks (validation-only, no storage) ----
+
+// Skills add: valid and eligible for real apply
+const eligibleSkillsResult = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal({ proposedValue: ['Code Review', ' Unit testing '] }),
+  activeProfileId: 'p1',
+});
+assert.equal(eligibleSkillsResult.ok, true);
+assert.equal(isApplySectionSupported(eligibleSkillsResult.section, eligibleSkillsResult.action), true);
+
+// Summary update: valid and eligible for real apply
+const eligibleSummaryResult = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal({
+    section: 'summary',
+    action: 'update',
+    proposedValue: { text: 'A new professional summary.' },
+  }),
+  activeProfileId: 'p1',
+});
+assert.equal(eligibleSummaryResult.ok, true);
+assert.equal(isApplySectionSupported(eligibleSummaryResult.section, eligibleSummaryResult.action), true);
+
+// Certification add: valid but NOT eligible for real apply (Phase 2D-3 scope)
+const notYetCertResult = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal({
+    section: 'certifications',
+    action: 'add',
+    proposedValue: { name: 'First Aid', issuer: 'Red Cross', year: '2024' },
+  }),
+  activeProfileId: 'p1',
+});
+assert.equal(notYetCertResult.ok, true);
+assert.equal(isApplySectionSupported(notYetCertResult.section, notYetCertResult.action), false);
+
+// Experience add: valid but NOT eligible for real apply (Phase 2D-3 scope)
+const notYetExpResult = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal({
+    section: 'experience',
+    action: 'add',
+    proposedValue: {
+      jobTitle: 'Claims Support',
+      employer: 'NTT Data',
+      location: 'Remote',
+      bulletPoints: ['Handled provider inquiries'],
+    },
+  }),
+  activeProfileId: 'p1',
+});
+assert.equal(notYetExpResult.ok, true);
+assert.equal(isApplySectionSupported(notYetExpResult.section, notYetExpResult.action), false);
+
+// Duplicate skill: blocked, not eligible
+const dupBlocked = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal({ proposedValue: 'claims review' }),
+  activeProfileId: 'p1',
+});
+assert.equal(dupBlocked.ok, false);
+assert.equal(dupBlocked.blocked, true);
+assert.equal(isApplySectionSupported(dupBlocked.section, dupBlocked.action), true);
+
+// Stale fingerprint: blocked, not eligible
+const staleFp = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal({
+    baseProfileFingerprint: profileProposalFingerprint(normalizeResumeContent({
+      ...baseProfile,
+      summary: 'Totally different summary.',
+    })),
+  }),
+  activeProfileId: 'p1',
+});
+assert.equal(staleFp.ok, false);
+assert.match(staleFp.reasons.join('\n'), /fingerprint/i);
+
+// Active profile mismatch: blocked
+const mismatch = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal(),
+  activeProfileId: 'p2',
+});
+assert.equal(mismatch.ok, false);
+assert.match(mismatch.reasons.join('\n'), /targetProfileId/i);
+
+// Locked skills: blocked
+const lockedSkillsResult = validateAndApplyProfileProposal({
+  profile: normalizeResumeContent({ ...baseProfile, metadata: { lockedSections: { skills: true } } }),
+  proposal: proposal({}, normalizeResumeContent({ ...baseProfile, metadata: { lockedSections: { skills: true } } })),
+  activeProfileId: 'p1',
+});
+assert.equal(lockedSkillsResult.ok, false);
+assert.match(lockedSkillsResult.reasons.join('\n'), /section is locked/i);
+
+// Sensitive: needs confirmation
+const sensitiveResult = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal({
+    section: 'summary',
+    action: 'update',
+    proposedValue: { text: 'Add my disability advocacy experience.' },
+  }),
+  activeProfileId: 'p1',
+});
+assert.equal(sensitiveResult.ok, false);
+assert.equal(sensitiveResult.needsConfirmation, true);
+
+// Sensitive confirmed: ok
+const sensitiveOkResult = validateAndApplyProfileProposal({
+  profile: baseProfile,
+  proposal: proposal({
+    section: 'summary',
+    action: 'update',
+    proposedValue: { text: 'Add my disability advocacy experience.' },
+  }),
+  activeProfileId: 'p1',
+  confirmedSensitive: true,
+});
+assert.equal(sensitiveOkResult.ok, true);
+
+// ---- Guarded apply integration tests (mocked chrome.storage) ----
+
+const storageStore = new Map();
+global.chrome = {
+  storage: {
+    local: {
+      async get(keys) {
+        const result = {};
+        const keyList = Array.isArray(keys) ? keys : [keys];
+        for (const key of keyList) {
+          if (storageStore.has(key)) result[key] = JSON.parse(JSON.stringify(storageStore.get(key)));
+        }
+        return result;
+      },
+      async set(items) {
+        for (const [key, value] of Object.entries(items)) {
+          storageStore.set(key, JSON.parse(JSON.stringify(value)));
+        }
+      },
+      async remove(key) {
+        storageStore.delete(key);
+      },
+    },
+  },
+};
+
+const { loadProfile, loadProfiles, saveProfile } = await import('../modules/profile.js');
+
+async function guardedProfileApplyTest(afterProfile, expectedId, expectedFingerprint) {
+  if (!expectedId) return { ok: false, error: 'No active profile ID available.' };
+  const { activeId } = await loadProfiles();
+  if (activeId !== expectedId) {
+    return { ok: false, error: 'Active profile has changed. Please close and reopen the Apply Requirements Review.' };
+  }
+  const currentProfile = await loadProfile();
+  const currentFingerprint = profileProposalFingerprint(currentProfile);
+  if (currentFingerprint !== expectedFingerprint) {
+    return { ok: false, error: 'Profile has changed since the proposal was created. Please review and try again.' };
+  }
+  try {
+    await saveProfile(afterProfile);
+    return { ok: true };
+  } catch (_err) {
+    return { ok: false, error: 'Failed to save profile.' };
+  }
+}
+
+// Setup storage: activeProfileId = 'p1', profileIndex with one entry
+const testProfileId = 'p1';
+const testProfile = normalizeResumeContent({
+  summary: 'Old summary.',
+  skills: ['Claims review', 'Documentation'],
+  certifications: [],
+  experience: [],
+  metadata: { lockedSections: {} },
+});
+storageStore.clear();
+storageStore.set('profileIndex', [{ id: testProfileId, name: 'General' }]);
+storageStore.set('activeProfileId', testProfileId);
+storageStore.set('profile_p1', testProfile);
+
+const initialFingerprint = profileProposalFingerprint(testProfile);
+
+// Test: successful skills add saves afterProfile and fingerprint matches
+const skillsAfterProfile = normalizeResumeContent({
+  ...testProfile,
+  skills: [...testProfile.skills, 'Appeals coordination'],
+});
+const skillsSaveResult = await guardedProfileApplyTest(skillsAfterProfile, testProfileId, initialFingerprint);
+assert.equal(skillsSaveResult.ok, true);
+const storedSkillsProfile = normalizeResumeContent(storageStore.get('profile_p1'));
+assert.deepEqual(storedSkillsProfile.skills, ['Claims review', 'Documentation', 'Appeals coordination']);
+
+// Reset for next test
+storageStore.set('profile_p1', testProfile);
+
+// Test: successful summary update saves afterProfile
+const summaryAfterProfile = normalizeResumeContent({
+  ...testProfile,
+  summary: 'Updated summary.',
+});
+const summarySaveResult = await guardedProfileApplyTest(summaryAfterProfile, testProfileId, initialFingerprint);
+assert.equal(summarySaveResult.ok, true);
+const storedSummaryProfile = normalizeResumeContent(storageStore.get('profile_p1'));
+assert.equal(storedSummaryProfile.summary, 'Updated summary.');
+
+// Reset for next test
+storageStore.set('profile_p1', testProfile);
+
+// Test: stale fingerprint blocks apply
+const staleFingerprintValue = 'fp_deadbeef';
+const staleSaveResult = await guardedProfileApplyTest(skillsAfterProfile, testProfileId, staleFingerprintValue);
+assert.equal(staleSaveResult.ok, false);
+assert.match(staleSaveResult.error, /Profile has changed/i);
+// Verify profile was NOT mutated
+const unchangedProfile = normalizeResumeContent(storageStore.get('profile_p1'));
+assert.deepEqual(unchangedProfile, testProfile);
+
+// Reset for next test
+storageStore.set('profile_p1', testProfile);
+
+// Test: active profile mismatch blocks apply
+const mismatchSaveResult = await guardedProfileApplyTest(skillsAfterProfile, 'p99', initialFingerprint);
+assert.equal(mismatchSaveResult.ok, false);
+assert.match(mismatchSaveResult.error, /Active profile has changed/i);
+const unchangedAfterMismatch = normalizeResumeContent(storageStore.get('profile_p1'));
+assert.deepEqual(unchangedAfterMismatch, testProfile);
+
+// Test: duplicate skill blocks at validation level
+const dupSkillApply = validateAndApplyProfileProposal({
+  profile: testProfile,
+  proposal: proposal({ proposedValue: 'Claims review' }),
+  activeProfileId: testProfileId,
+});
+assert.equal(dupSkillApply.ok, false);
+assert.equal(dupSkillApply.blocked, true);
+
+// Test: no saveProfile or profile mutation for blocked proposals
+assert.deepEqual(normalizeResumeContent(storageStore.get('profile_p1')), testProfile);
+
+// Cleanup mock
+delete global.chrome;
 
 console.log('profileProposalApply checks passed');

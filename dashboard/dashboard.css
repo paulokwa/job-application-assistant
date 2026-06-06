@@ -3221,6 +3221,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-weight: 700;
 }
 
+.job-chat-profile-suggestion-notice--applied {
+  color: var(--color-success);
+}
+
 .job-chat-profile-suggestion-buttons {
   display: flex;
   flex-wrap: wrap;

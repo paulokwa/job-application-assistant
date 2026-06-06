@@ -8,6 +8,15 @@ const SUPPORTED_ACTIONS = {
   experience: new Set(['add']),
 };
 
+const APPLY_SUPPORTED_SECTIONS = {
+  skills: new Set(['add']),
+  summary: new Set(['update']),
+};
+
+export function isApplySectionSupported(section, action) {
+  return Boolean(APPLY_SUPPORTED_SECTIONS[section]?.has(action));
+}
+
 const ALLOWED_PROPOSAL_KEYS = new Set([
   'type',
   'proposalVersion',
