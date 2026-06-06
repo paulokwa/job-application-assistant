@@ -268,6 +268,7 @@ let currentReminderRequestId = 0;
 let generationStatusTimers = [];
 let jobChatPatienceTimers = [];
 const editedHtmlSaveTimers = { resume: null, 'cover-letter': null };
+const alreadySeenScanWarnings = new Set();
 
 // ── DOM refs ──────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -2165,14 +2166,16 @@ async function confirmAiJobInfoSuggestions(info) {
   ).then(result => result === 'primary');
 }
 
-async function confirmScannedAiJobInfoSuggestions(info) {
+async function confirmScannedAiJobInfoSuggestions(info, alreadySeen = null) {
   return showChoiceDialog(
     'Apply AI field suggestions?',
-    'Review the detected details. Fit Check is optional.',
+    alreadySeen
+      ? 'Review the detected details. This posting already appears in your workspace, so check your application status before generating again. Fit Check is optional.'
+      : 'Review the detected details. Fit Check is optional.',
     {
       secondaryLabel: 'Apply',
       primaryLabel: 'Apply + Fit Check',
-      reviewDetails: jobInfoSuggestionReview(info),
+      reviewDetails: alreadySeenReviewDetails(alreadySeen, jobInfoSuggestionReview(info)),
     }
   );
 }
@@ -2532,6 +2535,12 @@ async function scanCurrentPage() {
     }
 
     await applyExtractedData(response, tab.url || '', !!response.selectedText);
+    const alreadySeen = await findAlreadySeenJob(state.jobData);
+    state.currentJobMeta = {
+      ...(state.currentJobMeta || {}),
+      alreadySeen,
+    };
+    if (alreadySeen) showAlreadySeenJobWarning(alreadySeen);
     prepareAiFitCheckContext(response, tab);
     await persistScannedJobSession(response, tab);
     showToast('✦ Page scanned');
@@ -2587,10 +2596,22 @@ async function scanJobPageAndMaybeSuggestFields() {
     }
 
     await applyExtractedData(response, tab.url || '', !!response.selectedText);
+    const alreadySeen = await findAlreadySeenJob(state.jobData);
+    state.currentJobMeta = {
+      ...(state.currentJobMeta || {}),
+      alreadySeen,
+    };
+    if (alreadySeen) showAlreadySeenJobWarning(alreadySeen);
     prepareAiFitCheckContext(response, tab);
     await persistScannedJobSession(response, tab);
 
     const settings = await loadSettings();
+    if (!settings?.provider && alreadySeen) {
+      showAlreadySeenJobWarning(alreadySeen, { force: true });
+      showToast('Job page scanned');
+      return;
+    }
+
     if (!settings?.provider) {
       showJobInfoReviewNotice(
         'Job page scanned. AI is not connected, so some fields may need manual review.',
@@ -2618,13 +2639,16 @@ async function scanJobPageAndMaybeSuggestFields() {
         aiJobInfoAttemptedFor: descText,
       };
 
-      if (!info.jobTitle && !info.company) {
+      if (!info.jobTitle && !info.company && alreadySeen) {
+        showAlreadySeenJobWarning(alreadySeen, { force: true });
+      } else if (!info.jobTitle && !info.company) {
         showJobInfoReviewNotice('AI could not confidently find Job Title or Employer. Please review the fields manually.');
       } else {
-        const choice = await confirmScannedAiJobInfoSuggestions(info);
+        const choice = await confirmScannedAiJobInfoSuggestions(info, alreadySeen);
         if (choice !== 'cancel') {
           applyAiJobInfoSuggestions(info);
-          showJobInfoReviewNotice(
+          if (alreadySeen) showAlreadySeenJobWarning(alreadySeen, { force: true });
+          if (!alreadySeen) showJobInfoReviewNotice(
             'Job page scanned. AI suggested job details — please review before generating.',
             'info'
           );
@@ -2636,10 +2660,14 @@ async function scanJobPageAndMaybeSuggestFields() {
     } catch (aiErr) {
       if (aiErr?.name !== 'AbortError') {
         console.warn('[JPDA] AI job info step failed:', aiErr?.message || aiErr);
-        showJobInfoReviewNotice(
-          'Job page scanned, but AI cleanup failed. You can still edit the fields manually.',
-          'warning'
-        );
+        if (alreadySeen) {
+          showAlreadySeenJobWarning(alreadySeen, { force: true });
+        } else {
+          showJobInfoReviewNotice(
+            'Job page scanned, but AI cleanup failed. You can still edit the fields manually.',
+            'warning'
+          );
+        }
       }
     }
 
@@ -2756,6 +2784,8 @@ function bindEvents() {
   dom.jobInfoReview.addEventListener('click', e => {
     if (e.target.dataset.action === 'open-ai-settings') openSettingsSection('provider');
     if (e.target.dataset.action === 'retry-job-scan') scanJobPageAndMaybeSuggestFields();
+    if (e.target.dataset.action === 'open-jobs') dom.jobsView.classList.add('visible');
+    if (e.target.dataset.action === 'open-history') dom.historyView.classList.add('visible');
   });
   dom.btnSaveJob.addEventListener('click', saveCurrentJob);
 
@@ -3446,6 +3476,127 @@ function findSavedJobDuplicate(savedJobs, draft) {
   );
 }
 
+function jobLookupDraft(jobData = {}) {
+  return {
+    title: jobData.jobTitle || jobData.title || '',
+    company: jobData.company || '',
+    sourceUrl: jobData.sourceUrl || '',
+  };
+}
+
+function alreadySeenSignature(jobData = {}) {
+  const draft = jobLookupDraft(jobData);
+  const url = normalizeSavedJobUrl(draft.sourceUrl);
+  if (url) return `url:${url}`;
+  const title = normalizeSavedJobText(draft.title);
+  const company = normalizeSavedJobText(draft.company);
+  return title && company ? `role:${title}|${company}` : '';
+}
+
+function historyEntryJobData(entry = {}) {
+  return {
+    jobTitle: entry.jobData?.jobTitle || entry.jobTitle || '',
+    title: entry.jobData?.title || entry.jobTitle || '',
+    company: entry.jobData?.company || entry.company || '',
+    sourceUrl: entry.jobData?.sourceUrl || entry.sourceUrl || '',
+  };
+}
+
+function findJobHistoryDuplicate(historyEntries, draft) {
+  const draftUrl = normalizeSavedJobUrl(draft.sourceUrl);
+  if (draftUrl) {
+    return historyEntries.find(entry => normalizeSavedJobUrl(historyEntryJobData(entry).sourceUrl) === draftUrl);
+  }
+
+  const draftTitle = normalizeSavedJobText(draft.title);
+  const draftCompany = normalizeSavedJobText(draft.company);
+  if (!draftTitle || !draftCompany) return null;
+
+  return historyEntries.find(entry => {
+    const entryJob = historyEntryJobData(entry);
+    return normalizeSavedJobText(entryJob.jobTitle || entryJob.title) === draftTitle &&
+      normalizeSavedJobText(entryJob.company) === draftCompany;
+  });
+}
+
+function formatSeenDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function describeAlreadySeenResult(result = {}) {
+  const parts = [];
+  if (result.savedJob) {
+    const status = result.savedJob.status ? `, status: ${result.savedJob.status}` : '';
+    const savedDate = formatSeenDate(result.savedJob.createdAt);
+    parts.push(`Saved in Jobs${savedDate ? ` on ${savedDate}` : ''}${status}`);
+  }
+  if (result.historyEntry) {
+    const generatedDate = formatSeenDate(result.historyEntry.date);
+    const docType = result.historyEntry.docType || 'draft';
+    parts.push(`Generated ${docType}${generatedDate ? ` on ${generatedDate}` : ''}`);
+  }
+  return parts.join('\n');
+}
+
+async function findAlreadySeenJob(jobData = state.jobData) {
+  const signature = alreadySeenSignature(jobData);
+  if (!signature) return null;
+
+  const data = await chrome.storage.local.get([SAVED_JOBS_KEY, 'jobHistory']);
+  const savedJobs = Array.isArray(data[SAVED_JOBS_KEY]) ? data[SAVED_JOBS_KEY] : [];
+  const historyEntries = Array.isArray(data.jobHistory) ? data.jobHistory : [];
+  const draft = jobLookupDraft(jobData);
+  const savedJob = findSavedJobDuplicate(savedJobs, draft) || null;
+  const historyEntry = findJobHistoryDuplicate(historyEntries, draft) || null;
+
+  if (!savedJob && !historyEntry) return null;
+  return {
+    signature,
+    savedJob,
+    historyEntry,
+    summary: describeAlreadySeenResult({ savedJob, historyEntry }),
+  };
+}
+
+function alreadySeenReviewDetails(alreadySeen, baseDetails = []) {
+  if (!alreadySeen) return baseDetails;
+  return [
+    { label: 'Already in workspace', value: alreadySeen.summary || 'This posting appears in Jobs or History.' },
+    ...baseDetails,
+  ];
+}
+
+function alreadySeenWarningMessage(alreadySeen) {
+  const summary = alreadySeen?.summary || 'This posting appears in Jobs or History.';
+  return `${summary}. You can continue, but check whether you already applied before generating or sending anything again.`;
+}
+
+function alreadySeenWarningActions(alreadySeen) {
+  const actions = [];
+  if (alreadySeen?.savedJob) {
+    actions.push('<button type="button" class="job-info-review-action" data-action="open-jobs">Open Jobs</button>');
+  }
+  if (alreadySeen?.historyEntry) {
+    actions.push('<button type="button" class="job-info-review-action" data-action="open-history">Open History</button>');
+  }
+  return actions.length ? ` ${actions.join(' ')}` : '';
+}
+
+function showAlreadySeenJobWarning(alreadySeen, { force = false } = {}) {
+  if (!alreadySeen?.signature) return false;
+  if (!force && alreadySeenScanWarnings.has(alreadySeen.signature)) return false;
+  alreadySeenScanWarnings.add(alreadySeen.signature);
+  showJobInfoReviewNotice(
+    alreadySeenWarningMessage(alreadySeen),
+    'warning',
+    alreadySeenWarningActions(alreadySeen)
+  );
+  return true;
+}
+
 async function saveCurrentJob() {
   const draft = getCurrentSavedJobDraft();
 
@@ -3693,6 +3844,7 @@ function showChoiceDialog(title, body, { primaryLabel = 'Continue', secondaryLab
     reviewDetails.forEach(({ label, value }) => {
       const row = document.createElement('div');
       row.className = 'confirm-review-row';
+      if (label === 'Already in workspace') row.classList.add('confirm-review-row--warning');
 
       const rowLabel = document.createElement('span');
       rowLabel.className = 'confirm-review-label';
