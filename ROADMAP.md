@@ -79,7 +79,75 @@ See `RELEASE_V4_CHECKLIST.md` for the active v4.0 release-cycle checklist, smoke
 
 ## Active Roadmap Ideas
 
-No active implementation task is selected. v4.0 development has started, but do not package or submit v4.0 unless the user explicitly confirms a release scope.
+No active implementation task is selected. The Job Chat profile proposal Apply pipeline is implemented for add-style safe actions. See "Deferred Profile Apply Scope" below for intentionally blocked areas. Do not package or submit v4.0 unless the user explicitly confirms a release scope.
+
+## Deferred Profile Apply Scope / Future Work
+
+The profile proposal Apply pipeline is complete for the supported scope listed below. The remaining sections and actions are intentionally blocked. **Do not enable them by simply adding entries to `APPLY_SUPPORTED_SECTIONS` in `modules/profileProposalApply.js`.** Each deferred area needs its own design, validation, diff preview, tests, Playwright smoke coverage, and undo behavior.
+
+### Currently Supported Apply Scope
+
+```
+skills add
+summary update
+certifications add
+experience add
+```
+
+These are implemented with: proposal validation, diff preview, edit-before-apply, guarded save (fingerprint + active profile checks), one-step undo with session snapshot backup, stale markers for generated outputs, and Playwright smoke coverage.
+
+### Intentionally Deferred
+
+1. **Update actions** (skills update, summary update already done, experience update, certification update, etc.)
+   - Deferred because updating existing profile items requires reliable target resolution, ambiguity handling, before/after review, and conflict protection.
+   - Future work must avoid guessing which existing item to update.
+   - Must require exact target resolution or user disambiguation.
+   - Must have diff preview showing both the old item and the proposed change.
+
+2. **Remove actions** (all sections)
+   - Deferred because deletion is destructive.
+   - Future work must require explicit confirmation, exact target resolution, undo, and a stronger warning than add/update.
+   - Must not remove items silently.
+
+3. **personalInfo apply**
+   - Deferred because this includes sensitive identity/contact fields: name, email, phone, cityProvince, linkedin, portfolio, website.
+   - Future work should require field-by-field review and stronger confirmation.
+   - AI must never invent or guess identity details.
+
+4. **education apply**
+   - Deferred because credentials, institutions, and dates are factual and high-risk if altered incorrectly.
+   - Future work should preserve factual grounding, require exact user confirmation, and support multi-entry diff preview.
+
+5. **projects apply**
+   - Deferred because project entries can be invented or over-expanded by AI.
+   - Future work should require strong factual grounding and edit-before-apply with name/description/technology/link review.
+
+6. **customSections apply**
+   - Deferred because custom section structure varies by user.
+   - Future work needs schema/label handling and careful mapping of user-defined fields.
+
+7. **coverLetterProfile apply**
+   - Deferred because this is generator-context data (strengths, etc.), not normal resume profile content.
+   - Future work should define exact schema and preview behavior before writes.
+
+8. **doNotClaimNotes apply**
+   - Deferred because these are safety/anti-hallucination constraints.
+   - Future work must be especially careful — edits here can affect what the AI is allowed to claim in generated content.
+   - Any apply flow should require explicit review and probably manual editing only.
+
+### Hard Rules for Future Implementation
+
+7. **Dashboard must continue using deterministic helper-produced `afterProfile` only.**
+
+8. **Guarded save, fingerprint checks, active profile checks, undo snapshot creation, and stale markers must remain in place for every new section/action.**
+
+9. **Each new section/action must add matching tests: `isApplySectionSupported`, apply success, duplicate blocking, incomplete blocking, undo, section isolation.**
+
+10. **Each new section/action must add Playwright smoke coverage: apply + undo, duplicate blocked, safety paths as applicable.**
+
+11. **Update/remove actions must not be implemented without ambiguity detection.**
+
+12. **AI must never directly patch storage. The pure helper in `modules/profileProposalApply.js` is the only code path that constructs profile patches.**
 
 ## Later Autofill Improvements
 

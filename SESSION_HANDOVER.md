@@ -30,6 +30,7 @@ Status:
   - Stale markers for generated outputs after profile change
   - 5 Node unit tests + 11 Playwright smoke tests via npm scripts
   - Update/remove actions remain blocked; personalInfo/education/projects/customSections not yet enabled
+  - Full deferred scope and hard rules documented in ROADMAP.md — see "Deferred Profile Apply Scope / Future Work"
   - Packaging safety still gated — see RELEASE_V4_CHECKLIST.md for exclusion list
 - [DONE] npm test scripts added (test:unit, test:smoke, test:smoke:headed, test)
 - [WAITING] User confirms final v4.0 release scope.

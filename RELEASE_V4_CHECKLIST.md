@@ -42,7 +42,8 @@ Included so far:
   - Apply supported for: skills add, summary update, certifications add, experience add
   - One-step Undo with snapshot (in-memory + chrome.storage.session backup, 15-min TTL)
   - Stale markers for generated outputs after profile change
-  - Update/remove actions intentionally blocked; personalInfo/education/projects/customSections not yet enabled
+  - Update/remove actions intentionally blocked; personalInfo/education/projects/customSections/coverLetterProfile/doNotClaimNotes not yet enabled.
+  - Full deferred scope documented in `ROADMAP.md` — see "Deferred Profile Apply Scope / Future Work."
 
 - **Playwright Smoke Tests**
   - 11 smoke tests covering apply, undo, safety paths (duplicate, locked, stale, cancel)
