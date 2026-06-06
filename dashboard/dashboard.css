@@ -29,6 +29,21 @@
   --color-accent-subtle:   oklch(93% 0.05 195);
   --color-accent-on:       oklch(98% 0.005 195);
 
+  /* Workspace aliases for the document-focused redesign */
+  --workspace-canvas:       var(--color-canvas);
+  --workspace-panel:        var(--color-surface);
+  --document-surface:       var(--color-surface);
+  --document-shadow:        var(--shadow-card);
+  --action-primary:         var(--color-accent);
+  --action-primary-hover:   var(--color-accent-hover);
+  --action-primary-on:      var(--color-accent-on);
+  --action-improve:         var(--color-accent);
+  --action-improve-subtle:  var(--color-accent-subtle);
+  --workspace-gap:          12px;
+  --workspace-panel-width:  320px;
+  --tool-rail-width:        280px;
+  --document-max-width:     850px;
+
   /* Semantic */
   --color-success:         oklch(56% 0.13 145);
   --color-success-subtle:  oklch(94% 0.05 145);
@@ -451,6 +466,79 @@ body {
 
 #app-main:has(#right-col[hidden]) {
   grid-template-columns: 1fr;
+}
+
+.workspace-shell {
+  display: grid;
+  grid-template-columns: minmax(280px, var(--workspace-panel-width)) minmax(0, 1fr);
+  gap: var(--workspace-gap);
+  min-height: 0;
+}
+
+.workflow-section {
+  background: var(--workspace-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.workflow-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.document-stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 0;
+  min-height: 0;
+  background: var(--workspace-canvas);
+  padding: 24px;
+  overflow: auto;
+}
+
+.document-hero {
+  width: 100%;
+  max-width: var(--document-max-width);
+  min-height: 640px;
+  background: var(--document-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--document-shadow);
+}
+
+.tool-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: var(--tool-rail-width);
+  min-width: 0;
+}
+
+.postgen-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sticky-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--workspace-panel);
+  border-top: 1px solid var(--color-border);
+  padding: 10px 12px;
 }
 
 .output-placeholder {
@@ -1568,6 +1656,12 @@ body {
   padding: 24px;
 }
 
+.draft-preview-wrapper.document-hero {
+  max-width: none;
+  min-height: 0;
+  box-shadow: none;
+}
+
 .preview-frame {
   width: 100%;
   height: 100%;
@@ -1914,6 +2008,235 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   color: var(--color-ink);
   font-size: 12px;
   line-height: 1.45;
+}
+
+/* Side-panel workflow hierarchy */
+:root[data-dashboard-mode="panel"] #app-main {
+  gap: 10px;
+  padding: 10px;
+  background: var(--workspace-canvas);
+}
+
+:root[data-dashboard-mode="panel"] #left-col,
+:root[data-dashboard-mode="panel"] #right-col {
+  gap: 10px;
+  padding-right: 4px;
+}
+
+:root[data-dashboard-mode="panel"] #app-header {
+  background: var(--workspace-panel);
+  border-bottom-color: var(--color-border-subtle);
+}
+
+:root[data-dashboard-mode="panel"] .profile-strip {
+  position: relative;
+  padding-top: 18px;
+  border-color: var(--color-border-subtle);
+  background: var(--color-raised);
+}
+
+:root[data-dashboard-mode="panel"] .profile-strip::before {
+  content: "Step 2 · Profile/Provider";
+  position: absolute;
+  top: 3px;
+  left: 10px;
+  color: var(--color-ink-3);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+:root[data-dashboard-mode="panel"] .workflow-section {
+  position: relative;
+  border-color: var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+:root[data-dashboard-mode="panel"] .workflow-section::before {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+:root[data-dashboard-mode="panel"] #card-job-info::before,
+:root[data-dashboard-mode="panel"] #card-job-desc::before {
+  content: "Step 1 · Job";
+}
+
+:root[data-dashboard-mode="panel"] #card-application-form::before {
+  content: "Optional helper";
+}
+
+:root[data-dashboard-mode="panel"] #card-generate::before {
+  content: "Step 3 · Generate";
+  color: var(--action-primary);
+}
+
+:root[data-dashboard-mode="panel"] #card-drafts::before {
+  content: "Step 4 · Review";
+}
+
+:root[data-dashboard-mode="panel"] #card-revision::before {
+  content: "Review tools";
+}
+
+:root[data-dashboard-mode="panel"] #card-ats::before {
+  content: "Document check";
+}
+
+:root[data-dashboard-mode="panel"] #card-save::before {
+  content: "Step 5 · Apply";
+  color: var(--color-success);
+}
+
+:root[data-dashboard-mode="panel"] .card-header {
+  margin-bottom: 10px;
+}
+
+:root[data-dashboard-mode="panel"] .card-title {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+:root[data-dashboard-mode="panel"] .step-badge {
+  width: 18px;
+  height: 18px;
+  border-width: 1px;
+  font-size: 10px;
+}
+
+:root[data-dashboard-mode="panel"] #card-job-info,
+:root[data-dashboard-mode="panel"] #card-job-desc {
+  background: var(--workspace-panel);
+}
+
+:root[data-dashboard-mode="panel"] #card-job-desc {
+  margin-top: -2px;
+}
+
+:root[data-dashboard-mode="panel"] #card-application-form.autofill-card {
+  background: var(--color-raised);
+  border-style: dashed;
+}
+
+:root[data-dashboard-mode="panel"] #card-application-form.autofill-card::before,
+:root[data-dashboard-mode="panel"] #card-application-form .card-title,
+:root[data-dashboard-mode="panel"] #card-application-form .autofill-helper {
+  color: var(--color-ink-3);
+}
+
+:root[data-dashboard-mode="panel"] #card-generate {
+  background: oklch(from var(--action-primary) 97% 0.018 h);
+  border-color: oklch(from var(--action-primary) l c h / 0.35);
+}
+
+:root[data-dashboard-mode="panel"] #card-generate .card-title {
+  color: var(--color-ink);
+}
+
+:root[data-dashboard-mode="panel"] #card-generate .btn-primary {
+  min-height: 44px;
+  background: var(--action-primary);
+  color: var(--action-primary-on);
+}
+
+:root[data-dashboard-mode="panel"] #card-generate .btn-primary:hover:not(:disabled) {
+  background: var(--action-primary-hover);
+}
+
+:root[data-dashboard-mode="panel"] #card-job-info .btn-scan:not(#btn-scan-page),
+:root[data-dashboard-mode="panel"] #card-ats .btn-scan {
+  background: transparent;
+  border-color: var(--color-border-subtle);
+  color: var(--color-ink-2);
+}
+
+:root[data-dashboard-mode="panel"] #btn-scan-page {
+  background: var(--action-primary);
+  border-color: var(--action-primary);
+  color: var(--action-primary-on);
+  font-weight: 700;
+}
+
+:root[data-dashboard-mode="panel"] #btn-scan-page:hover {
+  background: var(--action-primary-hover);
+  border-color: var(--action-primary-hover);
+}
+
+:root[data-dashboard-mode="panel"] #right-col {
+  background: var(--workspace-canvas);
+}
+
+:root[data-dashboard-mode="panel"] #card-drafts {
+  border-color: oklch(from var(--action-improve) l c h / 0.28);
+}
+
+:root[data-dashboard-mode="panel"] #card-revision,
+:root[data-dashboard-mode="panel"] #card-ats {
+  background: var(--color-raised);
+}
+
+:root[data-dashboard-mode="panel"] #card-revision .btn-secondary,
+:root[data-dashboard-mode="panel"] #card-ats .btn-secondary {
+  background: var(--workspace-panel);
+}
+
+:root[data-dashboard-mode="panel"] #card-save {
+  border-color: oklch(from var(--color-success) l c h / 0.35);
+}
+
+:root[data-dashboard-mode="panel"] #card-save .btn-confirm {
+  min-height: 38px;
+}
+
+:root[data-dashboard-mode="panel"] .preview-review-nudge,
+:root[data-dashboard-mode="panel"] .ai-review-warning,
+:root[data-dashboard-mode="panel"] .gen-privacy-note,
+:root[data-dashboard-mode="panel"] .export-hint {
+  line-height: 1.45;
+}
+
+@media (max-width: 430px) {
+  :root[data-dashboard-mode="panel"] .form-grid {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  :root[data-dashboard-mode="panel"] .form-grid label {
+    margin-top: 4px;
+  }
+
+  :root[data-dashboard-mode="panel"] .btn-group-row,
+  :root[data-dashboard-mode="panel"] .save-button-row,
+  :root[data-dashboard-mode="panel"] .revision-buttons {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  :root[data-dashboard-mode="panel"] .btn-primary,
+  :root[data-dashboard-mode="panel"] .btn-secondary,
+  :root[data-dashboard-mode="panel"] .btn-confirm {
+    width: 100%;
+  }
+
+  :root[data-dashboard-mode="panel"] .card-header-right,
+  :root[data-dashboard-mode="panel"] .autofill-actions {
+    align-items: stretch;
+  }
+
+  :root[data-dashboard-mode="panel"] .card-header-right .btn-scan,
+  :root[data-dashboard-mode="panel"] .autofill-actions > button {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
 }
 
 /* ══════════════════════════════════════════════

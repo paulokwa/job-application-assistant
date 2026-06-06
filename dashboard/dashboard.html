@@ -111,13 +111,13 @@
   <!-- ═══════════════════════════════════════════════════
        MAIN LAYOUT
   ═══════════════════════════════════════════════════ -->
-  <main id="app-main">
+  <main id="app-main" class="workspace-shell">
 
     <!-- ─── LEFT COLUMN ──────────────────────────── -->
     <div id="left-col">
 
       <!-- Job Info Card -->
-      <section class="card" id="card-job-info">
+      <section class="card workflow-section" id="card-job-info">
         <div class="card-header">
           <span class="card-title"><span class="step-badge" aria-hidden="true">1</span> Job Info</span>
           <div class="card-header-right">
@@ -145,7 +145,7 @@
       </section>
 
       <!-- Job Description Card -->
-      <section class="card" id="card-job-desc">
+      <section class="card workflow-section" id="card-job-desc">
         <div class="card-header">
           <span class="card-title"><span class="step-badge" aria-hidden="true">2</span> Job Description</span>
           <span class="card-hint">Edit before generating</span>
@@ -157,7 +157,7 @@
       </section>
 
       <!-- Application Form Card -->
-      <section class="card autofill-card is-collapsed" id="card-application-form">
+      <section class="card workflow-section autofill-card is-collapsed" id="card-application-form">
         <div class="card-header">
           <span class="card-title">Application Autofill &mdash; optional</span>
           <button id="btn-toggle-autofill-tools" class="autofill-toggle" type="button" aria-expanded="false" aria-controls="autofill-tools-body">
@@ -176,7 +176,7 @@
       </section>
 
       <!-- Generate Controls Card -->
-      <section class="card" id="card-generate">
+      <section class="card workflow-section" id="card-generate">
         <div class="card-header">
           <span class="card-title"><span class="step-badge" aria-hidden="true">3</span> Generate</span>
         </div>
@@ -232,10 +232,10 @@
     </div><!-- /left-col -->
 
     <!-- ─── RIGHT COLUMN ─────────────────────────── -->
-    <div id="right-col">
+    <div id="right-col" class="postgen-tools">
 
       <!-- Draft Preview Card -->
-      <section class="card" id="card-drafts">
+      <section class="card workflow-section" id="card-drafts">
         <div class="card-header preview-card-header">
           <span class="card-title">Preview</span>
           <div class="tab-bar" role="tablist" aria-label="Document preview">
@@ -304,7 +304,7 @@
             <strong>Ready when you are</strong>
             <p>Fill in the job info and description, then click Generate.</p>
           </div>
-          <div id="draft-resume-content" class="draft-preview-wrapper hidden">
+          <div id="draft-resume-content" class="draft-preview-wrapper document-hero hidden">
             <div class="preview-edit-bar">
               <button id="btn-edit-resume" class="btn-edit-toggle" type="button" title="Edit the document directly in the preview">✏ Edit</button>
               <button id="btn-clear-resume" class="btn-clear-draft" type="button" title="Clear this draft">Clear</button>
@@ -319,7 +319,7 @@
             <strong>Ready when you are</strong>
             <p>Fill in the job info and description, then click Generate.</p>
           </div>
-          <div id="draft-cl-content" class="draft-preview-wrapper hidden">
+          <div id="draft-cl-content" class="draft-preview-wrapper document-hero hidden">
             <div class="preview-edit-bar">
               <button id="btn-edit-cl" class="btn-edit-toggle" type="button" title="Edit the document directly in the preview">✏ Edit</button>
               <button id="btn-clear-cl" class="btn-clear-draft" type="button" title="Clear this draft">Clear</button>
@@ -334,14 +334,14 @@
             <strong>Merged view</strong>
             <p>Both documents combined into a single preview.</p>
           </div>
-          <div id="draft-merged-content" class="draft-preview-wrapper hidden">
+          <div id="draft-merged-content" class="draft-preview-wrapper document-hero hidden">
             <iframe id="preview-merged-frame" class="preview-frame" title="Merged document preview" sandbox="allow-same-origin"></iframe>
           </div>
         </div>
       </section>
 
       <!-- Revision Card -->
-      <section class="card" id="card-revision">
+      <section class="card workflow-section" id="card-revision">
         <div class="card-header">
           <span class="card-title">Refine</span>
         </div>
@@ -358,7 +358,7 @@
       </section>
 
       <!-- ATS Check Card -->
-      <section class="card" id="card-ats">
+      <section class="card workflow-section" id="card-ats">
         <div class="card-header">
           <span class="card-title">ATS Check</span>
           <button id="btn-ats-scan" class="btn-scan" type="button" disabled>Scan keywords</button>
@@ -387,7 +387,7 @@
       </section>
 
       <!-- Save Card -->
-      <section class="card" id="card-save">
+      <section class="card workflow-section" id="card-save">
         <div class="card-header">
           <span class="card-title">Save as PDF</span>
         </div>
