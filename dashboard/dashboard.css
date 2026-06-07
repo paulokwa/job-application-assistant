@@ -2292,82 +2292,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 :root[data-dashboard-mode="panel"] .profile-strip {
-  position: relative;
-  padding-top: 18px;
   border-color: var(--color-border-subtle);
   background: var(--color-raised);
 }
 
-:root[data-dashboard-mode="panel"] .profile-strip::before {
-  content: "Step 2 · Profile";
-  position: absolute;
-  top: 3px;
-  left: 10px;
-  color: var(--color-ink-3);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
 :root[data-dashboard-mode="panel"] .workflow-section {
-  position: relative;
   border-color: var(--color-border-subtle);
   border-radius: var(--radius-md);
   box-shadow: none;
-}
-
-:root[data-dashboard-mode="panel"] .workflow-section::before {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--color-ink-3);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-:root[data-dashboard-mode="panel"] #card-job-info::before,
-:root[data-dashboard-mode="panel"] #card-job-desc::before {
-  content: "Step 1 · Job";
-}
-
-:root[data-dashboard-mode="panel"] #card-job-desc::before {
-  display: none;
-  content: none;
-}
-
-:root[data-dashboard-mode="panel"] #card-application-form::before {
-  content: "Optional apply helper";
-}
-
-:root[data-dashboard-mode="panel"] #card-generate::before {
-  content: "Step 3 · Generate";
-  color: var(--action-primary);
-}
-
-:root[data-dashboard-mode="panel"] #card-drafts::before {
-  content: "Step 4 · Review";
-}
-
-:root[data-dashboard-mode="panel"] #card-revision::before {
-  content: "Review tools";
-}
-
-:root[data-dashboard-mode="panel"] #card-ats::before {
-  content: "Document check";
-}
-
-:root[data-dashboard-mode="panel"] #card-save::before {
-  content: "Step 5 · Apply";
-  color: var(--color-success);
-}
-
-:root[data-dashboard-mode="panel"] .tool-group .workflow-section::before {
-  display: none;
-  content: none;
 }
 
 :root[data-dashboard-mode="panel"] .card-header {

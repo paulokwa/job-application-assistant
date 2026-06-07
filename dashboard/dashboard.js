@@ -1640,7 +1640,7 @@ async function init() {
   await populateProfileStrip();
 
   const [localData, syncData, scopedDraft] = await Promise.all([
-    chrome.storage.local.get([...SOURCE_RESUME_KEYS, AI_PROVIDER_SETUP_SAVED_KEY, 'theme', 'leftColCollapsed']),
+    chrome.storage.local.get([...SOURCE_RESUME_KEYS, AI_PROVIDER_SETUP_SAVED_KEY, 'theme']),
     chrome.storage.sync.get(['docSettings', 'appPreferences']),
     loadScopedSavedDraft(),
   ]);
@@ -1655,11 +1655,6 @@ async function init() {
 
   if (state.settings?.provider === 'mock') {
     dom.mockBanner.classList.remove('hidden');
-  }
-
-  // Restore collapsed left column (panel mode only)
-  if (dashboardMode === 'panel' && localData.leftColCollapsed) {
-    collapseLeftCol(false);
   }
 
   bindEvents();
@@ -3157,7 +3152,7 @@ function bindEvents() {
     if (dom.leftCol?.classList.contains('left-col-collapsed')) {
       expandLeftCol();
     } else {
-      collapseLeftCol(true);
+      collapseLeftCol();
     }
   });
   dom.leftCol?.querySelector('.left-col-rail-labels')?.addEventListener('click', expandLeftCol);
@@ -6225,18 +6220,16 @@ function collapsePreview() {
 
 // ── Collapsible Left Column ───────────────────────────────────────────────
 
-function collapseLeftCol(persist = true) {
+function collapseLeftCol() {
   if (!dom.leftCol) return;
   dom.leftCol.classList.add('left-col-collapsed');
   dom.btnToggleLeftCol?.setAttribute('aria-expanded', 'false');
-  if (persist) chrome.storage.local.set({ leftColCollapsed: true }).catch(() => {});
 }
 
 function expandLeftCol() {
   if (!dom.leftCol) return;
   dom.leftCol.classList.remove('left-col-collapsed');
   dom.btnToggleLeftCol?.setAttribute('aria-expanded', 'true');
-  chrome.storage.local.set({ leftColCollapsed: false }).catch(() => {});
 }
 
 // Start app
