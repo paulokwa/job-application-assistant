@@ -282,6 +282,7 @@ const dom = {
   fieldUrl:           $('field-url'),
   fieldDesc:          $('field-job-desc'),
   descQualityNotice:  $('desc-quality-notice'),
+  generateFieldNotice: $('generate-field-notice'),
   jobInfoReview:      $('job-info-review'),
   
   btnGenResume:       $('btn-gen-resume'),
@@ -2158,6 +2159,12 @@ function maybeShowDescQualityNotice(text) {
   }
 }
 
+function updateGenerateFieldNotice() {
+  if (!dom.generateFieldNotice) return;
+  const titleMissing = !dom.fieldTitle.value.trim();
+  dom.generateFieldNotice.classList.toggle('hidden', !titleMissing);
+}
+
 function maybeShowScannedJobInfoReview(fields, jobTitle, company) {
   if (!fields?.needsReview && jobTitle && company) {
     hideJobInfoReviewNotice();
@@ -2211,6 +2218,7 @@ function applyAiJobInfoSuggestions(info) {
     dom.fieldCompany.value = info.company;
     state.jobData.company = info.company;
   }
+  updateGenerateFieldNotice();
   syncJobChatToCurrentJob();
   refreshJobChatEntryPoints();
 }
@@ -2323,6 +2331,7 @@ async function applyExtractedData(raw, url, usedSelection) {
   dom.fieldUrl.value     = url;
   dom.fieldDesc.value    = text;
   maybeShowDescQualityNotice(text);
+  updateGenerateFieldNotice();
 
   state.jobData = nextJobData;
   state.currentJobMeta = {
@@ -2820,7 +2829,14 @@ function bindEvents() {
   dom.jobInfoReview.addEventListener('click', e => {
     if (e.target.dataset.action === 'open-ai-settings') openSettingsSection('provider');
     if (e.target.dataset.action === 'retry-job-scan') scanJobPageAndMaybeSuggestFields();
-    if (e.target.dataset.action === 'open-jobs') dom.jobsView.classList.add('visible');
+    if (e.target.dataset.action === 'open-jobs') {
+      dom.jobsView.classList.add('visible');
+      const jobId = e.target.dataset.jobId;
+      if (jobId) {
+        const frame = document.getElementById('jobs-frame');
+        frame?.contentWindow?.postMessage({ type: 'JPDA_SCROLL_TO_JOB', id: jobId }, window.location.origin);
+      }
+    }
     if (e.target.dataset.action === 'open-history') dom.historyView.classList.add('visible');
   });
   dom.btnSaveJob.addEventListener('click', saveCurrentJob);
@@ -3125,6 +3141,7 @@ function bindEvents() {
     refreshJobInfoReviewNotice();
     syncJobChatToCurrentJob();
     refreshJobChatEntryPoints();
+    updateGenerateFieldNotice();
   });
   dom.fieldCompany.addEventListener('input', () => {
     state.jobData.company = dom.fieldCompany.value;
@@ -3639,7 +3656,7 @@ function alreadySeenWarningMessage(alreadySeen) {
 function alreadySeenWarningActions(alreadySeen) {
   const actions = [];
   if (alreadySeen?.savedJob) {
-    actions.push('<button type="button" class="job-info-review-action" data-action="open-jobs">Open Jobs</button>');
+    actions.push(`<button type="button" class="job-info-review-action" data-action="open-jobs" data-job-id="${alreadySeen.savedJob.id}">Open Jobs</button>`);
   }
   if (alreadySeen?.historyEntry) {
     actions.push('<button type="button" class="job-info-review-action" data-action="open-history">Open History</button>');
