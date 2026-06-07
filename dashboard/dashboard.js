@@ -2660,10 +2660,19 @@ async function scanJobPageAndMaybeSuggestFields() {
         if (choice !== 'cancel') {
           applyAiJobInfoSuggestions(info);
           if (alreadySeen) showAlreadySeenJobWarning(alreadySeen, { force: true });
-          if (!alreadySeen) showJobInfoReviewNotice(
-            'Job page scanned. AI suggested job details — please review before generating.',
-            'info'
-          );
+          if (!alreadySeen) {
+            const missingTitle   = !dom.fieldTitle.value.trim();
+            const missingCompany = !dom.fieldCompany.value.trim();
+            if (missingTitle && missingCompany) {
+              showJobInfoReviewNotice('AI could not confidently find Job Title or Employer. Please enter them manually.');
+            } else if (missingTitle) {
+              showJobInfoReviewNotice('AI detected Employer but could not find a Job Title. Please enter it manually.');
+            } else if (missingCompany) {
+              showJobInfoReviewNotice('AI detected Job Title but could not find Employer. Please enter it manually.');
+            } else {
+              showJobInfoReviewNotice('Job page scanned. AI suggested job details — please review before generating.', 'info');
+            }
+          }
           if (choice === 'primary') {
             await runFitCheckAI(dom.profileSwitcher.dataset.profileId || '');
           }
