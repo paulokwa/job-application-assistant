@@ -40,11 +40,66 @@ function isRestrictedUrl(url) {
   );
 }
 
-// Injects content.js into a tab and asks it to capture page content.
-// content.js guards against duplicate injection, so this is safe to call repeatedly.
+// Injects content.js into all frames and returns the best capture result.
+// Cross-origin iframes (e.g. embedded ATS widgets) may contain the real job
+// content while the top-level document only has nav/footer text. Sending
+// CAPTURE_CONTENT to each frame individually and scoring the responses lets
+// us pick the frame that actually has the job detail.
+// Falls back to main-frame-only if allFrames injection is unavailable.
 async function captureTab(tabId) {
-  await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-  return chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_CONTENT' });
+  let targets;
+  try {
+    targets = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      files: ['content.js'],
+    });
+  } catch (_) {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    return chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_CONTENT' });
+  }
+
+  const frameIds = [...new Set(
+    (targets || []).map(r => r.frameId).filter(id => id != null)
+  )];
+  if (frameIds.length === 0) {
+    return { error: 'No frames available to capture.' };
+  }
+
+  const responses = await Promise.all(frameIds.map(frameId =>
+    new Promise(resolve => {
+      try {
+        chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_CONTENT' }, { frameId }, response => {
+          resolve(chrome.runtime.lastError ? null : response);
+        });
+      } catch (_) { resolve(null); }
+    })
+  ));
+
+  let best = null;
+  let bestScore = -Infinity;
+  for (const r of responses) {
+    const s = scoreCaptureResult(r);
+    if (s > bestScore) { bestScore = s; best = r; }
+  }
+  return best || { error: 'Could not extract content from the page.' };
+}
+
+// Scores a CAPTURE_CONTENT response so the frame with real job content wins.
+function scoreCaptureResult(result) {
+  if (!result || result.error) return -Infinity;
+  if (result.usedSelection) return 10000;
+  if (result.usedIndeedViewJobFetch) return 5000;
+  let score = 0;
+  if (result.usedDetailContainer && result.detailContainerScore) {
+    score += 1000 + (result.detailContainerScore || 0);
+  }
+  const text = result.pageText || '';
+  if (/^job\s*title\s*[:\-]/im.test(text))                    score += 500;
+  if (/\bresponsibilities\b/i.test(text))                      score += 100;
+  if (/\b(?:qualifications?|requirements?)\b/i.test(text))     score += 100;
+  if (/\b(?:full|part)[- ]?time\b/i.test(text))                score += 50;
+  score += Math.min(200, text.length / 50);
+  return score;
 }
 
 function capSessionScanText(value) {
