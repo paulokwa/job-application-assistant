@@ -22,16 +22,18 @@ export function extractJobFields(rawText, url) {
   let companySource = '';
 
   const titlePatterns = [
-    /^job\s*title[:\-–]?\s*(.+)$/i,
-    /^position[:\-–]?\s*(.+)$/i,
-    /^role[:\-–]?\s*(.+)$/i,
-    /^vacancy[:\-–]?\s*(.+)$/i,
-    /^posting\s*title[:\-–]?\s*(.+)$/i,
+    /^job\s*title\s*[:\-–]\s*(.+)$/i,
+    /^position\s*[:\-–]\s*(.+)$/i,
+    /^role\s*[:\-–]\s*(.+)$/i,
+    /^vacancy\s*[:\-–]\s*(.+)$/i,
+    /^posting\s*title\s*[:\-–]\s*(.+)$/i,
   ];
   const companyPatterns = [
-    /^(?:company|employer|organization|department|ministry|agency|branch)[:\-–]?\s*(.+)$/i,
-    /^(?:employer|hiring\s*organization)[:\-–]?\s*(.+)$/i,
+    /^(?:company|employer|organization|department|ministry|agency|branch)\s*[:\-–]\s*(.+)$/i,
+    /^(?:employer|hiring\s+organization)\s*[:\-–]\s*(.+)$/i,
   ];
+
+  const NAV_RE = /^(?:home|menu|skip\s+to\s+content|skip\s+to\s+main|back|search|login|sign\s*(?:in|up|out)?|register|contact\s+us|about|careers?|jobs?(?:\s+(?:board|portal|search|listing|near\s+me))?|resources|employers|job\s+seekers?|online\s+portal|fran[çc]ais|english|apply\s+now|apply\s+online|share|save|print|download|follow\s+us|connect|newsletter|privacy|terms|accessibility|sitemap|browse|view\s+all|see\s+all|show\s+all|categories?|locations?|tags?|filters?|sort\s+by|refine|more\s+info|learn\s+more|read\s+more|continue|close|expand|collapse|toggle|subscribe|submit|send|cancel|reset|next|previous|go\s+back|return|open|select|choose|agree|disagree|accept|decline|yes|no|ok|okay|got\s+it|dismiss|hide|show|switch|change|update|delete|remove|add|create|new|edit|manage|settings|help|support|faq|feedback|report|flag|block|unfollow|follow|like|favorite|bookmark|email|call|chat|visit|explore|discover|start|begin|welcome|thank|congratul|sorry|error|warning|notic|alert|loading|processing|please\s+wait|no\s+results|no\s+posts|no\s+jobs|empty|0\s+results|copyright|©|\d{4}\s)/i;
 
   for (const line of lines) {
     if (!jobTitle) {
@@ -49,9 +51,24 @@ export function extractJobFields(rawText, url) {
     if (jobTitle && company) break;
   }
 
-  // Fallback: first meaningful line as job title
+  // Heading-style fallback: short capitalized line without colon, not nav text
   if (!jobTitle) {
-    const firstMeaningfulLine = lines.find(l => l.length > 8 && l.length < 120 && !/^(home|menu|skip|search|login|sign)/i.test(l));
+    const headingCandidate = lines.find(l =>
+      l.length >= 4 &&
+      l.length <= 100 &&
+      !NAV_RE.test(l) &&
+      !/[:\-–]/.test(l) &&
+      /^[A-Z0-9][\w\s&\/,\-.']+$/.test(l)
+    );
+    if (headingCandidate) {
+      jobTitle = headingCandidate;
+      jobTitleSource = 'heading';
+    }
+  }
+
+  // Generic fallback: first meaningful line as job title (with expanded nav rejection)
+  if (!jobTitle) {
+    const firstMeaningfulLine = lines.find(l => l.length > 8 && l.length < 120 && !NAV_RE.test(l));
     if (firstMeaningfulLine) {
       jobTitle = firstMeaningfulLine;
       jobTitleSource = 'fallback';
@@ -65,7 +82,7 @@ export function extractJobFields(rawText, url) {
     description: rawText,
     jobTitleSource,
     companySource,
-    needsReview: !jobTitle || !company || jobTitleSource === 'fallback' || !companySource,
+    needsReview: !jobTitle || !company || jobTitleSource === 'fallback' || jobTitleSource === 'heading' || !companySource,
   };
 }
 
