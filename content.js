@@ -279,13 +279,32 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           // dashboard logic — this only affects the pageText fallback path.
           const indeedResult = selectedText ? null : await fetchIndeedSelectedJob(location.href);
           const detailResult = indeedResult ? null : findBestJobDetailContainer(document);
-          const pageText = detailResult
+          let pageText = detailResult
             ? (detailResult.el.innerText || '')
             : indeedResult
               ? indeedResult.pageText
             : (document.body.innerText || '');
 
           const title = document.title || '';
+
+          // Prepend page heading and title to help extraction find the job title
+          // even when the best detail container excludes the page header.
+          try {
+            const pageHeadingParts = [];
+            const h1El = document.querySelector('h1');
+            if (h1El) {
+              const h1Text = (h1El.textContent || '').replace(/\s+/g, ' ').trim();
+              if (h1Text && h1Text.length >= 4) pageHeadingParts.push(h1Text);
+            }
+            if (title && title.length >= 4) pageHeadingParts.push(title);
+            if (pageHeadingParts.length > 0) {
+              const headingBlock = pageHeadingParts.join('\n');
+              if (!pageText.startsWith(headingBlock)) {
+                pageText = headingBlock + '\n\n' + pageText;
+              }
+            }
+          } catch (_) {}
+
           const url = indeedResult?.url || location.href;
 
           // Collect JSON-LD structured data for job-page detection.

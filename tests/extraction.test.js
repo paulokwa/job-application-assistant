@@ -210,5 +210,33 @@ test('dash variants in labels are handled', () => {
   assert.equal(r.company, 'Acme');
 });
 
+test('Current Open Positions rejected by NAV_RE', () => {
+  const r = extractJobFields('Current Open Positions\nJob Description\nResponsibilities\nQualifications', '');
+  assert.ok(r.jobTitle !== 'Current Open Positions', `Should not pick Current Open Positions, got '${r.jobTitle}'`);
+});
+
+test('Responsibilities heading rejected by NAV_RE', () => {
+  const r = extractJobFields('Home\nResponsibilities\nAdministrative Clerk\nContact Us', '');
+  assert.equal(r.jobTitle, 'Administrative Clerk');
+  assert.equal(r.jobTitleSource, 'heading');
+});
+
+test('Qualifications heading rejected by NAV_RE', () => {
+  const r = extractJobFields('Home\nQualifications\nAdministrative Clerk\nContact Us', '');
+  assert.equal(r.jobTitle, 'Administrative Clerk');
+  assert.equal(r.jobTitleSource, 'heading');
+});
+
+test('What You heading rejected by NAV_RE', () => {
+  const r = extractJobFields('Home\nWhat You will Do\nAdministrative Clerk\nContact Us', '');
+  assert.equal(r.jobTitle, 'Administrative Clerk');
+  assert.equal(r.jobTitleSource, 'heading');
+});
+
+test('h1 prepend scenario finds title from heading', () => {
+  const r = extractJobFields('Administrative Assistant\nAdministrative Assistant - Advantage Personnel\n\nCurrent Open Positions\nResponsibilities:\nAnswer phone calls\nDuties:\nFiling documents', '');
+  assert.equal(r.jobTitle, 'Administrative Assistant');
+});
+
 console.log(`\nResults: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
