@@ -238,5 +238,30 @@ test('h1 prepend scenario finds title from heading', () => {
   assert.equal(r.jobTitle, 'Administrative Assistant');
 });
 
+test('Advantage Personnel layout extracts correct job title and rejects lets get started / select language', () => {
+  const text = `Select Language​▼\nAdministrative Assistant\nBackShareLets get started!\nJob Title: Administrative Assistant\nLocation: Halifax, NS\nJob Type: Part-Time\nPay Rate: $22.00/hr\nCompany: Advantage Personnel`;
+  const r = extractJobFields(text, '');
+  assert.equal(r.jobTitle, 'Administrative Assistant');
+  assert.equal(r.company, 'Advantage Personnel');
+  assert.equal(r.jobTitleSource, 'pattern');
+});
+
+test('split-line title label matches value on next line', () => {
+  const text = `Job Title\nAdministrative Assistant\nCompany\nAdvantage Personnel`;
+  const r = extractJobFields(text, '');
+  assert.equal(r.jobTitle, 'Administrative Assistant');
+  assert.equal(r.company, 'Advantage Personnel');
+  assert.equal(r.jobTitleSource, 'pattern');
+});
+
+test('split-line title label ignores next line if it is navigation', () => {
+  const text = `Job Title\nContact Us\nAdministrative Assistant\nCompany\nAdvantage Personnel`;
+  const r = extractJobFields(text, '');
+  // Since 'Contact Us' is in NAV_RE, split-line check should reject it.
+  // The title will then fallback to heading-style 'Administrative Assistant'.
+  assert.equal(r.jobTitle, 'Administrative Assistant');
+  assert.equal(r.jobTitleSource, 'heading');
+});
+
 console.log(`\nResults: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

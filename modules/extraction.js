@@ -21,6 +21,7 @@ export function extractJobFields(rawText, url) {
   let jobTitleSource = '';
   let companySource = '';
 
+  // Inline label patterns — match "Job Title: Administrative Assistant" on one line
   const titlePatterns = [
     /^job\s*title\s*[:\-–]\s*(.+)$/i,
     /^position\s*[:\-–]\s*(.+)$/i,
@@ -28,13 +29,26 @@ export function extractJobFields(rawText, url) {
     /^vacancy\s*[:\-–]\s*(.+)$/i,
     /^posting\s*title\s*[:\-–]\s*(.+)$/i,
   ];
+  // Split-line label patterns — match "Job Title:" alone on a line (value on the next line)
+  const titleLabelOnly = [
+    /^job\s*title\s*[:\-–]?\s*$/i,
+    /^position\s*[:\-–]?\s*$/i,
+    /^role\s*[:\-–]?\s*$/i,
+    /^vacancy\s*[:\-–]?\s*$/i,
+    /^posting\s*title\s*[:\-–]?\s*$/i,
+  ];
   const companyPatterns = [
     /^(?:company|employer|organization|department|ministry|agency|branch)\s*[:\-–]\s*(.+)$/i,
     /^(?:employer|hiring\s+organization)\s*[:\-–]\s*(.+)$/i,
   ];
+  const companyLabelOnly = [
+    /^(?:company|employer|organization|department|ministry|agency|branch)\s*[:\-–]?\s*$/i,
+    /^(?:employer|hiring\s+organization)\s*[:\-–]?\s*$/i,
+  ];
 
-  const NAV_RE = /^(?:home|menu|skip\s+to\s+content|skip\s+to\s+main|back|search|login|sign\s*(?:in|up|out)?|register|contact\s+us|about|careers?|current\s+open|jobs?(?:\s+(?:board|portal|search|listing|near\s+me))?|resources|employers|job\s+seekers?|online\s+portal|fran[çc]ais|english|apply\s+now|apply\s+online|share|save|print|download|follow\s+us|connect|newsletter|privacy|terms|accessibility|sitemap|browse|view\s+all|see\s+all|show\s+all|categories?|locations?|tags?|filters?|sort\s+by|refine|more\s+info|learn\s+more|read\s+more|continue|close|expand|collapse|toggle|subscribe|submit|send|cancel|reset|next|previous|go\s+back|return|open|select|choose|agree|disagree|accept|decline|yes|no|ok|okay|got\s+it|dismiss|hide|show|switch|change|update|delete|remove|add|create|new|edit|manage|settings|help|support|faq|feedback|report|flag|block|unfollow|follow|like|favorite|bookmark|email|call|chat|visit|explore|discover|start|begin|welcome|thank|congratul|sorry|error|warning|notic|alert|loading|processing|please\s+wait|no\s+results|no\s+posts|no\s+jobs|empty|0\s+results|copyright|©|responsibilities|qualifications|requirements|what\s+you|\d{4}\s)/i;
+  const NAV_RE = /^(?:home|menu|skip\s+to\s+content|skip\s+to\s+main|back|search|login|sign\s*(?:in|up|out)?|register|contact\s+us|about|careers?|current\s+open|jobs?(?:\s+(?:board|portal|search|listing|near\s+me))?|resources|employers|job\s+seekers?|online\s+portal|fran[çc]ais|english|apply(?:\s+(?:now|online|here))?|share|save|print|download|follow\s+us|connect|newsletter|privacy|terms|accessibility|sitemap|browse|view\s+all|see\s+all|show\s+all|categories?|locations?|tags?|filters?|sort\s+by|refine|more\s+info|learn\s+more|read\s+more|continue|close|expand|collapse|toggle|subscribe|submit|send|cancel|reset|next|previous|go\s+back|return|open|select|choose|agree|disagree|accept|decline|yes|no|ok|okay|got\s+it|dismiss|hide|show|switch|change|update|delete|remove|add|create|new|edit|manage|settings|help|support|faq|feedback|report|flag|block|unfollow|follow|like|favorite|bookmark|email|call|chat|visit|explore|discover|start|begin|welcome|thank|congratul|sorry|error|warning|notic|alert|loading|processing|please\s+wait|no\s+results|no\s+posts|no\s+jobs|empty|0\s+results|copyright|©|responsibilities|qualifications|requirements|what\s+you|let'?s\s+get\s+started|get\s+started|select\s+language|\d{4}\s)/i;
 
+  // Pass 1 — inline label patterns (label and value on the same line)
   for (const line of lines) {
     if (!jobTitle) {
       for (const pat of titlePatterns) {
@@ -49,6 +63,33 @@ export function extractJobFields(rawText, url) {
       }
     }
     if (jobTitle && company) break;
+  }
+
+  // Pass 2 — split-line label patterns (label on one line, value on the next)
+  if (!jobTitle || !company) {
+    for (let i = 0; i < lines.length - 1; i++) {
+      const line = lines[i];
+      const nextLine = lines[i + 1];
+      if (!jobTitle) {
+        for (const pat of titleLabelOnly) {
+          if (pat.test(line) && nextLine && nextLine.length >= 2 && !NAV_RE.test(nextLine)) {
+            jobTitle = nextLine;
+            jobTitleSource = 'pattern';
+            break;
+          }
+        }
+      }
+      if (!company) {
+        for (const pat of companyLabelOnly) {
+          if (pat.test(line) && nextLine && nextLine.length >= 2 && !NAV_RE.test(nextLine)) {
+            company = nextLine;
+            companySource = 'pattern';
+            break;
+          }
+        }
+      }
+      if (jobTitle && company) break;
+    }
   }
 
   // Heading-style fallback: short capitalized line without colon, not nav text
