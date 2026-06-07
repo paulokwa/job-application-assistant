@@ -677,6 +677,7 @@ async function init() {
 
   window.addEventListener('message', e => {
     if (e.data?.type === 'START_JOBS_TOUR') startJobsTour({ markSeen: true });
+    if (e.data?.type === 'JPDA_SCROLL_TO_JOB' && e.data.id) scrollToJob(e.data.id);
   });
   document.getElementById('jobs-tour-btn-skip').addEventListener('click', endJobsTour);
   document.getElementById('jobs-tour-btn-prev').addEventListener('click', () => {
@@ -806,6 +807,14 @@ async function init() {
       await refreshJobs();
     }
   });
+}
+
+function scrollToJob(id) {
+  const card = document.querySelector(`.job-card[data-id="${CSS.escape(id)}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('job-card--highlight');
+  setTimeout(() => card.classList.remove('job-card--highlight'), 2000);
 }
 
 init();

@@ -287,6 +287,15 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+.job-card--highlight {
+  animation: job-card-highlight 2s ease-out forwards;
+}
+@keyframes job-card-highlight {
+  0%   { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-subtle); }
+  60%  { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-subtle); }
+  100% { border-color: var(--color-border); box-shadow: var(--shadow-card); }
+}
+
 .job-card-main {
   display: flex;
   align-items: flex-start;
