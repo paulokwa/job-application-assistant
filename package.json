@@ -9,7 +9,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test:unit": "node tests/profileProposalApply.test.js && node tests/jobChatProfileProposal.test.js && node tests/profileRoundTrip.test.js && node tests/autofillMatcher.test.js && node tests/pdfImport.test.js",
+    "test:unit": "node tests/extraction.test.js && node tests/profileProposalApply.test.js && node tests/jobChatProfileProposal.test.js && node tests/profileRoundTrip.test.js && node tests/autofillMatcher.test.js && node tests/pdfImport.test.js",
     "test:smoke": "playwright test tests/smoke/profile-apply.spec.js",
     "test:smoke:headed": "playwright test tests/smoke/profile-apply.spec.js --headed",
     "test": "npm run test:unit && npm run test:smoke"

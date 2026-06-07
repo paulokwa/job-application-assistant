@@ -2148,10 +2148,10 @@ function maybeShowScannedJobInfoReview(fields, jobTitle, company) {
   showJobInfoReviewNotice('Review Job Title and Employer before saving or analyzing. Page scans can miss these fields. Use AI suggest fields for a second pass.');
 }
 
-function jobInfoSuggestionReview(info) {
+function jobInfoSuggestionReview(info, currentTitle = '', currentCompany = '') {
   return [
-    { label: 'Job title', value: info.jobTitle || '(no title found)' },
-    { label: 'Employer', value: info.company || '(no employer found)' },
+    { label: 'Job title', value: info.jobTitle || currentTitle || '(no title found)' },
+    { label: 'Employer', value: info.company || currentCompany || '(no employer found)' },
   ];
 }
 
@@ -2161,7 +2161,7 @@ async function confirmAiJobInfoSuggestions(info) {
     'Review the detected details before applying.',
     {
       primaryLabel: 'Apply',
-      reviewDetails: jobInfoSuggestionReview(info),
+      reviewDetails: jobInfoSuggestionReview(info, dom.fieldTitle.value.trim(), dom.fieldCompany.value.trim()),
     }
   ).then(result => result === 'primary');
 }
@@ -2175,7 +2175,7 @@ async function confirmScannedAiJobInfoSuggestions(info, alreadySeen = null) {
     {
       secondaryLabel: 'Apply',
       primaryLabel: 'Apply + Fit Check',
-      reviewDetails: alreadySeenReviewDetails(alreadySeen, jobInfoSuggestionReview(info)),
+      reviewDetails: alreadySeenReviewDetails(alreadySeen, jobInfoSuggestionReview(info, dom.fieldTitle.value.trim(), dom.fieldCompany.value.trim())),
     }
   );
 }
