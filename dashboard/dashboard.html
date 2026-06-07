@@ -116,6 +116,23 @@
     <!-- ─── LEFT COLUMN ──────────────────────────── -->
     <div id="left-col">
 
+      <!-- Collapse/expand toggle (panel mode only) -->
+      <button id="btn-toggle-left-col"
+              class="btn-toggle-left-col"
+              type="button"
+              aria-expanded="true"
+              aria-controls="left-col"
+              aria-label="Collapse setup">
+        <span class="btn-toggle-left-col-collapse" aria-hidden="true">‹ Collapse setup</span>
+        <span class="btn-toggle-left-col-expand" aria-hidden="true">›</span>
+      </button>
+      <div class="left-col-rail-labels" aria-hidden="true">
+        <span>Job</span>
+        <span>Desc</span>
+        <span>Auto</span>
+        <span>Gen</span>
+      </div>
+
       <!-- Job Info Card -->
       <section class="card workflow-section" id="card-job-info">
         <div class="card-header">
@@ -246,7 +263,7 @@
       <!-- Draft Preview Card -->
       <section class="card workflow-section tool-card tool-card--review" id="card-drafts">
         <div class="card-header preview-card-header">
-          <span class="card-title">Preview</span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">4</span> Preview</span>
           <div class="tab-bar" role="tablist" aria-label="Document preview">
             <button class="tab-btn active" data-tab="resume" role="tab" aria-selected="true" aria-controls="tab-resume">Resume</button>
             <button class="tab-btn" data-tab="cover-letter" role="tab" aria-selected="false" aria-controls="tab-cover-letter">Cover Letter</button>
@@ -299,6 +316,8 @@
               </div>
             </div>
           </details>
+          <button id="btn-preview-expand" class="btn-preview-expand" type="button" title="Expand preview" aria-label="Expand preview to full panel">⤢</button>
+          <button id="btn-preview-close" class="btn-preview-close" type="button" aria-label="Collapse preview">✕ Close</button>
         </div>
         <div class="preview-review-nudge" role="note">
           AI draft — review facts, dates, titles, and claims before submitting.
@@ -359,7 +378,7 @@
       <!-- Revision Card -->
       <section class="card workflow-section tool-card tool-card--improve" id="card-revision">
         <div class="card-header">
-          <span class="card-title">Refine</span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">5</span> Refine</span>
         </div>
         <textarea
           id="field-revision"
@@ -412,7 +431,7 @@
       <!-- Save Card -->
       <section class="card workflow-section tool-card tool-card--apply" id="card-save">
         <div class="card-header">
-          <span class="card-title">Save as PDF</span>
+          <span class="card-title"><span class="step-badge" aria-hidden="true">6</span> Save as PDF</span>
         </div>
         <div class="ai-review-warning" role="note">
           AI-generated content — review all facts, dates, job titles, and claims carefully before submitting. You are responsible for the accuracy of your application.

@@ -247,6 +247,7 @@ const state = {
   jobChat: { messages: [], jobSignature: '' },
   profileUndoSnapshot: null,
   profileChangeStale: null,
+  appPreferences: {},
 };
 
 let currentAbortController = null;
@@ -483,6 +484,11 @@ const dom = {
 
   rightCol:            $('right-col'),
   outputPlaceholder:   $('output-placeholder'),
+  leftCol:             $('left-col'),
+
+  btnPreviewExpand:    $('btn-preview-expand'),
+  btnPreviewClose:     $('btn-preview-close'),
+  btnToggleLeftCol:    $('btn-toggle-left-col'),
 
   // Job Discussion Chat
   btnChat:             $('btn-chat'),
@@ -1634,11 +1640,12 @@ async function init() {
   await populateProfileStrip();
 
   const [localData, syncData, scopedDraft] = await Promise.all([
-    chrome.storage.local.get([...SOURCE_RESUME_KEYS, AI_PROVIDER_SETUP_SAVED_KEY, 'theme']),
-    chrome.storage.sync.get(['docSettings']),
+    chrome.storage.local.get([...SOURCE_RESUME_KEYS, AI_PROVIDER_SETUP_SAVED_KEY, 'theme', 'leftColCollapsed']),
+    chrome.storage.sync.get(['docSettings', 'appPreferences']),
     loadScopedSavedDraft(),
   ]);
   state.docSettings = syncData.docSettings || {};
+  state.appPreferences = syncData.appPreferences || {};
   applyTheme(localData.theme || 'system');
   setSourceResumeState(localData);
   const aiProviderSetupComplete = localData[AI_PROVIDER_SETUP_SAVED_KEY] || hasExistingAiProviderSetup(state.settings);
@@ -1648,6 +1655,11 @@ async function init() {
 
   if (state.settings?.provider === 'mock') {
     dom.mockBanner.classList.remove('hidden');
+  }
+
+  // Restore collapsed left column (panel mode only)
+  if (dashboardMode === 'panel' && localData.leftColCollapsed) {
+    collapseLeftCol(false);
   }
 
   bindEvents();
@@ -2972,8 +2984,9 @@ function bindEvents() {
     state.settings = await loadSettings();
     state.profile  = await loadProfile();
     await refreshSourceResumeState();
-    const { docSettings: refreshedDoc } = await chrome.storage.sync.get(['docSettings']);
+    const { docSettings: refreshedDoc, appPreferences: refreshedPrefs } = await chrome.storage.sync.get(['docSettings', 'appPreferences']);
     state.docSettings = refreshedDoc || {};
+    state.appPreferences = refreshedPrefs || {};
     dom.mockBanner.classList.toggle('hidden', state.settings?.provider !== 'mock');
     await populateProfileStrip();
     if (state.autofillFields.length > 0) {
@@ -3129,6 +3142,25 @@ function bindEvents() {
     syncJobChatToCurrentJob();
     refreshJobChatEntryPoints();
   });
+
+  // Preview expand / collapse
+  dom.btnPreviewExpand?.addEventListener('click', expandPreview);
+  dom.btnPreviewClose?.addEventListener('click', collapsePreview);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.body.classList.contains('preview-expanded')) {
+      collapsePreview();
+    }
+  });
+
+  // Collapsible left column (panel mode only)
+  dom.btnToggleLeftCol?.addEventListener('click', () => {
+    if (dom.leftCol?.classList.contains('left-col-collapsed')) {
+      expandLeftCol();
+    } else {
+      collapseLeftCol(true);
+    }
+  });
+  dom.leftCol?.querySelector('.left-col-rail-labels')?.addEventListener('click', expandLeftCol);
 }
 
 // ── Core Logic ────────────────────────────────────────────────────────────
@@ -3384,6 +3416,11 @@ async function runGeneration(mode) {
     state.generationReceipt = createGenerationReceipt(mode, generationStartedAt, Date.now());
     renderGenerationReceipt();
     showToast('✦ Drafts ready.');
+
+    // Auto-expand preview in panel mode when user preference is set (or default on)
+    if (dashboardMode === 'panel' && state.appPreferences.autoExpandPreview !== false) {
+      expandPreview();
+    }
 
     // Persist so draft survives the panel being closed and reopened. If quota
     // fails, the in-memory draft remains usable for export in the current view.
@@ -6058,6 +6095,8 @@ function isDashboardTourTargetAvailable(selector) {
 
 function startTour() {
   dom.settingsView.classList.remove('visible');
+  // Ensure left column is visible so tour targets are reachable
+  if (dashboardMode === 'panel') expandLeftCol();
   currentTourSteps = TOUR_STEPS.filter(step => isDashboardTourTargetAvailable(step.target));
   if (!currentTourSteps.length) return;
   tourIndex = 0;
@@ -6168,6 +6207,36 @@ function tourKeyHandler(e) {
   if (e.key === 'Escape') endTour();
   if (e.key === 'ArrowRight' && tourIndex < currentTourSteps.length - 1) showTourStep(tourIndex + 1);
   if (e.key === 'ArrowLeft'  && tourIndex > 0) showTourStep(tourIndex - 1);
+}
+
+// ── Preview Expand / Collapse ─────────────────────────────────────────────
+
+function expandPreview() {
+  document.body.classList.add('preview-expanded');
+  dom.btnPreviewExpand?.setAttribute('aria-expanded', 'true');
+  dom.btnPreviewClose?.focus();
+}
+
+function collapsePreview() {
+  document.body.classList.remove('preview-expanded');
+  dom.btnPreviewExpand?.setAttribute('aria-expanded', 'false');
+  dom.btnPreviewExpand?.focus();
+}
+
+// ── Collapsible Left Column ───────────────────────────────────────────────
+
+function collapseLeftCol(persist = true) {
+  if (!dom.leftCol) return;
+  dom.leftCol.classList.add('left-col-collapsed');
+  dom.btnToggleLeftCol?.setAttribute('aria-expanded', 'false');
+  if (persist) chrome.storage.local.set({ leftColCollapsed: true }).catch(() => {});
+}
+
+function expandLeftCol() {
+  if (!dom.leftCol) return;
+  dom.leftCol.classList.remove('left-col-collapsed');
+  dom.btnToggleLeftCol?.setAttribute('aria-expanded', 'true');
+  chrome.storage.local.set({ leftColCollapsed: false }).catch(() => {});
 }
 
 // Start app

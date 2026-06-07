@@ -21,6 +21,7 @@ import { mergeProfileFormData } from '../modules/profileRoundTrip.js';
 let profile = null;
 let settings = {};
 let docSettings = {};
+let appPreferences = {};
 let profileDirty = false;
 let autofillStatusTimers = [];
 
@@ -196,10 +197,11 @@ async function init() {
   // Load saved data
   const [providerSettings, stored] = await Promise.all([
     loadProviderSettings(),
-    chrome.storage.sync.get(['docSettings']),
+    chrome.storage.sync.get(['docSettings', 'appPreferences']),
   ]);
   settings = providerSettings;
   docSettings = stored.docSettings || { templateMode: 'smart' };
+  appPreferences = stored.appPreferences || {};
   profile = await loadProfile();
   if (hasExistingAiProviderSetup(settings)) {
     chrome.storage.local.set({ [AI_PROVIDER_SETUP_SAVED_KEY]: true });
@@ -208,6 +210,7 @@ async function init() {
   // Populate sections
   populateProviderSection(settings);
   populateDocSection(docSettings);
+  populatePreferencesSection(appPreferences);
   populateProfile(profile);
   setProfileDirty(false);
   await populateSourceStatus();
@@ -223,6 +226,7 @@ async function init() {
   // Wiring
   $('btn-save-provider').addEventListener('click', saveProvider);
   $('btn-save-documents').addEventListener('click', saveDocuments);
+  $('btn-save-preferences').addEventListener('click', savePreferences);
   $('btn-save-profile').addEventListener('click', saveProfileData);
   $('btn-clear-profile').addEventListener('click', clearProfile);
   $('btn-remove-source-resume').addEventListener('click', removeSourceResume);
@@ -866,6 +870,30 @@ async function saveDocuments() {
   btn.disabled = true;
   setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
   showToast('✅ Document settings saved');
+}
+
+// ── Preferences ──────────────────────────────────────────────────────────
+
+function populatePreferencesSection(prefs) {
+  const chk = $('pref-auto-expand-preview');
+  if (chk) chk.checked = prefs.autoExpandPreview !== false;
+}
+
+async function savePreferences() {
+  appPreferences.autoExpandPreview = $('pref-auto-expand-preview')?.checked !== false;
+  try {
+    await chrome.storage.sync.set({ appPreferences });
+  } catch (err) {
+    console.warn('Could not save preferences:', err?.message || err);
+    showToast('Could not save preferences.');
+    return;
+  }
+  const btn = $('btn-save-preferences');
+  const original = btn.textContent;
+  btn.textContent = '✓ Saved';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
+  showToast('✅ Preferences saved');
 }
 
 // ── Source Resume & Profile ───────────────────────────────────────────────

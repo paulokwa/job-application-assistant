@@ -27,6 +27,7 @@
       <button class="nav-btn" data-section="documents">Documents</button>
       <button class="nav-btn" data-section="profiles">Manage Profiles</button>
       <button class="nav-btn" data-section="profile">My Profile</button>
+      <button class="nav-btn" data-section="preferences">Preferences</button>
       <button class="nav-btn" data-section="feedback">Help & Feedback</button>
       <button id="btn-settings-tour" class="settings-tour-btn" title="Take a tour of Settings" aria-label="Start settings tour">?</button>
     </nav>
@@ -366,6 +367,24 @@
     <!-- ══════════════════════════════════════════
          SECTION: HELP & FEEDBACK
     ══════════════════════════════════════════ -->
+    <!-- ══════════════════════════════════════════
+         PREFERENCES SECTION
+         ══════════════════════════════════════════ -->
+    <section id="section-preferences" class="settings-section" aria-labelledby="preferences-heading">
+      <h2 class="section-title" id="preferences-heading">Preferences</h2>
+      <p class="section-desc">Customize dashboard behavior.</p>
+      <div class="card">
+        <div class="form-row">
+          <label class="checkbox-row" for="pref-auto-expand-preview">
+            <input type="checkbox" id="pref-auto-expand-preview" checked />
+            <span>Auto-expand preview after generation</span>
+          </label>
+          <p class="field-hint">When enabled, the preview panel expands to full screen automatically after each draft is generated.</p>
+        </div>
+      </div>
+      <button class="btn-save-section" id="btn-save-preferences">Save Preferences</button>
+    </section>
+
     <section id="section-feedback" class="settings-section" aria-labelledby="feedback-heading">
       <h2 class="section-title" id="feedback-heading">Help & Feedback</h2>
       <p class="section-desc">Send a bug report, feature idea, or general note. This opens your email app with a prefilled message.</p>

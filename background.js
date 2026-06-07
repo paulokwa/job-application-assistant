@@ -178,6 +178,7 @@ async function openSidePanelForTab(tab) {
 
 async function toggleSidePanelForTab(tab) {
   if (!tab?.id) return;
+  if (tab.url?.startsWith(chrome.runtime.getURL('dashboard/'))) return;
 
   if (chrome.sidePanel.close && isSidePanelOpen(tab.id)) {
     try {
@@ -226,6 +227,7 @@ chrome.action.onClicked.addListener((tab) => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== 'jpda-main') return;
+  if (tab.url?.startsWith(chrome.runtime.getURL('dashboard/'))) return;
 
   // 1. OPEN SIDE PANEL IMMEDIATELY (must be synchronous inside the user gesture handler)
   openSidePanelForTab(tab).catch(err => console.error('Failed to open side panel via context menu:', err?.message || err));
