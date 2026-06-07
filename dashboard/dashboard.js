@@ -2185,6 +2185,8 @@ async function confirmAiJobInfoSuggestions(info) {
 }
 
 async function confirmScannedAiJobInfoSuggestions(info, alreadySeen = null) {
+  const descQuality = checkDescriptionQuality(dom.fieldDesc.value);
+  const fitCheckBlocked = descQuality !== 'ok';
   return showChoiceDialog(
     'Apply AI field suggestions?',
     alreadySeen
@@ -2193,6 +2195,8 @@ async function confirmScannedAiJobInfoSuggestions(info, alreadySeen = null) {
     {
       secondaryLabel: 'Apply',
       primaryLabel: 'Apply + Fit Check',
+      primaryDisabled: fitCheckBlocked,
+      primaryDisabledTitle: 'Add more of the job description before running Fit Check.',
       reviewDetails: alreadySeenReviewDetails(alreadySeen, jobInfoSuggestionReview(info, dom.fieldTitle.value.trim(), dom.fieldCompany.value.trim())),
     }
   );
@@ -3883,7 +3887,7 @@ function showConfirmDialog(title, body, confirmLabel = 'Continue') {
     .then(result => result === 'primary');
 }
 
-function showChoiceDialog(title, body, { primaryLabel = 'Continue', secondaryLabel = '', reviewDetails = [] } = {}) {
+function showChoiceDialog(title, body, { primaryLabel = 'Continue', secondaryLabel = '', reviewDetails = [], primaryDisabled = false, primaryDisabledTitle = '' } = {}) {
   return new Promise(resolve => {
     const overlay   = document.getElementById('confirm-overlay');
     const btnOk     = document.getElementById('confirm-btn-ok');
@@ -3912,6 +3916,8 @@ function showChoiceDialog(title, body, { primaryLabel = 'Continue', secondaryLab
       review.appendChild(row);
     });
     btnOk.textContent = primaryLabel;
+    btnOk.disabled = primaryDisabled;
+    btnOk.title = primaryDisabled ? primaryDisabledTitle : '';
     btnSecondary.textContent = secondaryLabel;
     btnSecondary.classList.toggle('hidden', !secondaryLabel);
     overlay.classList.remove('hidden');
@@ -3919,6 +3925,8 @@ function showChoiceDialog(title, body, { primaryLabel = 'Continue', secondaryLab
 
     const cleanup = result => {
       overlay.classList.add('hidden');
+      btnOk.disabled = false;
+      btnOk.title = '';
       overlay.removeEventListener('click', onBackdrop);
       btnOk.removeEventListener('click', onOk);
       btnSecondary.removeEventListener('click', onSecondary);
