@@ -42,7 +42,7 @@
   --workspace-gap:          12px;
   --workspace-panel-width:  320px;
   --tool-rail-width:        280px;
-  --document-max-width:     850px;
+  --document-max-width:     min(850px, 100%);
 
   /* Semantic */
   --color-success:         oklch(56% 0.13 145);
@@ -596,8 +596,8 @@ body {
 
 /* Full-page document workspace */
 :root[data-dashboard-mode="full"] #app-main {
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 320px);
-  grid-template-rows: auto auto auto minmax(80px, auto) auto minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(260px, 320px);
+  grid-template-rows: auto auto auto minmax(80px, auto) minmax(48px, auto) minmax(0, 1fr);
   align-items: start;
   gap: 14px;
   padding: 14px;
@@ -606,7 +606,16 @@ body {
 }
 
 :root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) {
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 320px);
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-rows: auto;
+}
+
+:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) #card-job-info,
+:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) #card-job-desc,
+:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) #card-generate,
+:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) #card-application-form {
+  grid-column: 1;
+  grid-row: auto;
 }
 
 :root[data-dashboard-mode="full"] #left-col,
@@ -632,12 +641,11 @@ body {
 :root[data-dashboard-mode="full"] #card-application-form {
   grid-column: 3;
   grid-row: 5;
-  margin-top: 64px;
 }
 
 :root[data-dashboard-mode="full"] .tool-group--review {
   grid-column: 2;
-  grid-row: 1 / span 6;
+  grid-row: 1 / -1;
   align-self: stretch;
   min-height: 0;
 }
@@ -730,15 +738,35 @@ body {
   min-height: 92px;
 }
 
-@media (max-width: 1120px) {
+@media (min-width: 1440px) {
   :root[data-dashboard-mode="full"] #app-main {
-    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(240px, 290px);
-    gap: 12px;
-    padding: 12px;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(300px, 340px);
+    gap: 16px;
+    padding: 16px;
   }
 
   :root[data-dashboard-mode="full"] #card-drafts .draft-preview-wrapper {
-    padding: 34px 18px 18px;
+    padding: 40px 32px 32px;
+  }
+
+  :root[data-dashboard-mode="full"] .tool-group--improve {
+    max-height: min(580px, 62vh);
+  }
+}
+
+@media (max-width: 1120px) {
+  :root[data-dashboard-mode="full"] #app-main {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(240px, 280px);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  :root[data-dashboard-mode="full"] .tool-group--improve {
+    max-height: min(460px, 52vh);
+  }
+
+  :root[data-dashboard-mode="full"] #card-drafts .draft-preview-wrapper {
+    padding: 32px 16px 16px;
   }
 }
 
