@@ -529,6 +529,52 @@ body {
   gap: 10px;
 }
 
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tool-group--review {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+
+.tool-group-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px;
+  color: var(--color-ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.tool-group-title {
+  color: var(--color-ink-2);
+}
+
+.tool-group-hint {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-3);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-card {
+  min-width: 0;
+}
+
 .sticky-action-bar {
   position: sticky;
   bottom: 0;
@@ -546,6 +592,154 @@ body {
   color: var(--color-ink-2);
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* Full-page document workspace */
+:root[data-dashboard-mode="full"] #app-main {
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 320px);
+  grid-template-rows: auto auto auto minmax(80px, auto) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  padding: 14px;
+  overflow: auto;
+  background: var(--workspace-canvas);
+}
+
+:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) {
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 320px);
+}
+
+:root[data-dashboard-mode="full"] #left-col,
+:root[data-dashboard-mode="full"] #right-col {
+  display: contents;
+}
+
+:root[data-dashboard-mode="full"] #card-job-info {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+:root[data-dashboard-mode="full"] #card-job-desc {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+:root[data-dashboard-mode="full"] #card-generate {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+:root[data-dashboard-mode="full"] #card-application-form {
+  grid-column: 3;
+  grid-row: 5;
+  margin-top: 64px;
+}
+
+:root[data-dashboard-mode="full"] .tool-group--review {
+  grid-column: 2;
+  grid-row: 1 / span 6;
+  align-self: stretch;
+  min-height: 0;
+}
+
+:root[data-dashboard-mode="full"] .tool-group--improve {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  max-height: min(520px, 58vh);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+:root[data-dashboard-mode="full"] .tool-group--apply {
+  grid-column: 3;
+  grid-row: 3 / span 2;
+}
+
+:root[data-dashboard-mode="full"] .workflow-section,
+:root[data-dashboard-mode="full"] .tool-card {
+  border-color: var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+:root[data-dashboard-mode="full"] .tool-group {
+  min-height: 0;
+}
+
+:root[data-dashboard-mode="full"] .tool-group-heading {
+  color: var(--color-ink-3);
+  font-size: 9.5px;
+  letter-spacing: 0.045em;
+}
+
+:root[data-dashboard-mode="full"] .tool-group-hint {
+  display: none;
+}
+
+:root[data-dashboard-mode="full"] #card-drafts {
+  min-height: 0;
+  height: 100%;
+  padding: 16px;
+  box-shadow: var(--document-shadow);
+}
+
+:root[data-dashboard-mode="full"] #card-drafts .preview-card-header {
+  margin-bottom: 12px;
+}
+
+:root[data-dashboard-mode="full"] #card-drafts .tab-panel.active {
+  flex: 1 1 auto;
+}
+
+:root[data-dashboard-mode="full"] #card-drafts .draft-preview-wrapper {
+  min-height: 0;
+  padding: 36px 28px 28px;
+}
+
+:root[data-dashboard-mode="full"] #card-drafts .preview-frame {
+  min-height: 640px;
+}
+
+:root[data-dashboard-mode="full"] #card-revision,
+:root[data-dashboard-mode="full"] #card-ats,
+:root[data-dashboard-mode="full"] #card-save,
+:root[data-dashboard-mode="full"] #card-application-form {
+  padding: 12px;
+  background: var(--workspace-panel);
+}
+
+:root[data-dashboard-mode="full"] #card-revision,
+:root[data-dashboard-mode="full"] #card-ats {
+  background: var(--color-raised);
+}
+
+:root[data-dashboard-mode="full"] #card-save .save-button-row {
+  grid-template-columns: 1fr;
+}
+
+:root[data-dashboard-mode="full"] #card-application-form.autofill-card {
+  border-style: dashed;
+  color: var(--color-ink-3);
+}
+
+:root[data-dashboard-mode="full"] #field-job-desc {
+  min-height: 220px;
+}
+
+:root[data-dashboard-mode="full"] #field-revision {
+  min-height: 92px;
+}
+
+@media (max-width: 1120px) {
+  :root[data-dashboard-mode="full"] #app-main {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(240px, 290px);
+    gap: 12px;
+    padding: 12px;
+  }
+
+  :root[data-dashboard-mode="full"] #card-drafts .draft-preview-wrapper {
+    padding: 34px 18px 18px;
+  }
 }
 
 /* ══════════════════════════════════════════════
@@ -1573,6 +1767,14 @@ body {
   min-height: 400px;
 }
 
+#app-main:has(#draft-resume-content:not(.hidden)) #card-drafts,
+#app-main:has(#draft-cl-content:not(.hidden)) #card-drafts,
+#app-main:has(#draft-merged-content:not(.hidden)) #card-drafts {
+  background: var(--document-surface);
+  border-color: var(--color-border);
+  box-shadow: var(--document-shadow);
+}
+
 .manual-edit-notice {
   margin: -4px 0 8px;
   padding: 7px 10px;
@@ -1586,12 +1788,17 @@ body {
 
 .preview-edit-bar {
   position: absolute;
-  top: 8px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
   display: flex;
   gap: 6px;
+  padding: 3px;
+  background: oklch(from var(--document-surface) l c h / 0.92);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 22px oklch(0% 0 0 / 0.08);
 }
 
 .btn-edit-toggle {
@@ -1601,7 +1808,7 @@ body {
   padding: 4px 11px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-ink-3);
   cursor: pointer;
   line-height: 1.4;
@@ -1630,7 +1837,7 @@ body {
   padding: 4px 11px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: transparent;
   color: var(--color-ink-3);
   cursor: pointer;
   line-height: 1.4;
@@ -1646,27 +1853,31 @@ body {
 }
 
 .draft-preview-wrapper {
-  background: var(--color-desk);
-  border: 1px solid var(--color-border);
+  background:
+    linear-gradient(180deg, oklch(from var(--workspace-canvas) l c h / 0.65), transparent 140px),
+    var(--workspace-canvas);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
   flex: 1;
   overflow: auto;
   scrollbar-gutter: stable;
   position: relative;
-  padding: 24px;
+  padding: 34px 24px 24px;
 }
 
 .draft-preview-wrapper.document-hero {
   max-width: none;
   min-height: 0;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 oklch(from var(--document-surface) l c h / 0.18);
 }
 
 .preview-frame {
   width: 100%;
   height: 100%;
   border: none;
-  background: transparent;
+  background: var(--document-surface);
+  border-radius: calc(var(--radius-sm) + 1px);
+  box-shadow: 0 12px 30px oklch(0% 0 0 / 0.12);
 }
 
 /* ══════════════════════════════════════════════
@@ -1843,6 +2054,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .preview-review-nudge {
   margin: -4px 0 10px;
+  padding: 7px 9px;
+  background: var(--color-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
   color: var(--color-ink-2);
   font-size: 11.5px;
   line-height: 1.4;
@@ -1857,7 +2072,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: 40px;
+  min-height: 260px;
+  padding: 40px 24px;
+  background:
+    linear-gradient(var(--color-border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-border-subtle) 1px, transparent 1px),
+    var(--workspace-canvas);
+  background-size: 28px 28px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
   color: var(--color-ink-3);
   text-align: center;
 }
@@ -1898,13 +2121,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .gen-status--complete {
   align-items: flex-start;
-  padding: 9px 10px;
-  background: var(--color-success-subtle);
-  border: 1px solid var(--color-success);
+  padding: 8px 10px;
+  background: var(--color-raised);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-sm);
-  color: var(--color-ink);
+  color: var(--color-ink-2);
   line-height: 1.45;
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
 }
 
 .gen-status--complete #gen-status-text {
@@ -2036,7 +2259,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 :root[data-dashboard-mode="panel"] .profile-strip::before {
-  content: "Step 2 · Profile/Provider";
+  content: "Step 2 · Profile";
   position: absolute;
   top: 3px;
   left: 10px;
@@ -2057,11 +2280,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 :root[data-dashboard-mode="panel"] .workflow-section::before {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: var(--color-ink-3);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.05em;
   line-height: 1.2;
   text-transform: uppercase;
 }
@@ -2071,8 +2294,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   content: "Step 1 · Job";
 }
 
+:root[data-dashboard-mode="panel"] #card-job-desc::before {
+  display: none;
+  content: none;
+}
+
 :root[data-dashboard-mode="panel"] #card-application-form::before {
-  content: "Optional helper";
+  content: "Optional apply helper";
 }
 
 :root[data-dashboard-mode="panel"] #card-generate::before {
@@ -2095,6 +2323,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 :root[data-dashboard-mode="panel"] #card-save::before {
   content: "Step 5 · Apply";
   color: var(--color-success);
+}
+
+:root[data-dashboard-mode="panel"] .tool-group .workflow-section::before {
+  display: none;
+  content: none;
 }
 
 :root[data-dashboard-mode="panel"] .card-header {
@@ -2152,6 +2385,39 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   background: var(--action-primary-hover);
 }
 
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-resume-content:not(.hidden)) #card-generate,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-cl-content:not(.hidden)) #card-generate,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-merged-content:not(.hidden)) #card-generate {
+  background: var(--workspace-panel);
+  border-color: var(--color-border-subtle);
+}
+
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-resume-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .draft-settings,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-cl-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .draft-settings,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-merged-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .draft-settings,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-resume-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .gen-privacy-note,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-cl-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .gen-privacy-note,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-merged-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .gen-privacy-note {
+  color: var(--color-ink-3);
+}
+
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-resume-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .btn-primary,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-cl-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .btn-primary,
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-merged-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .btn-primary {
+  min-height: 40px;
+  background: var(--color-raised);
+  border-color: var(--color-border);
+  color: var(--color-ink-2);
+}
+
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-resume-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .btn-primary:hover:not(:disabled),
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-cl-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .btn-primary:hover:not(:disabled),
+:root[data-dashboard-mode="panel"] #app-main:has(#draft-merged-content:not(.hidden)) #card-generate:not(:has(#gen-status:not(.hidden):not(.gen-status--complete))) .btn-primary:hover:not(:disabled) {
+  background: var(--color-border-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
 :root[data-dashboard-mode="panel"] #card-job-info .btn-scan:not(#btn-scan-page),
 :root[data-dashboard-mode="panel"] #card-ats .btn-scan {
   background: transparent;
@@ -2175,13 +2441,98 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   background: var(--workspace-canvas);
 }
 
+:root[data-dashboard-mode="panel"] .tool-group {
+  gap: 6px;
+}
+
+:root[data-dashboard-mode="panel"] .tool-group-heading {
+  padding: 0 2px;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.045em;
+  line-height: 1;
+}
+
+:root[data-dashboard-mode="panel"] .tool-group-hint {
+  display: none;
+}
+
+:root[data-dashboard-mode="panel"] .tool-group--review {
+  gap: 6px;
+}
+
+:root[data-dashboard-mode="panel"] .tool-group--improve,
+:root[data-dashboard-mode="panel"] .tool-group--apply {
+  padding-top: 0;
+}
+
 :root[data-dashboard-mode="panel"] #card-drafts {
   border-color: oklch(from var(--action-improve) l c h / 0.28);
+}
+
+:root[data-dashboard-mode="panel"] #right-col:has(#draft-resume-content:not(.hidden)) #card-drafts,
+:root[data-dashboard-mode="panel"] #right-col:has(#draft-cl-content:not(.hidden)) #card-drafts,
+:root[data-dashboard-mode="panel"] #right-col:has(#draft-merged-content:not(.hidden)) #card-drafts {
+  flex: 1 1 auto;
+  min-height: min(600px, 68vh);
+}
+
+:root[data-dashboard-mode="panel"] #right-col:has(#draft-resume-content:not(.hidden)) .tool-group--review,
+:root[data-dashboard-mode="panel"] #right-col:has(#draft-cl-content:not(.hidden)) .tool-group--review,
+:root[data-dashboard-mode="panel"] #right-col:has(#draft-merged-content:not(.hidden)) .tool-group--review {
+  flex: 1 0 min(625px, 72vh);
+  min-height: min(625px, 72vh);
+}
+
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-resume-content:not(.hidden))::before,
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-cl-content:not(.hidden))::before,
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-merged-content:not(.hidden))::before {
+  display: none;
+  content: none;
+}
+
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-resume-content:not(.hidden)) .card-title,
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-cl-content:not(.hidden)) .card-title,
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-merged-content:not(.hidden)) .card-title {
+  font-size: 15px;
+}
+
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-resume-content:not(.hidden)) .preview-review-nudge,
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-cl-content:not(.hidden)) .preview-review-nudge,
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-merged-content:not(.hidden)) .preview-review-nudge {
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+  color: var(--color-ink-3);
+}
+
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-resume-content:not(.hidden)) .draft-preview-wrapper,
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-cl-content:not(.hidden)) .draft-preview-wrapper,
+:root[data-dashboard-mode="panel"] #card-drafts:has(#draft-merged-content:not(.hidden)) .draft-preview-wrapper {
+  border-color: transparent;
 }
 
 :root[data-dashboard-mode="panel"] #card-revision,
 :root[data-dashboard-mode="panel"] #card-ats {
   background: var(--color-raised);
+}
+
+:root[data-dashboard-mode="panel"] .tool-group--improve #card-revision,
+:root[data-dashboard-mode="panel"] .tool-group--improve #card-ats,
+:root[data-dashboard-mode="panel"] .tool-group--apply #card-save {
+  border-color: var(--color-border-subtle);
+  padding: 12px;
+}
+
+:root[data-dashboard-mode="panel"] .tool-group--improve #card-ats:has(#ats-empty:not(.hidden)),
+:root[data-dashboard-mode="panel"] .tool-group--apply #card-save:has(button:disabled) {
+  color: var(--color-ink-3);
+}
+
+:root[data-dashboard-mode="panel"] .tool-group--improve #card-revision .card-title,
+:root[data-dashboard-mode="panel"] .tool-group--improve #card-ats .card-title,
+:root[data-dashboard-mode="panel"] .tool-group--apply #card-save .card-title {
+  font-size: 13.5px;
 }
 
 :root[data-dashboard-mode="panel"] #card-revision .btn-secondary,
@@ -2236,6 +2587,36 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   :root[data-dashboard-mode="panel"] .autofill-actions > button {
     flex: 1 1 100%;
     justify-content: center;
+  }
+
+  :root[data-dashboard-mode="panel"] #right-col:has(#draft-resume-content:not(.hidden)) #card-drafts,
+  :root[data-dashboard-mode="panel"] #right-col:has(#draft-cl-content:not(.hidden)) #card-drafts,
+  :root[data-dashboard-mode="panel"] #right-col:has(#draft-merged-content:not(.hidden)) #card-drafts {
+    min-height: min(500px, 66vh);
+  }
+
+  :root[data-dashboard-mode="panel"] #right-col:has(#draft-resume-content:not(.hidden)) .tool-group--review,
+  :root[data-dashboard-mode="panel"] #right-col:has(#draft-cl-content:not(.hidden)) .tool-group--review,
+  :root[data-dashboard-mode="panel"] #right-col:has(#draft-merged-content:not(.hidden)) .tool-group--review {
+    flex-basis: min(530px, 70vh);
+    min-height: min(530px, 70vh);
+  }
+
+  :root[data-dashboard-mode="panel"] .tool-group-heading {
+    min-height: 9px;
+  }
+
+  :root[data-dashboard-mode="panel"] .draft-preview-wrapper {
+    padding: 32px 14px 14px;
+  }
+
+  :root[data-dashboard-mode="panel"] .preview-edit-bar {
+    top: 7px;
+  }
+
+  :root[data-dashboard-mode="panel"] .tab-btn {
+    padding-left: 8px;
+    padding-right: 8px;
   }
 }
 

@@ -157,7 +157,7 @@
       </section>
 
       <!-- Application Form Card -->
-      <section class="card workflow-section autofill-card is-collapsed" id="card-application-form">
+      <section class="card workflow-section autofill-card apply-helper is-collapsed" id="card-application-form">
         <div class="card-header">
           <span class="card-title">Application Autofill &mdash; optional</span>
           <button id="btn-toggle-autofill-tools" class="autofill-toggle" type="button" aria-expanded="false" aria-controls="autofill-tools-body">
@@ -234,8 +234,14 @@
     <!-- ─── RIGHT COLUMN ─────────────────────────── -->
     <div id="right-col" class="postgen-tools">
 
+      <div class="tool-group tool-group--review" aria-label="Review tools">
+        <div class="tool-group-heading" aria-hidden="true">
+          <span class="tool-group-title">Review</span>
+          <span class="tool-group-hint">Preview, edit, appearance</span>
+        </div>
+
       <!-- Draft Preview Card -->
-      <section class="card workflow-section" id="card-drafts">
+      <section class="card workflow-section tool-card tool-card--review" id="card-drafts">
         <div class="card-header preview-card-header">
           <span class="card-title">Preview</span>
           <div class="tab-bar" role="tablist" aria-label="Document preview">
@@ -339,9 +345,16 @@
           </div>
         </div>
       </section>
+      </div>
+
+      <div class="tool-group tool-group--improve" aria-label="Improve tools">
+        <div class="tool-group-heading" aria-hidden="true">
+          <span class="tool-group-title">Improve</span>
+          <span class="tool-group-hint">Refine and check keywords</span>
+        </div>
 
       <!-- Revision Card -->
-      <section class="card workflow-section" id="card-revision">
+      <section class="card workflow-section tool-card tool-card--improve" id="card-revision">
         <div class="card-header">
           <span class="card-title">Refine</span>
         </div>
@@ -358,7 +371,7 @@
       </section>
 
       <!-- ATS Check Card -->
-      <section class="card workflow-section" id="card-ats">
+      <section class="card workflow-section tool-card tool-card--improve" id="card-ats">
         <div class="card-header">
           <span class="card-title">ATS Check</span>
           <button id="btn-ats-scan" class="btn-scan" type="button" disabled>Scan keywords</button>
@@ -385,9 +398,16 @@
           </div>
         </div>
       </section>
+      </div>
+
+      <div class="tool-group tool-group--apply" aria-label="Apply tools">
+        <div class="tool-group-heading" aria-hidden="true">
+          <span class="tool-group-title">Apply</span>
+          <span class="tool-group-hint">Export, email, form support</span>
+        </div>
 
       <!-- Save Card -->
-      <section class="card workflow-section" id="card-save">
+      <section class="card workflow-section tool-card tool-card--apply" id="card-save">
         <div class="card-header">
           <span class="card-title">Save as PDF</span>
         </div>
@@ -409,6 +429,7 @@
           <p class="export-hint">AI reads the job posting and drafts an application email. Review before sending.</p>
         </div>
       </section>
+      </div>
 
     </div><!-- /right-col -->
 
