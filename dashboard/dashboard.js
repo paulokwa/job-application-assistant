@@ -1,6 +1,6 @@
 // dashboard/dashboard.js — Main dashboard controller (Redesigned for HTML/PDF System)
 
-import { extractJobFields } from '../modules/extraction.js';
+import { extractJobFields, checkDescriptionQuality } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
 import { prepareApplicationEmail } from '../modules/emailDrafting.js';
 import { generateRecruiterMessage } from '../modules/recruiterMessage.js';
@@ -280,6 +280,7 @@ const dom = {
   fieldCompany:       $('field-company'),
   fieldUrl:           $('field-url'),
   fieldDesc:          $('field-job-desc'),
+  descQualityNotice:  $('desc-quality-notice'),
   jobInfoReview:      $('job-info-review'),
   
   btnGenResume:       $('btn-gen-resume'),
@@ -2140,6 +2141,16 @@ function refreshJobInfoReviewNotice() {
   }
 }
 
+function maybeShowDescQualityNotice(text) {
+  if (!dom.descQualityNotice) return;
+  const quality = checkDescriptionQuality(text);
+  if (quality === 'ok') {
+    dom.descQualityNotice.classList.add('hidden');
+  } else {
+    dom.descQualityNotice.classList.remove('hidden');
+  }
+}
+
 function maybeShowScannedJobInfoReview(fields, jobTitle, company) {
   if (!fields?.needsReview && jobTitle && company) {
     hideJobInfoReviewNotice();
@@ -2148,10 +2159,10 @@ function maybeShowScannedJobInfoReview(fields, jobTitle, company) {
   showJobInfoReviewNotice('Review Job Title and Employer before saving or analyzing. Page scans can miss these fields. Use AI suggest fields for a second pass.');
 }
 
-function jobInfoSuggestionReview(info) {
+function jobInfoSuggestionReview(info, currentTitle = '', currentCompany = '') {
   return [
-    { label: 'Job title', value: info.jobTitle || '(no title found)' },
-    { label: 'Employer', value: info.company || '(no employer found)' },
+    { label: 'Job title', value: info.jobTitle || currentTitle || '(no title found)' },
+    { label: 'Employer', value: info.company || currentCompany || '(no employer found)' },
   ];
 }
 
@@ -2161,7 +2172,7 @@ async function confirmAiJobInfoSuggestions(info) {
     'Review the detected details before applying.',
     {
       primaryLabel: 'Apply',
-      reviewDetails: jobInfoSuggestionReview(info),
+      reviewDetails: jobInfoSuggestionReview(info, dom.fieldTitle.value.trim(), dom.fieldCompany.value.trim()),
     }
   ).then(result => result === 'primary');
 }
@@ -2175,7 +2186,7 @@ async function confirmScannedAiJobInfoSuggestions(info, alreadySeen = null) {
     {
       secondaryLabel: 'Apply',
       primaryLabel: 'Apply + Fit Check',
-      reviewDetails: alreadySeenReviewDetails(alreadySeen, jobInfoSuggestionReview(info)),
+      reviewDetails: alreadySeenReviewDetails(alreadySeen, jobInfoSuggestionReview(info, dom.fieldTitle.value.trim(), dom.fieldCompany.value.trim())),
     }
   );
 }
@@ -2300,6 +2311,7 @@ async function applyExtractedData(raw, url, usedSelection) {
   dom.fieldCompany.value = company;
   dom.fieldUrl.value     = url;
   dom.fieldDesc.value    = text;
+  maybeShowDescQualityNotice(text);
 
   state.jobData = nextJobData;
   state.currentJobMeta = {
@@ -2648,10 +2660,19 @@ async function scanJobPageAndMaybeSuggestFields() {
         if (choice !== 'cancel') {
           applyAiJobInfoSuggestions(info);
           if (alreadySeen) showAlreadySeenJobWarning(alreadySeen, { force: true });
-          if (!alreadySeen) showJobInfoReviewNotice(
-            'Job page scanned. AI suggested job details — please review before generating.',
-            'info'
-          );
+          if (!alreadySeen) {
+            const missingTitle   = !dom.fieldTitle.value.trim();
+            const missingCompany = !dom.fieldCompany.value.trim();
+            if (missingTitle && missingCompany) {
+              showJobInfoReviewNotice('AI could not confidently find Job Title or Employer. Please enter them manually.');
+            } else if (missingTitle) {
+              showJobInfoReviewNotice('AI detected Employer but could not find a Job Title. Please enter it manually.');
+            } else if (missingCompany) {
+              showJobInfoReviewNotice('AI detected Job Title but could not find Employer. Please enter it manually.');
+            } else {
+              showJobInfoReviewNotice('Job page scanned. AI suggested job details — please review before generating.', 'info');
+            }
+          }
           if (choice === 'primary') {
             await runFitCheckAI(dom.profileSwitcher.dataset.profileId || '');
           }
@@ -3102,6 +3123,7 @@ function bindEvents() {
   });
   dom.fieldDesc.addEventListener('input', () => {
     state.jobData.description = dom.fieldDesc.value;
+    maybeShowDescQualityNotice(dom.fieldDesc.value);
     markManualEntryIfEmpty();
     state.currentJobMeta.aiJobInfoAttemptedFor = '';
     syncJobChatToCurrentJob();

@@ -279,13 +279,62 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           // dashboard logic — this only affects the pageText fallback path.
           const indeedResult = selectedText ? null : await fetchIndeedSelectedJob(location.href);
           const detailResult = indeedResult ? null : findBestJobDetailContainer(document);
-          const pageText = detailResult
-            ? (detailResult.el.innerText || '')
+
+          // Try same-origin iframes when the main document scan found nothing,
+          // or found only a low-confidence container (semantic tag alone with no
+          // job content signals). Some job boards (e.g. onyourteam.com) render
+          // the job detail inside a frame while the outer page shell — which may
+          // have a <main> element — contains only nav and footer text.
+          const detailIsLowConfidence = detailResult &&
+            !detailResult.reason.includes('pos:') &&
+            !detailResult.reason.includes('pos_id_class');
+
+          let iframeResult = null;
+          if (!indeedResult && (!detailResult || detailIsLowConfidence)) {
+            for (const frame of Array.from(document.querySelectorAll('iframe'))) {
+              try {
+                const frameDoc = frame.contentDocument;
+                if (!frameDoc || !frameDoc.body) continue;
+                if ((frameDoc.body.innerText || '').length < 200) continue;
+                const r = findBestJobDetailContainer(frameDoc);
+                if (r && (!iframeResult || r.score > iframeResult.score)) iframeResult = r;
+              } catch (_) {
+                // Cross-origin iframe — browser blocks read, skip silently
+              }
+            }
+          }
+
+          // Prefer whichever result (main doc or iframe) scored higher.
+          const chosenDetail = (iframeResult && (!detailResult || iframeResult.score > detailResult.score))
+            ? iframeResult
+            : detailResult;
+
+          let pageText = chosenDetail
+            ? (chosenDetail.el.innerText || '')
             : indeedResult
               ? indeedResult.pageText
-            : (document.body.innerText || '');
+              : (document.body.innerText || '');
 
           const title = document.title || '';
+
+          // Prepend page heading and title to help extraction find the job title
+          // even when the best detail container excludes the page header.
+          try {
+            const pageHeadingParts = [];
+            const h1El = document.querySelector('h1');
+            if (h1El) {
+              const h1Text = (h1El.textContent || '').replace(/\s+/g, ' ').trim();
+              if (h1Text && h1Text.length >= 4) pageHeadingParts.push(h1Text);
+            }
+            if (title && title.length >= 4) pageHeadingParts.push(title);
+            if (pageHeadingParts.length > 0) {
+              const headingBlock = pageHeadingParts.join('\n');
+              if (!pageText.startsWith(headingBlock)) {
+                pageText = headingBlock + '\n\n' + pageText;
+              }
+            }
+          } catch (_) {}
+
           const url = indeedResult?.url || location.href;
 
           // Collect JSON-LD structured data for job-page detection.
@@ -303,9 +352,11 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
             usedSelection: selectedText.length > 0,
             structuredData: structuredData,
             // Diagnostic metadata — not displayed in V1 UI but useful for debugging.
-            usedDetailContainer: Boolean(detailResult),
-            detailContainerScore: detailResult?.score ?? null,
-            detailContainerReason: detailResult?.reason ?? null,
+            usedDetailContainer: Boolean(chosenDetail),
+            detailContainerScore: chosenDetail?.score ?? null,
+            detailContainerReason: (chosenDetail === iframeResult && iframeResult)
+              ? `iframe:${iframeResult.reason}`
+              : chosenDetail?.reason ?? null,
             usedIndeedViewJobFetch: Boolean(indeedResult),
           });
         } catch (error) {
