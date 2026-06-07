@@ -128,6 +128,32 @@ export function extractJobFields(rawText, url) {
 }
 
 /**
+ * Rates whether the description field looks like real job content.
+ * Returns 'ok', 'poor', or 'empty'. Used to warn the user before generation.
+ * No AI call — purely heuristic.
+ * @param {string} text
+ * @returns {'ok'|'poor'|'empty'}
+ */
+export function checkDescriptionQuality(text) {
+  if (!text || text.trim().length < 150) return 'empty';
+  const signals = [
+    /\bresponsibilities\b/i,
+    /\bqualifications?\b/i,
+    /\brequirements?\b/i,
+    /\b(?:full|part)[- ]?time\b/i,
+    /\bemployment\s+type\b/i,
+    /\bjob\s+(?:title|description|overview|summary)\b/i,
+    /\bwe\s+(?:are|'re)\s+(?:looking|seeking|hiring)\b/i,
+    /\bapply\b/i,
+    /\bsalary\b|\bcompensation\b|\bwage\b/i,
+    /\bexperience\b/i,
+    /\bskills?\b/i,
+  ];
+  const hits = signals.filter(re => re.test(text)).length;
+  return hits >= 2 ? 'ok' : 'poor';
+}
+
+/**
  * Scans text for special application instructions.
  * @param {string} text
  * @returns {string[]} Array of detected instruction strings

@@ -1,6 +1,6 @@
 // dashboard/dashboard.js — Main dashboard controller (Redesigned for HTML/PDF System)
 
-import { extractJobFields } from '../modules/extraction.js';
+import { extractJobFields, checkDescriptionQuality } from '../modules/extraction.js';
 import { generateResume, generateCoverLetter, reviseDraft, extractAtsKeywords } from '../modules/drafting.js';
 import { prepareApplicationEmail } from '../modules/emailDrafting.js';
 import { generateRecruiterMessage } from '../modules/recruiterMessage.js';
@@ -280,6 +280,7 @@ const dom = {
   fieldCompany:       $('field-company'),
   fieldUrl:           $('field-url'),
   fieldDesc:          $('field-job-desc'),
+  descQualityNotice:  $('desc-quality-notice'),
   jobInfoReview:      $('job-info-review'),
   
   btnGenResume:       $('btn-gen-resume'),
@@ -2140,6 +2141,16 @@ function refreshJobInfoReviewNotice() {
   }
 }
 
+function maybeShowDescQualityNotice(text) {
+  if (!dom.descQualityNotice) return;
+  const quality = checkDescriptionQuality(text);
+  if (quality === 'ok') {
+    dom.descQualityNotice.classList.add('hidden');
+  } else {
+    dom.descQualityNotice.classList.remove('hidden');
+  }
+}
+
 function maybeShowScannedJobInfoReview(fields, jobTitle, company) {
   if (!fields?.needsReview && jobTitle && company) {
     hideJobInfoReviewNotice();
@@ -2300,6 +2311,7 @@ async function applyExtractedData(raw, url, usedSelection) {
   dom.fieldCompany.value = company;
   dom.fieldUrl.value     = url;
   dom.fieldDesc.value    = text;
+  maybeShowDescQualityNotice(text);
 
   state.jobData = nextJobData;
   state.currentJobMeta = {
@@ -3102,6 +3114,7 @@ function bindEvents() {
   });
   dom.fieldDesc.addEventListener('input', () => {
     state.jobData.description = dom.fieldDesc.value;
+    maybeShowDescQualityNotice(dom.fieldDesc.value);
     markManualEntryIfEmpty();
     state.currentJobMeta.aiJobInfoAttemptedFor = '';
     syncJobChatToCurrentJob();

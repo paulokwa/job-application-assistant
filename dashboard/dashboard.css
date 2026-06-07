@@ -841,6 +841,17 @@ body {
   flex-basis: 100%;
 }
 
+.desc-quality-notice {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  color: var(--color-warning);
+  background: var(--color-warning-subtle);
+  border: 1px solid oklch(from var(--color-warning) l c h / 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .job-info-review {
   margin-top: 10px;
   padding: 8px 10px;
