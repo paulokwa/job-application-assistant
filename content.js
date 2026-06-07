@@ -280,11 +280,17 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           const indeedResult = selectedText ? null : await fetchIndeedSelectedJob(location.href);
           const detailResult = indeedResult ? null : findBestJobDetailContainer(document);
 
-          // If the main document scan found nothing, try same-origin iframes.
-          // Some job boards (e.g. onyourteam.com) render the job detail inside
-          // a frame while the outer page shell contains only nav and footer text.
+          // Try same-origin iframes when the main document scan found nothing,
+          // or found only a low-confidence container (semantic tag alone with no
+          // job content signals). Some job boards (e.g. onyourteam.com) render
+          // the job detail inside a frame while the outer page shell — which may
+          // have a <main> element — contains only nav and footer text.
+          const detailIsLowConfidence = detailResult &&
+            !detailResult.reason.includes('pos:') &&
+            !detailResult.reason.includes('pos_id_class');
+
           let iframeResult = null;
-          if (!indeedResult && !detailResult) {
+          if (!indeedResult && (!detailResult || detailIsLowConfidence)) {
             for (const frame of Array.from(document.querySelectorAll('iframe'))) {
               try {
                 const frameDoc = frame.contentDocument;
@@ -298,13 +304,16 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
             }
           }
 
-          let pageText = detailResult
-            ? (detailResult.el.innerText || '')
-            : iframeResult
-              ? (iframeResult.el.innerText || '')
-              : indeedResult
-                ? indeedResult.pageText
-                : (document.body.innerText || '');
+          // Prefer whichever result (main doc or iframe) scored higher.
+          const chosenDetail = (iframeResult && (!detailResult || iframeResult.score > detailResult.score))
+            ? iframeResult
+            : detailResult;
+
+          let pageText = chosenDetail
+            ? (chosenDetail.el.innerText || '')
+            : indeedResult
+              ? indeedResult.pageText
+              : (document.body.innerText || '');
 
           const title = document.title || '';
 
@@ -343,9 +352,11 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
             usedSelection: selectedText.length > 0,
             structuredData: structuredData,
             // Diagnostic metadata — not displayed in V1 UI but useful for debugging.
-            usedDetailContainer: Boolean(detailResult || iframeResult),
-            detailContainerScore: (detailResult ?? iframeResult)?.score ?? null,
-            detailContainerReason: detailResult?.reason ?? (iframeResult ? `iframe:${iframeResult.reason}` : null),
+            usedDetailContainer: Boolean(chosenDetail),
+            detailContainerScore: chosenDetail?.score ?? null,
+            detailContainerReason: (chosenDetail === iframeResult && iframeResult)
+              ? `iframe:${iframeResult.reason}`
+              : chosenDetail?.reason ?? null,
             usedIndeedViewJobFetch: Boolean(indeedResult),
           });
         } catch (error) {
