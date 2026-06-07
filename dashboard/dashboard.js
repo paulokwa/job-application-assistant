@@ -2811,6 +2811,10 @@ function bindEvents() {
       showToast('Add a profile before running AI Fit Check.');
       return;
     }
+    if (checkDescriptionQuality(dom.fieldDesc.value) !== 'ok') {
+      showToast('Add more of the job description before running Fit Check.');
+      return;
+    }
     runFitCheckAI(profileId).catch(() => {});
   });
   dom.jobInfoReview.addEventListener('click', e => {
