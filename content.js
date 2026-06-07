@@ -279,11 +279,32 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
           // dashboard logic — this only affects the pageText fallback path.
           const indeedResult = selectedText ? null : await fetchIndeedSelectedJob(location.href);
           const detailResult = indeedResult ? null : findBestJobDetailContainer(document);
+
+          // If the main document scan found nothing, try same-origin iframes.
+          // Some job boards (e.g. onyourteam.com) render the job detail inside
+          // a frame while the outer page shell contains only nav and footer text.
+          let iframeResult = null;
+          if (!indeedResult && !detailResult) {
+            for (const frame of Array.from(document.querySelectorAll('iframe'))) {
+              try {
+                const frameDoc = frame.contentDocument;
+                if (!frameDoc || !frameDoc.body) continue;
+                if ((frameDoc.body.innerText || '').length < 200) continue;
+                const r = findBestJobDetailContainer(frameDoc);
+                if (r && (!iframeResult || r.score > iframeResult.score)) iframeResult = r;
+              } catch (_) {
+                // Cross-origin iframe — browser blocks read, skip silently
+              }
+            }
+          }
+
           let pageText = detailResult
             ? (detailResult.el.innerText || '')
-            : indeedResult
-              ? indeedResult.pageText
-            : (document.body.innerText || '');
+            : iframeResult
+              ? (iframeResult.el.innerText || '')
+              : indeedResult
+                ? indeedResult.pageText
+                : (document.body.innerText || '');
 
           const title = document.title || '';
 
@@ -322,9 +343,9 @@ if (typeof window.__jpdaContentInjected === 'undefined') {
             usedSelection: selectedText.length > 0,
             structuredData: structuredData,
             // Diagnostic metadata — not displayed in V1 UI but useful for debugging.
-            usedDetailContainer: Boolean(detailResult),
-            detailContainerScore: detailResult?.score ?? null,
-            detailContainerReason: detailResult?.reason ?? null,
+            usedDetailContainer: Boolean(detailResult || iframeResult),
+            detailContainerScore: (detailResult ?? iframeResult)?.score ?? null,
+            detailContainerReason: detailResult?.reason ?? (iframeResult ? `iframe:${iframeResult.reason}` : null),
             usedIndeedViewJobFetch: Boolean(indeedResult),
           });
         } catch (error) {
