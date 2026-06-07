@@ -820,7 +820,7 @@ body {
 }
 
 #card-job-info .card-header-right {
-  flex: 1 1 100%;
+  flex: 0 0 100%;
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 6px;
