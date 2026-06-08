@@ -838,6 +838,10 @@ body {
   white-space: nowrap;
 }
 
+#source-indicator:empty {
+  display: none;
+}
+
 #source-indicator:not(:empty) {
   flex-basis: 100%;
 }
@@ -2290,6 +2294,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 :root[data-dashboard-mode="panel"] #app-header {
   background: var(--workspace-panel);
   border-bottom-color: var(--color-border-subtle);
+}
+
+:root[data-dashboard-mode="panel"] .header-left {
+  display: none;
+}
+
+:root[data-dashboard-mode="panel"] .header-right {
+  flex: 1 1 100%;
 }
 
 :root[data-dashboard-mode="panel"] .profile-strip {
