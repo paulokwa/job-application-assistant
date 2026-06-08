@@ -40,6 +40,7 @@ import { normalizeProfileDatePart } from '../modules/schema.js';
 // Support/Ko-fi URL — used by the header button.
 const SUPPORT_URL = 'https://ko-fi.com/mwakelabs';
 const AI_PROVIDER_SETUP_SAVED_KEY = 'aiProviderSetupSaved';
+const PREVIEW_EDIT_HINT_SEEN_KEY = 'previewEditHintSeen';
 const SYNC_HISTORY_SUMMARY_KEY = 'jobHistorySummary';
 const CHAT_REFINE_REPLY_CHAR_LIMIT = 2000;
 const SAVED_JOBS_KEY = 'savedJobs';
@@ -248,6 +249,7 @@ const state = {
   profileUndoSnapshot: null,
   profileChangeStale: null,
   appPreferences: {},
+  previewEditHintSeen: false,
 };
 
 let currentAbortController = null;
@@ -319,6 +321,8 @@ const dom = {
   draftMergedContent: $('draft-merged-content'),
   tabBtnMerged:       $('tab-btn-merged'),
   manualEditNotice:   $('manual-edit-notice'),
+  previewEditNudge:   $('preview-edit-nudge'),
+  btnDismissPreviewEditNudge: $('btn-dismiss-preview-edit-nudge'),
   
   fieldRevision:      $('field-revision'),
   btnApplyChanges:    $('btn-apply-changes'),
@@ -1616,6 +1620,7 @@ async function clearGeneratedOutputForJobChange() {
   dom.btnAiFitCheck.classList.add('hidden');
   dom.genStatus.classList.add('hidden');
   dom.genStatus.classList.remove('gen-status--complete');
+  hidePreviewEditHint();
   clearEditState('resume');
   clearEditState('cover-letter');
   updateManualEditNotice();
@@ -1641,12 +1646,13 @@ async function init() {
   await populateProfileStrip();
 
   const [localData, syncData, scopedDraft] = await Promise.all([
-    chrome.storage.local.get([...SOURCE_RESUME_KEYS, AI_PROVIDER_SETUP_SAVED_KEY, 'theme']),
+    chrome.storage.local.get([...SOURCE_RESUME_KEYS, AI_PROVIDER_SETUP_SAVED_KEY, PREVIEW_EDIT_HINT_SEEN_KEY, 'theme']),
     chrome.storage.sync.get(['docSettings', 'appPreferences']),
     loadScopedSavedDraft(),
   ]);
   state.docSettings = syncData.docSettings || {};
   state.appPreferences = syncData.appPreferences || {};
+  state.previewEditHintSeen = Boolean(localData[PREVIEW_EDIT_HINT_SEEN_KEY]);
   applyTheme(localData.theme || 'system');
   setSourceResumeState(localData);
   const aiProviderSetupComplete = localData[AI_PROVIDER_SETUP_SAVED_KEY] || hasExistingAiProviderSetup(state.settings);
@@ -3076,8 +3082,15 @@ function bindEvents() {
   dom.btnAtsApply.addEventListener('click', applyAtsKeywords);
 
   // Inline editing
-  dom.btnEditResume.addEventListener('click', () => toggleEditMode('resume'));
-  dom.btnEditCL.addEventListener('click', () => toggleEditMode('cover-letter'));
+  dom.btnEditResume.addEventListener('click', () => {
+    hidePreviewEditHint();
+    toggleEditMode('resume');
+  });
+  dom.btnEditCL.addEventListener('click', () => {
+    hidePreviewEditHint();
+    toggleEditMode('cover-letter');
+  });
+  dom.btnDismissPreviewEditNudge.addEventListener('click', hidePreviewEditHint);
 
   // Clear individual draft
   dom.btnClearResume.addEventListener('click', () => clearDraft('resume'));
@@ -3441,6 +3454,7 @@ async function runGeneration(mode) {
     if (dashboardMode === 'panel' && state.appPreferences.autoExpandPreview !== false) {
       expandPreview();
     }
+    showPreviewEditHintOnce();
 
     // Persist so draft survives the panel being closed and reopened. If quota
     // fails, the in-memory draft remains usable for export in the current view.
@@ -4052,6 +4066,32 @@ function updateManualEditNotice() {
   dom.manualEditNotice.classList.toggle('hidden', !hasManualPreviewEdits());
 }
 
+function getGeneratedEditButtons() {
+  return [
+    state.drafts.resume ? dom.btnEditResume : null,
+    state.drafts['cover-letter'] ? dom.btnEditCL : null,
+  ].filter(Boolean);
+}
+
+function getPreviewEditButtons() {
+  return [dom.btnEditResume, dom.btnEditCL].filter(Boolean);
+}
+
+function hidePreviewEditHint() {
+  dom.previewEditNudge?.classList.add('hidden');
+  getPreviewEditButtons().forEach(btn => btn.classList.remove('edit-hint-active'));
+}
+
+function showPreviewEditHintOnce() {
+  if (state.previewEditHintSeen || !hasGeneratedOutput()) return;
+
+  state.previewEditHintSeen = true;
+  chrome.storage.local.set({ [PREVIEW_EDIT_HINT_SEEN_KEY]: true }).catch(() => {});
+
+  dom.previewEditNudge?.classList.remove('hidden');
+  getGeneratedEditButtons().forEach(btn => btn.classList.add('edit-hint-active'));
+}
+
 async function confirmTemplateRerenderIfNeeded() {
   if (!hasUnsavedPreviewEdits()) return true;
 
@@ -4341,7 +4381,7 @@ function clearEditState(tab) {
   const btn = tab === 'resume' ? dom.btnEditResume : dom.btnEditCL;
   if (btn) {
     btn.textContent = '✏ Edit';
-    btn.classList.remove('editing');
+    btn.classList.remove('editing', 'edit-hint-active');
     btn.title = 'Edit the document directly in the preview';
   }
 }
@@ -4529,6 +4569,7 @@ async function clearDraft(tab) {
   const contentEl   = tab === 'resume' ? dom.draftResumeContent : dom.draftCLContent;
   emptyEl.classList.remove('hidden');
   contentEl.classList.add('hidden');
+  hidePreviewEditHint();
   clearEditState(tab);
   await clearEditedHtml(tab);
   state.generationReceipt = null;
@@ -4601,6 +4642,7 @@ async function clearSession() {
   dom.draftMergedContent.classList.add('hidden');
   dom.tabBtnMerged.classList.add('hidden');
   dom.btnPrintMerged.classList.add('hidden');
+  hidePreviewEditHint();
   clearEditState('resume');
   clearEditState('cover-letter');
   updateManualEditNotice();
