@@ -492,6 +492,7 @@ const dom = {
   rightCol:            $('right-col'),
   outputPlaceholder:   $('output-placeholder'),
   leftCol:             $('left-col'),
+  fitCheckInline:      $('fit-check-inline'),
 
   btnPreviewExpand:    $('btn-preview-expand'),
   btnPreviewClose:     $('btn-preview-close'),
@@ -1635,6 +1636,7 @@ async function clearGeneratedOutputForJobChange() {
   dom.tabBtnMerged.classList.add('hidden');
   dom.btnPrintMerged.classList.add('hidden');
   dom.btnAiFitCheck.classList.add('hidden');
+  clearFitCheckInline();
   dom.genStatus.classList.add('hidden');
   dom.genStatus.classList.remove('gen-status--complete');
   hidePreviewEditHint();
@@ -2476,8 +2478,13 @@ function prepareAiFitCheckContext(scanResponse, tab) {
 
 async function sendAiFitCheckCard({ profileId, aiMatch = null, aiMatchError = null, aiLoading = false }) {
   const fc = state.lastFitCheck;
-  if (!fc?.tab?.id) return;
 
+  if (dashboardMode === 'full') {
+    renderFitCheckInline({ profileId, aiMatch, aiMatchError, aiLoading });
+    return;
+  }
+
+  if (!fc?.tab?.id) return;
   try {
     await chrome.tabs.sendMessage(fc.tab.id, {
       type: 'SHOW_FIT_CHECK_CARD',
@@ -2492,6 +2499,101 @@ async function sendAiFitCheckCard({ profileId, aiMatch = null, aiMatchError = nu
   } catch (err) {
     console.warn('[JPDA] AI Fit Check card injection failed:', err?.message || err);
   }
+}
+
+function renderFitCheckInline({ profileId, aiMatch = null, aiMatchError = null, aiLoading = false }) {
+  const el = dom.fitCheckInline;
+  if (!el) return;
+
+  el.innerHTML = '';
+  el.classList.remove('hidden');
+
+  const header = document.createElement('div');
+  header.className = 'fit-check-inline__header';
+  const title = document.createElement('span');
+  title.className = 'fit-check-inline__title';
+  title.textContent = '✦ AI Fit Check';
+  header.appendChild(title);
+
+  if (aiLoading) {
+    el.appendChild(header);
+    const loading = document.createElement('div');
+    loading.className = 'fit-check-inline__loading';
+    loading.innerHTML = '<div class="spinner" aria-hidden="true"></div><span>Checking fit…</span>';
+    el.appendChild(loading);
+    return;
+  }
+
+  if (aiMatch && typeof aiMatch === 'object') {
+    const labelMap = {
+      strong_match: 'Strong match', good_match: 'Good match', maybe: 'Possible match',
+      weak_match: 'Weak match', not_recommended: 'Low fit',
+    };
+    const labelText = labelMap[aiMatch.label] || aiMatch.label || '';
+    const aiScore = Math.max(0, Math.min(100, Math.round(Number(aiMatch.score) || 0)));
+    const score = document.createElement('span');
+    score.className = 'fit-check-inline__score';
+    score.textContent = `${aiScore}% · ${labelText}`;
+    header.appendChild(score);
+    el.appendChild(header);
+
+    const strongMatches = Array.isArray(aiMatch.strongMatches) ? aiMatch.strongMatches.slice(0, 3) : [];
+    const possibleGaps  = Array.isArray(aiMatch.possibleGaps)  ? aiMatch.possibleGaps.slice(0, 3)  : [];
+
+    if (strongMatches.length > 0) {
+      const st = document.createElement('div');
+      st.className = 'fit-check-inline__section-title';
+      st.textContent = 'Strengths';
+      const ul = document.createElement('ul');
+      ul.className = 'fit-check-inline__list';
+      strongMatches.forEach(s => { const li = document.createElement('li'); li.textContent = String(s); ul.appendChild(li); });
+      el.append(st, ul);
+    }
+    if (possibleGaps.length > 0) {
+      const st = document.createElement('div');
+      st.className = 'fit-check-inline__section-title';
+      st.textContent = 'Possible gaps';
+      const ul = document.createElement('ul');
+      ul.className = 'fit-check-inline__list';
+      possibleGaps.forEach(g => { const li = document.createElement('li'); li.textContent = String(g); ul.appendChild(li); });
+      el.append(st, ul);
+    }
+    if (aiMatch.recommendation) {
+      const rec = document.createElement('div');
+      rec.className = 'fit-check-inline__recommendation';
+      rec.textContent = String(aiMatch.recommendation);
+      el.appendChild(rec);
+    }
+  } else if (aiMatchError) {
+    el.appendChild(header);
+    const err = document.createElement('div');
+    err.className = 'fit-check-inline__error';
+    err.textContent = String(aiMatchError);
+    el.appendChild(err);
+  } else {
+    el.classList.add('hidden');
+    return;
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'fit-check-inline__actions';
+  const rerunBtn = document.createElement('button');
+  rerunBtn.type = 'button';
+  rerunBtn.className = 'fit-check-inline__rerun';
+  rerunBtn.textContent = 'Re-run';
+  rerunBtn.addEventListener('click', () => {
+    const fc = state.lastFitCheck;
+    if (fc?.aiMatchesByProfile) delete fc.aiMatchesByProfile[profileId];
+    runFitCheckAI(profileId).catch(() => {});
+  });
+  actions.appendChild(rerunBtn);
+  el.appendChild(actions);
+}
+
+function clearFitCheckInline() {
+  if (!dom.fitCheckInline) return;
+  dom.fitCheckInline.innerHTML = '';
+  dom.fitCheckInline.classList.add('hidden');
 }
 
 // Profile selection in the Fit Check card is temporary. Cached AI results are
@@ -2878,6 +2980,12 @@ function bindEvents() {
     }
     if (checkDescriptionQuality(dom.fieldDesc.value) !== 'ok') {
       showToast('Add more of the job description before running Fit Check.');
+      return;
+    }
+    // Reuse cached result — avoids redundant AI call when nothing has changed
+    const cached = state.lastFitCheck?.aiMatchesByProfile?.[profileId];
+    if (cached) {
+      sendAiFitCheckCard({ profileId, aiMatch: cached }).catch(() => {});
       return;
     }
     runFitCheckAI(profileId).catch(() => {});
@@ -4803,6 +4911,7 @@ async function clearSession() {
   dom.selectionNotice.classList.add('hidden');
   dom.sourceIndicator.textContent = '';
   dom.btnAiFitCheck.classList.add('hidden');
+  clearFitCheckInline();
   if (fitCheckTabId) {
     chrome.tabs.sendMessage(fitCheckTabId, { type: 'REMOVE_FIT_CHECK_CARD' }).catch(() => {});
   }
