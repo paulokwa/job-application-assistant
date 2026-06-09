@@ -3389,10 +3389,19 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .ats-apply-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--color-border-subtle);
+}
+
+.ats-apply-note {
+  width: 100%;
+  font-size: 12px;
+  color: var(--color-ink-3);
+  line-height: 1.5;
+  margin-bottom: 8px;
 }
 
 /* ══════════════════════════════════════════════
