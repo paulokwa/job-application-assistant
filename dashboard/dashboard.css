@@ -4491,6 +4491,9 @@ body.preview-expanded {
 .btn-toggle-left-col {
   display: none;
 }
+.btn-toggle-left-col[hidden] {
+  display: none !important;
+}
 /* Expanded: small icon button, right-aligned in the column */
 :root[data-dashboard-mode="panel"] .btn-toggle-left-col {
   position: absolute;

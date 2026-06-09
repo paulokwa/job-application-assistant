@@ -1593,6 +1593,10 @@ function updateOutputPanelVisibility() {
   const hasOutput = hasGeneratedOutput();
   dom.rightCol.hidden = !hasOutput;
   dom.outputPlaceholder.classList.toggle('hidden', hasOutput);
+  if (dom.btnToggleLeftCol) {
+    dom.btnToggleLeftCol.hidden = !hasOutput;
+    if (!hasOutput) expandLeftCol();
+  }
   refreshFullPageAvailability();
 }
 
