@@ -263,7 +263,7 @@ body.embedded .settings-section { padding: 16px; }
   margin-top: auto;
   background: transparent;
   border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   color: var(--color-ink-3);
   font-family: var(--font-display);
   font-weight: 700;

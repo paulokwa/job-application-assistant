@@ -298,12 +298,10 @@ body {
 
 
 .header-tour-btn {
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 700;
-  padding: 4px 9px;
   color: var(--color-ink-3);
   border-color: var(--color-border-subtle);
-  border-radius: var(--radius-pill);
 }
 .header-tour-btn:hover {
   color: var(--color-accent);
