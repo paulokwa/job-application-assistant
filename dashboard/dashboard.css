@@ -1245,6 +1245,20 @@ body {
   background: var(--color-danger-subtle);
 }
 
+.btn-scan--saved {
+  background: var(--color-success-subtle) !important;
+  border-color: var(--color-success) !important;
+  color: var(--color-success) !important;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+
+.btn-scan--error-state {
+  background: var(--color-danger-subtle) !important;
+  border-color: var(--color-danger) !important;
+  color: var(--color-danger) !important;
+  transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+}
+
 /* ── Tone slider ────────────────────────────── */
 .tone-group { gap: 6px; }
 

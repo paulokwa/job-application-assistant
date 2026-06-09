@@ -2893,7 +2893,10 @@ function bindEvents() {
   dom.btnSaveJob.addEventListener('click', saveCurrentJob);
 
   // New draft
-  dom.btnNewDraft.addEventListener('click', clearSession);
+  dom.btnNewDraft.addEventListener('click', async () => {
+    await clearSession();
+    flashBtnFeedback(dom.btnNewDraft, 'Cleared ✓', 'saved', 1800);
+  });
 
   // Profile strip
   dom.profileSwitcher.addEventListener('click', toggleProfileMenu);
@@ -3862,12 +3865,12 @@ async function saveCurrentJob() {
 
   const duplicate = findSavedJobDuplicate(savedJobs, draft);
   if (duplicate) {
-    showToast('This job is already saved.');
+    flashBtnFeedback(dom.btnSaveJob,'Already saved', '');
     return;
   }
 
   if (savedJobs.length >= MAX_SAVED_JOBS) {
-    showToast(`Saved Jobs is full (${MAX_SAVED_JOBS}). Delete a job before saving another.`);
+    flashBtnFeedback(dom.btnSaveJob,'Jobs full', 'error');
     return;
   }
 
@@ -3884,15 +3887,24 @@ async function saveCurrentJob() {
 
   try {
     await chrome.storage.local.set({ [SAVED_JOBS_KEY]: compactSavedJobs([compactedJob, ...savedJobs]) });
-    showToast(jobWasTruncated
-      ? 'This job description was very large, so Jobs saved a shortened copy.'
-      : 'Saved to Jobs.');
+    flashBtnFeedback(dom.btnSaveJob,jobWasTruncated ? 'Saved (trimmed) ✓' : 'Saved ✓', 'saved');
   } catch (err) {
     console.warn('Could not save job:', err?.message || err);
-    showToast(isStorageQuotaError(err)
-      ? storageQuotaMessage('savedJobs')
-      : 'Could not save this job. Please try again.');
+    flashBtnFeedback(dom.btnSaveJob,isStorageQuotaError(err) ? 'Storage full' : 'Save failed', 'error');
   }
+}
+
+function flashBtnFeedback(btn, text, variant, ms = 2500) {
+  const original = btn.textContent;
+  btn.textContent = text;
+  btn.disabled = true;
+  if (variant === 'saved') btn.classList.add('btn-scan--saved');
+  else if (variant === 'error') btn.classList.add('btn-scan--error-state');
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.disabled = false;
+    btn.classList.remove('btn-scan--saved', 'btn-scan--error-state');
+  }, ms);
 }
 
 // ── Recent exports history ────────────────────────────────────────────────
@@ -4811,7 +4823,6 @@ async function clearSession() {
   switchTab('resume');
   updateOutputPanelVisibility();
   refreshJobChatEntryPoints();
-  showToast('Draft cleared.');
 }
 
 function refreshRevisionButton() {
