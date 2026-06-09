@@ -1581,11 +1581,14 @@ function refreshFullPageAvailability() {
   const hasOutput = hasGeneratedOutput();
 
   if (dom.btnOpenFullPage) {
+    dom.btnOpenFullPage.hidden = !hasOutput;
     dom.btnOpenFullPage.disabled = !hasOutput;
-    dom.btnOpenFullPage.title = hasOutput
-      ? 'Open this workspace in a full browser tab'
-      : 'Generate a draft to open full page';
-    dom.btnOpenFullPage.setAttribute('aria-disabled', String(!hasOutput));
+    dom.btnOpenFullPage.title = 'Open this workspace in a full browser tab';
+    if (hasOutput) {
+      dom.btnOpenFullPage.removeAttribute('aria-disabled');
+    } else {
+      dom.btnOpenFullPage.setAttribute('aria-disabled', 'true');
+    }
   }
 }
 
