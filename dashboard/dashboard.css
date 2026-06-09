@@ -479,6 +479,11 @@ body {
   display: none !important;
 }
 
+/* Transparent wrapper in panel/sidebar mode; becomes column 3 container in full-page mode */
+.right-tools {
+  display: contents;
+}
+
 #app-main:has(#right-col[hidden]) {
   grid-template-columns: 1fr;
 }
@@ -612,71 +617,53 @@ body {
 /* Full-page document workspace */
 :root[data-dashboard-mode="full"] #app-main {
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(260px, 320px);
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
-  align-items: start;
+  grid-template-rows: 1fr;
+  align-items: stretch;
   gap: 14px;
   padding: 14px;
-  overflow: auto;
+  overflow: hidden;
   background: var(--workspace-canvas);
 }
 
 :root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) {
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  grid-template-rows: auto;
+  grid-template-rows: 1fr;
 }
 
-:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) #card-job-info,
-:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) #card-job-desc,
-:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) #card-generate,
-:root[data-dashboard-mode="full"] #app-main:has(#right-col[hidden]) #card-application-form {
+:root[data-dashboard-mode="full"] #left-col {
+  display: flex;
   grid-column: 1;
-  grid-row: auto;
+  grid-row: 1;
 }
 
-:root[data-dashboard-mode="full"] #left-col,
 :root[data-dashboard-mode="full"] #right-col {
   display: contents;
 }
 
-:root[data-dashboard-mode="full"] #card-job-info {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-:root[data-dashboard-mode="full"] #card-job-desc {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-:root[data-dashboard-mode="full"] #card-application-form {
-  grid-column: 1;
-  grid-row: 3;
-}
-
-:root[data-dashboard-mode="full"] #card-generate {
-  grid-column: 1;
-  grid-row: 4 / -1;
-}
-
 :root[data-dashboard-mode="full"] .tool-group--review {
   grid-column: 2;
-  grid-row: 1 / -1;
+  grid-row: 1;
   align-self: stretch;
   min-height: 0;
+  overflow-y: auto;
+}
+
+:root[data-dashboard-mode="full"] .right-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-column: 3;
+  grid-row: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 8px;
+  padding-bottom: 12px;
+  scrollbar-gutter: stable;
 }
 
 :root[data-dashboard-mode="full"] .tool-group--improve {
-  grid-column: 3;
-  grid-row: 1;
-  max-height: min(520px, 58vh);
-  overflow-y: auto;
   padding-right: 2px;
-}
-
-:root[data-dashboard-mode="full"] .tool-group--apply {
-  grid-column: 3;
-  grid-row: 2;
-  margin-top: 6px;
+  flex-shrink: 0;
 }
 
 :root[data-dashboard-mode="full"] .workflow-section,
@@ -776,10 +763,6 @@ body {
   :root[data-dashboard-mode="full"] #card-drafts .draft-preview-wrapper {
     padding: 40px 32px 32px;
   }
-
-  :root[data-dashboard-mode="full"] .tool-group--improve {
-    max-height: min(580px, 62vh);
-  }
 }
 
 @media (max-width: 1120px) {
@@ -787,10 +770,6 @@ body {
     grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(240px, 280px);
     gap: 10px;
     padding: 10px;
-  }
-
-  :root[data-dashboard-mode="full"] .tool-group--improve {
-    max-height: min(460px, 52vh);
   }
 
   :root[data-dashboard-mode="full"] #card-drafts .draft-preview-wrapper {
