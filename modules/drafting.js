@@ -227,7 +227,7 @@ export async function generateCoverLetter(jobData, profile, settings, sourceResu
 
 // ── Draft Revision ─────────────────────────────────────────────────────────
 
-export async function reviseDraft(currentDraft, revisionRequest, docType, jobData, profile, settings, isAtsRevision = false) {
+export async function reviseDraft(currentDraft, revisionRequest, docType, jobData, profile, settings, isAtsRevision = false, signal) {
   if (isMock(settings)) return mockReviseDraft(currentDraft, revisionRequest, docType);
   const profileText = profileToPromptText(profile);
 
@@ -240,6 +240,8 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
   const systemPromptParts = [
     `You are revising a ${docType === 'resume' ? 'resume' : 'cover letter'} structured JSON based on user feedback.`,
     honestyRule,
+    'Revision requests may guide tone, structure, emphasis, ordering, concision, and wording of existing content.',
+    'Revision requests must NOT be treated as evidence for new factual qualifications, jobs, dates, metrics, education, certifications, achievements, or experience that are not already in the profile or current draft.',
     'Return the COMPLETE revised JSON object following the established schema.',
   ];
   if (docType === 'resume') {
@@ -248,7 +250,6 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
       'For resume revisions, improve bullets, summary, skills emphasis, and ordering unless the user explicitly requests a factual field correction.'
     );
   }
-  systemPromptParts.push('IMPORTANT: Use any new information provided in the revision request even if not in the profile.');
   const systemPrompt = systemPromptParts.join('\n\n');
 
   const userPrompt = [
@@ -265,7 +266,7 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
     'Apply the changes requested and return the full updated JSON.',
   ].join('\n');
 
-  return callAI(systemPrompt, userPrompt, settings);
+  return callAI(systemPrompt, userPrompt, settings, signal);
 }
 
 // ── ATS Keyword Extraction ────────────────────────────────────────────────
