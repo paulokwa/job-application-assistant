@@ -2629,20 +2629,23 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 :root[data-dashboard-mode="panel"] #card-job-info .btn-scan:not(#btn-scan-page),
+:root[data-dashboard-mode="full"] #card-job-info .btn-scan:not(#btn-scan-page),
 :root[data-dashboard-mode="panel"] #card-ats .btn-scan {
   background: transparent;
   border-color: var(--color-border-subtle);
   color: var(--color-ink-2);
 }
 
-:root[data-dashboard-mode="panel"] #btn-scan-page {
+:root[data-dashboard-mode="panel"] #btn-scan-page,
+:root[data-dashboard-mode="full"] #btn-scan-page {
   background: var(--action-primary);
   border-color: var(--action-primary);
   color: var(--action-primary-on);
   font-weight: 700;
 }
 
-:root[data-dashboard-mode="panel"] #btn-scan-page:hover {
+:root[data-dashboard-mode="panel"] #btn-scan-page:hover,
+:root[data-dashboard-mode="full"] #btn-scan-page:hover {
   background: var(--action-primary-hover);
   border-color: var(--action-primary-hover);
 }
