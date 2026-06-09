@@ -41,6 +41,27 @@ Do not tailor, modernize, re-title, infer, or replace these factual fields:
 The target job title may influence the headline, summary, skills emphasis, bullet wording, and ordering/emphasis of relevant experience.
 The target job title must never be inserted into a historical work experience title.`;
 
+const ATS_GROUNDING_RULE = `KEYWORD MODE — ATS ALIGNMENT:
+The user is asking you to improve keyword alignment in their draft.
+
+SOURCE OF TRUTH RULE:
+The user's profile, source resume, and current draft are the ONLY sources of truth for what this applicant can claim.
+The job description provides terminology targets — it is NOT evidence of the applicant's qualifications, experience, or skills.
+
+YOU MAY:
+- Use job-posting language and phrasing where it accurately describes experience already present in the profile or draft.
+- Reorder, re-emphasise, and rephrase existing content to improve keyword alignment.
+- Add a term to the skills list or a bullet only when it is genuinely supported by the profile or current draft.
+- Use honest framing such as "exposure to", "familiarity with", or "transferable experience in" for adjacent skills that are present but not primary — only where the profile or draft supports the claim.
+
+YOU MUST NOT:
+- Add any keyword as a factual claim if the profile and current draft do not support it.
+- Claim years of experience, metrics, tools, technologies, employers, job titles, certifications, education, or achievements not already in the profile or current draft.
+- Turn job requirements or job description language into applicant experience.
+- Add keywords the applicant does not possess simply because they appear in the job posting.
+
+If a keyword cannot be incorporated honestly, omit it — do not force it in.`;
+
 function buildSourceTruthBlock(profileText, sourceResumeText) {
   const blocks = [];
   if (sourceResumeText) {
@@ -234,7 +255,7 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
   const draftStr = typeof currentDraft === 'object' ? JSON.stringify(currentDraft, null, 2) : currentDraft;
 
   const honestyRule = isAtsRevision
-    ? 'KEYWORD MODE: The user is explicitly directing you to incorporate the listed keywords and phrases. Add skill names, tools, and descriptive terms exactly as provided, placed naturally into existing bullet points or the skills list. Do not fabricate specific metrics, dates, or credentials not in the profile.'
+    ? ATS_GROUNDING_RULE
     : HALLUCINATION_GUARD;
 
   const systemPromptParts = [
