@@ -4311,10 +4311,13 @@ async function applyRevision() {
   dom.btnApplyChanges.classList.add('btn--loading');
   dom.btnRegenerate.disabled = true;
 
+  currentAbortController = new AbortController();
+  const { signal } = currentAbortController;
+
   try {
     const isAts = state.atsRevision;
     state.atsRevision = false;
-    const raw = await reviseDraft(state.drafts[docType], request, docType, state.jobData, state.profile, state.settings, isAts);
+    const raw = await reviseDraft(state.drafts[docType], request, docType, state.jobData, state.profile, state.settings, isAts, signal);
     const parsed = normalizeDraftContent(docType, tryParseJson(raw));
     if (parsed) {
       state.drafts[docType] = parsed;
@@ -4327,8 +4330,13 @@ async function applyRevision() {
     }
   } catch (e) {
     state.atsRevision = false;
-    showToast(`⚠️ ${mapError(e).message}`);
+    if (e.name === 'AbortError') {
+      showToast('Revision cancelled.');
+    } else {
+      showToast(`⚠️ ${mapError(e).message}`);
+    }
   } finally {
+    currentAbortController = null;
     dom.btnApplyChanges.classList.remove('btn--loading');
     dom.btnApplyChanges.textContent = 'Apply Changes';
     refreshRevisionButton();
