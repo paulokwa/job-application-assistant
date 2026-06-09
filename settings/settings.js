@@ -1568,6 +1568,18 @@ const SETTINGS_TOURS = {
       body: 'Profile edits are not saved automatically. Save after changes so future drafts use the updated details.'
     },
   ],
+  preferences: [
+    {
+      targetId: 'pref-auto-expand-preview',
+      title: 'Auto-expand preview',
+      body: 'When enabled, the document preview fills the screen automatically after each draft is generated — no manual click needed.',
+    },
+    {
+      targetId: 'btn-save-preferences',
+      title: 'Save preferences',
+      body: 'Preferences apply on the next relevant action. Save after adjusting so your changes take effect.',
+    },
+  ],
   feedback: [
     {
       targetId: 'csel-feedback-type-trigger',
