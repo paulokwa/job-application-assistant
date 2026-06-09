@@ -1,4 +1,4 @@
-// history/history.js — Job History page controller
+// history/history.js — Recent exports page controller
 // Entries are written by dashboard.js when the user saves a document as PDF.
 import { openSafeHttpUrl } from '../modules/url.js';
 import { compactJobHistoryEntry, isStorageQuotaError, storageQuotaMessage } from '../modules/storageLimits.js';
@@ -85,7 +85,7 @@ async function saveLocalHistory(entries) {
     await chrome.storage.local.set({ jobHistory: entries.map(compactJobHistoryEntry) });
     return true;
   } catch (err) {
-    console.warn('Could not save job history:', err?.message || err);
+    console.warn('Could not save recent exports:', err?.message || err);
     if (isStorageQuotaError(err)) window.alert(storageQuotaMessage('jobHistory'));
     return false;
   }
@@ -160,7 +160,7 @@ function render(entries) {
       ? 'Reload this job in the dashboard and regenerate'
       : entry.isSyncedSummary
         ? 'This synced summary does not include the job description needed to regenerate'
-        : 'This history entry does not include the job description needed to regenerate';
+        : 'This export entry does not include the job description needed to regenerate';
     const syncedLabel = entry.isSyncedSummary
       ? '<span class="date-origin">Synced summary</span>'
       : '';
@@ -178,7 +178,7 @@ function render(entries) {
         <div class="history-actions">
           <button class="action-btn" data-action="regenerate" data-id="${entry.id}" title="${escAttr(regenerateTitle)}" ${canRegenerate ? '' : 'disabled'}>Regenerate</button>
           ${openBtn}
-          <button class="action-btn action-btn--danger" data-action="delete" data-id="${entry.id}" title="Remove from history">Delete</button>
+          <button class="action-btn action-btn--danger" data-action="delete" data-id="${entry.id}" title="Remove from recent exports">Delete</button>
         </div>
       </td>
     `;
@@ -294,7 +294,7 @@ async function init() {
     if (btn.dataset.action === 'delete') {
       const ok = await showConfirm(
         'Remove this entry?',
-        'It will be removed from your history.',
+        'It will be removed from Recent exports.',
         'Delete'
       );
       if (ok) deleteEntry(Number(btn.dataset.id));
@@ -304,8 +304,8 @@ async function init() {
   // Clear all button
   document.getElementById('btn-clear-all').addEventListener('click', async () => {
     const ok = await showConfirm(
-      'Clear all history?',
-      'All saved entries will be removed. This cannot be undone.',
+      'Clear recent exports?',
+      'All recent export entries will be removed. This cannot be undone.',
       'Clear all'
     );
     if (ok) clearAll();

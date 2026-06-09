@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Job History — Job Application Assistant</title>
+  <title>Recent Exports — Job Application Assistant</title>
   <link rel="stylesheet" href="history.css" />
 </head>
 <body>
 
   <div class="history-header">
     <div>
-      <h1 class="page-title">Job History</h1>
+      <h1 class="page-title">Recent Exports</h1>
       <p class="page-subtitle">Jobs you exported a PDF for</p>
     </div>
     <button id="btn-clear-all" class="btn-danger-outline" type="button">Clear all</button>
@@ -20,11 +20,11 @@
 
     <div id="empty-state" class="empty-state hidden">
       <div class="empty-icon">📄</div>
-      <p class="empty-title">No history yet</p>
+      <p class="empty-title">No recent exports yet</p>
       <p class="empty-body">When you save a resume or cover letter as PDF, it will appear here.</p>
     </div>
 
-    <table id="history-table" class="history-table hidden" aria-label="Job history">
+    <table id="history-table" class="history-table hidden" aria-label="Recent exports">
       <thead>
         <tr>
           <th class="col-date">Date</th>

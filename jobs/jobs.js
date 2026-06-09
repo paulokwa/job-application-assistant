@@ -388,7 +388,7 @@ const SAVED_JOBS_TOUR_WITH_JOBS = [
   {
     target: '.jobs-header',
     title: 'Saved Jobs workspace',
-    body: 'This is your application queue. It stays separate from generation history so you can track roles you may still act on.',
+    body: 'This is your application queue. It stays separate from Recent exports so you can track roles you may still act on.',
   },
   {
     target: '#jobs-stats',
@@ -744,7 +744,7 @@ async function init() {
     if (btn.dataset.action === 'delete') {
       const ok = await showConfirm(
         'Delete saved job?',
-        'This removes it from Jobs. Generated history is not affected.',
+        'This removes it from Jobs. Recent exports are not affected.',
         'Delete'
       );
       if (ok) {

@@ -32,7 +32,6 @@
       <button id="btn-open-full-page" class="header-link-btn" type="button" title="Open this workspace in a full browser tab" hidden disabled>Full page</button>
       <button id="btn-chat" class="icon-btn" title="Discuss this job with AI" aria-label="Open job discussion chat">Chat</button>
       <button id="btn-jobs" class="icon-btn" title="Saved jobs" aria-label="View saved jobs">Jobs</button>
-      <button id="btn-history" class="icon-btn" title="Job history" aria-label="View job history">History</button>
       <button id="btn-tour" class="icon-btn header-tour-btn" title="Feature tour" aria-label="Start feature tour">?</button>
       <button id="btn-theme" class="icon-btn" title="Switch to light mode" aria-label="Switch to light mode">🖥️</button>
       <button id="btn-support" class="icon-btn" title="Support development" aria-label="Support development">☕</button>
@@ -55,30 +54,22 @@
     </div>
   </div>
 
-  <!-- ── History Overlay ── -->
-  <div id="history-view" class="settings-overlay" role="dialog" aria-label="Job History">
-    <div class="overlay-header">
-      <button id="btn-close-history" class="back-btn" aria-label="Back to dashboard">
-        <span aria-hidden="true">←</span> Dashboard
-      </button>
-      <span class="overlay-title">Job History</span>
-    </div>
-    <div class="overlay-content">
-      <iframe id="history-frame" src="../history/history.html" frameborder="0" title="Job History"></iframe>
-    </div>
-  </div>
-
   <!-- Jobs Overlay -->
-  <div id="jobs-view" class="settings-overlay" role="dialog" aria-label="Saved Jobs">
+  <div id="jobs-view" class="settings-overlay" role="dialog" aria-label="Jobs">
     <div class="overlay-header">
       <button id="btn-close-jobs" class="back-btn" aria-label="Back to dashboard">
         <span aria-hidden="true">←</span> Dashboard
       </button>
-      <span class="overlay-title">Saved Jobs</span>
+      <span class="overlay-title">Jobs</span>
+      <div class="overlay-tabs" role="tablist" aria-label="Jobs views">
+        <button id="jobs-tab-saved" class="overlay-tab active" type="button" role="tab" aria-selected="true" aria-controls="jobs-frame">Saved</button>
+        <button id="jobs-tab-recent" class="overlay-tab" type="button" role="tab" aria-selected="false" aria-controls="history-frame" tabindex="-1">Recent</button>
+      </div>
       <button id="btn-jobs-tour-overlay" class="overlay-help-btn" type="button" title="Take a tour of Saved Jobs" aria-label="Start Saved Jobs tour">?</button>
     </div>
     <div class="overlay-content">
       <iframe id="jobs-frame" src="../jobs/jobs.html" frameborder="0" title="Saved Jobs"></iframe>
+      <iframe id="history-frame" src="../history/history.html" frameborder="0" title="Recent exports" hidden></iframe>
     </div>
   </div>
 

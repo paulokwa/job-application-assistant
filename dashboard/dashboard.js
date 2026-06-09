@@ -348,16 +348,17 @@ const dom = {
   toast:              $('toast'),
   btnTheme:           $('btn-theme'),
   btnJobs:            $('btn-jobs'),
-  btnHistory:         $('btn-history'),
   profileSwitcher:    $('profile-switcher'),
   profileMenuList:    $('profile-menu-list'),
   profileStrip:       $('profile-strip'),
   btnOpenProfile:     $('btn-open-profile'),
   btnOpenFullPage:    $('btn-open-full-page'),
-  historyView:        $('history-view'),
-  btnCloseHistory:    $('btn-close-history'),
   jobsView:           $('jobs-view'),
   btnCloseJobs:       $('btn-close-jobs'),
+  jobsFrame:          $('jobs-frame'),
+  historyFrame:       $('history-frame'),
+  jobsTabSaved:       $('jobs-tab-saved'),
+  jobsTabRecent:      $('jobs-tab-recent'),
   btnJobsTourOverlay: $('btn-jobs-tour-overlay'),
   btnSupport:         $('btn-support'),
   btnSettings:        $('btn-settings'),
@@ -1847,11 +1848,31 @@ function generationModeLabel(mode) {
 }
 
 function isFromJobsFrame(event) {
-  return event.source === document.getElementById('jobs-frame')?.contentWindow;
+  return event.source === dom.jobsFrame?.contentWindow;
 }
 
 function isFromHistoryFrame(event) {
-  return event.source === document.getElementById('history-frame')?.contentWindow;
+  return event.source === dom.historyFrame?.contentWindow;
+}
+
+function setJobsOverlayTab(tab = 'saved') {
+  const activeTab = tab === 'recent' ? 'recent' : 'saved';
+  const showingRecent = activeTab === 'recent';
+
+  dom.jobsFrame.hidden = showingRecent;
+  dom.historyFrame.hidden = !showingRecent;
+  dom.jobsTabSaved.classList.toggle('active', !showingRecent);
+  dom.jobsTabRecent.classList.toggle('active', showingRecent);
+  dom.jobsTabSaved.setAttribute('aria-selected', String(!showingRecent));
+  dom.jobsTabRecent.setAttribute('aria-selected', String(showingRecent));
+  dom.jobsTabSaved.tabIndex = showingRecent ? -1 : 0;
+  dom.jobsTabRecent.tabIndex = showingRecent ? 0 : -1;
+  dom.btnJobsTourOverlay.hidden = showingRecent;
+}
+
+function openJobsOverlay(tab = 'saved') {
+  setJobsOverlayTab(tab);
+  dom.jobsView.classList.add('visible');
 }
 
 function withCurrentSourceTab(sessionPayload) {
@@ -2395,11 +2416,11 @@ async function applySession(session) {
 
   if (session.regenerateRequested) {
     const mode = session.pendingMode || 'both';
-    dom.historyView.classList.remove('visible');
+    dom.jobsView.classList.remove('visible');
     await updateScopedJobSession(current => current ? { ...current, regenerateRequested: null } : current);
     await clearEditedHtml('resume');
     await clearEditedHtml('cover-letter');
-    showToast('Reloaded job from history. Regenerating...');
+    showToast('Reloaded recent export. Regenerating...');
     runGeneration(mode);
   }
 }
@@ -2852,14 +2873,13 @@ function bindEvents() {
     if (e.target.dataset.action === 'open-ai-settings') openSettingsSection('provider');
     if (e.target.dataset.action === 'retry-job-scan') scanJobPageAndMaybeSuggestFields();
     if (e.target.dataset.action === 'open-jobs') {
-      dom.jobsView.classList.add('visible');
+      openJobsOverlay('saved');
       const jobId = e.target.dataset.jobId;
       if (jobId) {
-        const frame = document.getElementById('jobs-frame');
-        frame?.contentWindow?.postMessage({ type: 'JPDA_SCROLL_TO_JOB', id: jobId }, window.location.origin);
+        dom.jobsFrame?.contentWindow?.postMessage({ type: 'JPDA_SCROLL_TO_JOB', id: jobId }, window.location.origin);
       }
     }
-    if (e.target.dataset.action === 'open-history') dom.historyView.classList.add('visible');
+    if (e.target.dataset.action === 'open-history') openJobsOverlay('recent');
   });
   dom.btnSaveJob.addEventListener('click', saveCurrentJob);
 
@@ -2934,15 +2954,22 @@ function bindEvents() {
     if (prompt) sendJobChatTurn(prompt);
   });
 
-  // History
-  dom.btnHistory.addEventListener('click', () => dom.historyView.classList.add('visible'));
-  dom.btnCloseHistory.addEventListener('click', () => dom.historyView.classList.remove('visible'));
-
-  // Saved jobs
-  dom.btnJobs.addEventListener('click', () => dom.jobsView.classList.add('visible'));
+  // Jobs
+  dom.btnJobs.addEventListener('click', () => openJobsOverlay('saved'));
   dom.btnCloseJobs.addEventListener('click', () => dom.jobsView.classList.remove('visible'));
+  dom.jobsTabSaved.addEventListener('click', () => setJobsOverlayTab('saved'));
+  dom.jobsTabRecent.addEventListener('click', () => setJobsOverlayTab('recent'));
+  [dom.jobsTabSaved, dom.jobsTabRecent].forEach(tab => {
+    tab.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const nextTab = tab === dom.jobsTabSaved ? 'recent' : 'saved';
+      setJobsOverlayTab(nextTab);
+      (nextTab === 'recent' ? dom.jobsTabRecent : dom.jobsTabSaved).focus();
+    });
+  });
   dom.btnJobsTourOverlay.addEventListener('click', () => {
-    document.getElementById('jobs-frame')?.contentWindow?.postMessage({ type: 'START_JOBS_TOUR' }, '*');
+    dom.jobsFrame?.contentWindow?.postMessage({ type: 'START_JOBS_TOUR' }, '*');
   });
   window.addEventListener('message', async e => {
     if (e.origin !== window.location.origin) return;
@@ -2981,7 +3008,7 @@ function bindEvents() {
     }
     if (e.data?.type === 'JPDA_HISTORY_REGENERATE_REQUESTED') {
       const mode = e.data.mode || 'both';
-      dom.historyView.classList.remove('visible');
+      dom.jobsView.classList.remove('visible');
       const sessionPayload = withCurrentSourceTab(e.data.sessionPayload);
       if (sessionPayload) {
         await saveScopedJobSession(sessionPayload);
@@ -2990,7 +3017,7 @@ function bindEvents() {
       await updateScopedJobSession(current => current ? { ...current, regenerateRequested: null } : current);
       await clearEditedHtml('resume');
       await clearEditedHtml('cover-letter');
-      showToast('Reloaded job from history. Regenerating...');
+      showToast('Reloaded recent export. Regenerating...');
       runGeneration(mode);
       return;
     }
@@ -3651,7 +3678,7 @@ function describeAlreadySeenResult(result = {}) {
   if (result.historyEntry) {
     const generatedDate = formatSeenDate(result.historyEntry.date);
     const docType = result.historyEntry.docType || 'draft';
-    parts.push(`Generated ${docType}${generatedDate ? ` on ${generatedDate}` : ''}`);
+    parts.push(`Exported ${docType}${generatedDate ? ` on ${generatedDate}` : ''}`);
   }
   return parts.join('\n');
 }
@@ -3679,13 +3706,13 @@ async function findAlreadySeenJob(jobData = state.jobData) {
 function alreadySeenReviewDetails(alreadySeen, baseDetails = []) {
   if (!alreadySeen) return baseDetails;
   return [
-    { label: 'Already in workspace', value: alreadySeen.summary || 'This posting appears in Jobs or History.' },
+    { label: 'Already in workspace', value: alreadySeen.summary || 'This posting appears in Jobs or Recent.' },
     ...baseDetails,
   ];
 }
 
 function alreadySeenWarningMessage(alreadySeen) {
-  const summary = alreadySeen?.summary || 'This posting appears in Jobs or History.';
+  const summary = alreadySeen?.summary || 'This posting appears in Jobs or Recent.';
   return `${summary}. You can continue, but check whether you already applied before generating or sending anything again.`;
 }
 
@@ -3695,7 +3722,7 @@ function alreadySeenWarningActions(alreadySeen) {
     actions.push(`<button type="button" class="job-info-review-action" data-action="open-jobs" data-job-id="${alreadySeen.savedJob.id}">Open Jobs</button>`);
   }
   if (alreadySeen?.historyEntry) {
-    actions.push('<button type="button" class="job-info-review-action" data-action="open-history">Open History</button>');
+    actions.push('<button type="button" class="job-info-review-action" data-action="open-history">Open Recent</button>');
   }
   return actions.length ? ` ${actions.join(' ')}` : '';
 }
@@ -3758,11 +3785,10 @@ async function saveCurrentJob() {
   }
 }
 
-// ── Job History ───────────────────────────────────────────────────────────
+// ── Recent exports history ────────────────────────────────────────────────
 
 function postFitAnalysisResult(payload) {
-  const frame = document.getElementById('jobs-frame');
-  frame?.contentWindow?.postMessage(payload, window.location.origin);
+  dom.jobsFrame?.contentWindow?.postMessage(payload, window.location.origin);
 }
 
 function fitAnalysisErrorMessage(error) {
@@ -5967,7 +5993,7 @@ function toggleTheme() {
 }
 
 function syncEmbeddedTheme(theme) {
-  [dom.settingsFrame, document.getElementById('history-frame')].forEach(frame => {
+  [dom.settingsFrame, dom.historyFrame].forEach(frame => {
     const root = frame?.contentDocument?.documentElement;
     if (!root) return;
     if (theme === 'dark') root.dataset.theme = 'dark';
@@ -6160,14 +6186,9 @@ const TOUR_STEPS = [
     body: 'Open the workspace in a full browser tab for more screen space. The current job context carries over automatically so you can pick up right where you left off.',
   },
   {
-    target: '#btn-history',
-    title: 'History',
-    body: 'Browse previously generated jobs. Select any entry to reload the job details and regenerate tailored documents for that role.',
-  },
-  {
     target: '#btn-jobs',
-    title: 'Saved Jobs',
-    body: 'Open your saved application queue to compare fit, track status, add notes, and launch application-material actions for a saved role.',
+    title: 'Jobs',
+    body: 'Open Saved jobs to track roles, or Recent to reload an exported job and regenerate tailored documents.',
   },
 ];
 
