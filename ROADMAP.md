@@ -14,7 +14,9 @@ Version 2.0 was submitted to the Chrome Web Store on 2026-05-22 and accepted by 
 
 Version 3.0 was submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04.
 
-Version 4.0 development has started. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
+Version 4.0 is packaged and submitted to the Chrome Web Store (2026-06-09), pending Google approval. The v4.0 zip (`job-application-assistant-v4.0.0.zip`) contains runtime files only. Manifest is at `4.0.0`. All 41 unit tests pass on main.
+
+Version 4.5 is the next planned release cycle. Scope is stability, security, and code-quality improvements rather than major new features. See v4.5 section below.
 
 `main` currently contains:
 
@@ -28,9 +30,7 @@ Version 4.0 development has started. Do not create or submit a v4.0 package unle
 - Session scan payload cap for large temporary scan text
 - Application Form Autofill MVP (Phases 1–5, deterministic rule-based, review-before-fill, no AI, no auto-submit)
 - Approved v3.0 work including print filename support, Application Email Assistant, Application Pack actions, AI-only Fit Check, Job Chat follow-ups, and targeted autofill matcher improvements
-- v4.0 development work started with Tab-Scoped Job Sessions and Draft Restore
-
-The AI-only Fit Check revision is committed and included in the approved v3.0 package.
+- v4.0: Tab-Scoped Job Sessions and Draft Restore, Job Chat profile proposal Apply pipeline, pre-release blocker fixes (manifest bump, reviseDraft hallucination loophole, Refine abort signal), and ATS grounding guardrails
 
 ## v2.0 Release Status
 
@@ -54,14 +54,26 @@ The AI-only Fit Check revision is committed and included in the approved v3.0 pa
 
 ## v4.0 Release Status
 
-See `RELEASE_V4_CHECKLIST.md` for the active v4.0 release-cycle checklist, smoke tests, gates, and packaging guardrails.
-
 - [DONE] v4.0 development cycle opened.
 - [DONE] Tab-Scoped Job Sessions and Draft Restore completed for v4.0 development.
-- [WAITING] User confirms final v4.0 release scope.
-- [WAITING] `manifest.json` version bump to `4.0.0`.
-- [WAITING] Full v4.0 smoke testing.
-- [WAITING] User explicitly confirms v4.0 packaging/submission.
+- [DONE] Job Chat profile proposal Apply pipeline completed.
+- [DONE] Pre-release audit completed (`AUDIT_V4_PRE_RELEASE.md`).
+- [DONE] Safe release blockers fixed: manifest bumped to `4.0.0` (A-01), reviseDraft hallucination loophole closed (A-02), Refine abort signal wired (A-03).
+- [DONE] ATS grounding guardrails added: `ATS_GROUNDING_RULE` constant, UI disclosure note.
+- [DONE] All 41 unit tests passing on main.
+- [DONE] v4.0 submission zip created (`job-application-assistant-v4.0.0.zip`, 298 KB, runtime files only).
+- [DONE] v4.0 submitted to the Chrome Web Store (2026-06-09), pending Google approval.
+
+## v4.5 Planned Work
+
+Scope: stability, security, and code-quality improvements. No major new features planned.
+
+1. **Centralize duplicated tab-session constants** — `JOB_SESSIONS_BY_TAB_KEY`, `SESSION_SCAN_TEXT_CAP_CHARS`, and `SESSION_SCAN_TRUNCATION_MARKER` are duplicated between `background.js` and `dashboard/dashboard.js`. Move to a shared module. (A-04 from v4 audit.)
+2. **ATS keyword apply confirmation modal** — Add an explicit confirmation dialog before applying ATS keywords to the draft, beyond the current static disclosure note. (B-03/D-04 from v4 audit.)
+3. **Contact info opt-out for AI prompts** — Add an optional setting to exclude email/phone from being sent to AI providers via `profileToPromptText`. (B-02 from v4 audit.)
+4. **Gemini API-key-in-URL disclosure** — Surface a note in Settings when Gemini is selected, explaining that the API key is sent as a URL query parameter. (B-01 from v4 audit.)
+5. **`getLabelText` aria-labelledby composite label support** — Fix `getLabelText` in `modules/autofillMatcher.js` to handle multiple space-separated IDs in `aria-labelledby`. (B-04 from v4 audit.)
+6. **Align date-splitter handling** — `splitDates()` in `autofillMatcher.js` splits on dashes only; `schema.js` also splits on "to". Align the two so profiles storing dates with "to" as separator work correctly in autofill. (B-05 from v4 audit.)
 
 ## Final v2.0 Smoke Test Checklist
 

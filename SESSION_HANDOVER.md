@@ -4,7 +4,8 @@
 
 - v2.0 submitted to the Chrome Web Store on 2026-05-22 and accepted by Google.
 - v3.0 submitted to the Chrome Web Store on 2026-06-02 and approved by Google on 2026-06-04.
-- v4.0 is the active release cycle. Tab-Scoped Job Sessions and Draft Restore is completed v4.0 development work.
+- v4.0 packaged and submitted to the Chrome Web Store on 2026-06-09, pending Google approval. Manifest is at `4.0.0`. All 41 unit tests pass on main.
+- v4.5 is the next planned release cycle. Scope is stability, security, and code-quality improvements. See ROADMAP.md for the planned v4.5 work items.
 
 ## Next Action Gate
 
@@ -33,12 +34,18 @@ Status:
   - Full deferred scope and hard rules documented in ROADMAP.md — see "Deferred Profile Apply Scope / Future Work"
   - Packaging safety still gated — see RELEASE_V4_CHECKLIST.md for exclusion list
 - [DONE] npm test scripts added (test:unit, test:smoke, test:smoke:headed, test)
-- [WAITING] User confirms final v4.0 release scope.
-- [WAITING] `manifest.json` version bump to `4.0.0`.
-- [WAITING] Full v4.0 smoke testing.
-- [WAITING] User explicitly confirms v4.0 packaging/submission.
+- [DONE] User confirmed final v4.0 release scope (2026-06-09).
+- [DONE] `manifest.json` version bump to `4.0.0`.
+- [DONE] Pre-release audit completed (`AUDIT_V4_PRE_RELEASE.md` on `audit/v4-pre-release-readonly`).
+- [DONE] Safe release blockers fixed: A-01 manifest bump, A-02 reviseDraft hallucination loophole, A-03 Refine abort signal (`fix/v4-safe-release-blockers`, commit `6d4bf82`).
+- [DONE] ATS grounding guardrails: `ATS_GROUNDING_RULE`, UI disclosure note (`fix/v4-ats-grounding-guardrails`, commit `0c11d10`).
+- [DONE] Both fix branches merged to main. All 41 unit tests pass.
+- [DONE] v4.0 submission zip created (`job-application-assistant-v4.0.0.zip`, 298 KB, runtime files only, 2026-06-09).
+- [DONE] v4.0 submitted to the Chrome Web Store (2026-06-09).
+- [WAITING] v4.0 approved by Google.
+- [WAITING] v4.5 release scope confirmed by user.
 
-Next planned work: stabilize for v4.0 release. Do not create or submit a v4.0 package unless the user explicitly confirms a release scope.
+Next planned work: v4.5 stability and security pass. See ROADMAP.md for the 6 planned v4.5 items. Do not begin v4.5 work until the user confirms scope.
 
 ## v3 Features Added Since v2.0
 
@@ -83,7 +90,7 @@ Most items in this section are complete on `main` as of 2026-06-01. The AI-only 
   - Chat-to-Refine actions prefill the existing Refine textarea only; they do not auto-apply changes or generate automatically.
   - Native multi-turn provider messages, optional chat history persistence, closed-side-panel routing, and structured JSON action suggestions remain deferred.
 
-## v4 Development Work Started
+## v4 Development Work (Complete)
 
 - Tab-scoped Job Sessions and Draft Restore completed locally on 2026-06-04:
   - Side panel launches include `sourceTabId`, allowing each dashboard instance to bind to the browser tab that opened it.
@@ -190,11 +197,14 @@ Most items in this section are complete on `main` as of 2026-06-01. The AI-only 
 
 ## Current Main Branch State
 
-Latest packaged extension code commit (2026-06-01):
+Latest packaged extension code commit (2026-06-09) — all v4 fixes merged to main:
 
-`6a8aec7` - `Refactor job-related modules: remove Fit Check and job page detection`
+- `fix/v4-safe-release-blockers` merged: manifest `4.0.0`, reviseDraft hallucination loophole closed, Refine abort signal wired.
+- `fix/v4-ats-grounding-guardrails` merged: `ATS_GROUNDING_RULE` constant, UI disclosure note above Apply button.
 
-The approved v3 zip was created outside the repository at `C:\Coding\job-page-draft-assistant\job-application-assistant-v3.0.0.zip`. It contains runtime files only and was inspected to confirm `manifest.json` is at the archive root, the version is `3.0.0`, and `debugger` / `downloads` permissions are absent.
+The approved v3 zip is at `C:\Coding\job-application-assistant-v3.0.0.zip` (runtime files only, version `3.0.0`, no `debugger`/`downloads` permissions).
+
+The v4 submission zip is at `C:\Coding\job-application-assistant-v4.0.0.zip` (runtime files only, 298 KB, version `4.0.0`).
 
 ## Do Not Repeat
 
@@ -254,9 +264,10 @@ See `ROADMAP.md`. Do not duplicate the full roadmap here.
 
 ## Release Checklists
 
-See `RELEASE_V4_CHECKLIST.md` for the active v4.0 release-cycle checklist, smoke tests, gates, and packaging guardrails.
+See `RELEASE_V4_CHECKLIST.md` for the completed v4.0 release-cycle checklist and packaging record.
 See `RELEASE_V3_CHECKLIST.md` for the approved v3.0 package record.
 See `RELEASE_V2_CHECKLIST.md` only as the historical checklist for the already-submitted and accepted v2.0 package.
+A `RELEASE_V4.5_CHECKLIST.md` should be created when v4.5 scope is confirmed.
 
 ## Handover Maintenance Rule
 
