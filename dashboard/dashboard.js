@@ -1577,10 +1577,23 @@ function hasGeneratedOutput() {
   return Boolean(state.drafts.resume || state.drafts['cover-letter']);
 }
 
+function refreshFullPageAvailability() {
+  const hasOutput = hasGeneratedOutput();
+
+  if (dom.btnOpenFullPage) {
+    dom.btnOpenFullPage.disabled = !hasOutput;
+    dom.btnOpenFullPage.title = hasOutput
+      ? 'Open this workspace in a full browser tab'
+      : 'Generate a draft to open full page';
+    dom.btnOpenFullPage.setAttribute('aria-disabled', String(!hasOutput));
+  }
+}
+
 function updateOutputPanelVisibility() {
   const hasOutput = hasGeneratedOutput();
   dom.rightCol.hidden = !hasOutput;
   dom.outputPlaceholder.classList.toggle('hidden', hasOutput);
+  refreshFullPageAvailability();
 }
 
 function buildJobContextSignature(jobData = state.jobData) {
@@ -3250,6 +3263,11 @@ async function persistScannedJobSession(response, tab, pendingMode = null) {
 }
 
 async function openFullPage() {
+  if (!hasGeneratedOutput()) {
+    refreshFullPageAvailability();
+    return;
+  }
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const pageUrl = new URL(chrome.runtime.getURL('dashboard/dashboard.html'));
   pageUrl.searchParams.set('mode', 'full');
@@ -3435,6 +3453,7 @@ async function runGeneration(mode) {
     }
 
     updatePreviews();
+    updateOutputPanelVisibility();
     state.originalDrafts = JSON.parse(JSON.stringify(state.drafts));
 
     if (mode === 'both') {

@@ -244,6 +244,20 @@ body {
   color: var(--color-ink);
   border-color: var(--color-accent);
 }
+.header-link-btn:disabled,
+.header-link-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-ink-3);
+}
+.header-link-btn:disabled:hover,
+.header-link-btn[aria-disabled="true"]:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-ink-3);
+}
 .header-link-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent);
