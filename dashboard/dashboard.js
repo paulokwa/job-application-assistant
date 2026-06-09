@@ -2143,6 +2143,12 @@ async function handleFillPage() {
 
 function showJobInfoReviewNotice(message, tone = 'warning', actionHtml = '') {
   if (!dom.jobInfoReview) return;
+  if (dom.jobInfoReview.dataset.purpose === 'save-job-validation') {
+    [dom.fieldTitle, dom.fieldCompany, dom.fieldUrl, dom.fieldDesc].forEach(field => {
+      field.classList.remove('field-invalid');
+    });
+  }
+  delete dom.jobInfoReview.dataset.purpose;
   if (actionHtml) {
     dom.jobInfoReview.innerHTML = `<span>${esc(message)}</span>${actionHtml}`;
   } else {
@@ -2154,6 +2160,7 @@ function showJobInfoReviewNotice(message, tone = 'warning', actionHtml = '') {
 
 function showScanRecoveryNotice(kind = 'reconnect') {
   if (!dom.jobInfoReview) return;
+  clearSavedJobValidationState();
 
   const isRestricted = kind === 'restricted';
   const title = isRestricted
@@ -2183,10 +2190,15 @@ function showScanRecoveryNotice(kind = 'reconnect') {
 
 function hideJobInfoReviewNotice() {
   if (!dom.jobInfoReview) return;
+  delete dom.jobInfoReview.dataset.purpose;
   dom.jobInfoReview.classList.add('hidden');
 }
 
 function refreshJobInfoReviewNotice() {
+  if (dom.jobInfoReview?.dataset.purpose === 'save-job-validation') {
+    refreshSavedJobValidationNotice();
+    return;
+  }
   if (dom.fieldTitle.value.trim() && dom.fieldCompany.value.trim()) {
     hideJobInfoReviewNotice();
   }
@@ -2373,6 +2385,7 @@ async function applyExtractedData(raw, url, usedSelection) {
   dom.fieldCompany.value = company;
   dom.fieldUrl.value     = url;
   dom.fieldDesc.value    = text;
+  clearSavedJobValidationState();
   maybeShowDescQualityNotice(text);
   updateGenerateFieldNotice();
 
@@ -3208,6 +3221,7 @@ function bindEvents() {
   dom.fieldUrl.addEventListener('input', () => {
     state.jobData.sourceUrl = dom.fieldUrl.value;
     markManualEntryIfEmpty();
+    refreshSavedJobValidationNotice();
     syncJobChatToCurrentJob();
   });
   dom.fieldDesc.addEventListener('input', () => {
@@ -3215,6 +3229,7 @@ function bindEvents() {
     maybeShowDescQualityNotice(dom.fieldDesc.value);
     markManualEntryIfEmpty();
     state.currentJobMeta.aiJobInfoAttemptedFor = '';
+    refreshSavedJobValidationNotice();
     syncJobChatToCurrentJob();
     refreshJobChatEntryPoints();
   });
@@ -3575,6 +3590,25 @@ function normalizeSavedJobText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+function normalizePostingUrlInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return { raw: '', normalized: '', valid: true };
+
+  const candidate = /^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(candidate);
+    const protocolAllowed = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    const hostname = parsed.hostname.toLowerCase();
+    const hasUsableHost = hostname.includes('.') || hostname === 'localhost';
+    if (!protocolAllowed || !hasUsableHost) {
+      return { raw, normalized: '', valid: false };
+    }
+    return { raw, normalized: parsed.href, valid: true };
+  } catch (_) {
+    return { raw, normalized: '', valid: false };
+  }
+}
+
 function createSavedJobId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -3583,7 +3617,7 @@ function createSavedJobId() {
 function getCurrentSavedJobDraft() {
   const title = dom.fieldTitle.value.trim();
   const company = dom.fieldCompany.value.trim();
-  const sourceUrl = dom.fieldUrl.value.trim();
+  const sourceUrlInfo = normalizePostingUrlInput(dom.fieldUrl.value);
   const cleanDescription = dom.fieldDesc.value.trim();
   const sourceType = state.currentJobMeta?.sourceType || 'manual_entry';
   const rawContent = String(state.currentJobMeta?.rawContent || cleanDescription);
@@ -3593,13 +3627,82 @@ function getCurrentSavedJobDraft() {
     company,
     location: '',
     salaryText: '',
-    sourceUrl,
+    sourceUrl: sourceUrlInfo.valid ? sourceUrlInfo.normalized : sourceUrlInfo.raw,
+    sourceUrlValid: sourceUrlInfo.valid,
+    sourceUrlHasValue: Boolean(sourceUrlInfo.raw),
     sourceType,
     rawContent,
     cleanDescription,
     status: 'saved',
     notes: '',
   };
+}
+
+function formatSavedJobValidationItems(items) {
+  if (items.length <= 1) return items[0] || '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+function getSavedJobValidation(draft = getCurrentSavedJobDraft()) {
+  const missing = [];
+  if (!draft.title) missing.push('job title');
+  if (!draft.company) missing.push('employer');
+
+  const invalidSourceUrl = draft.sourceUrlHasValue && !draft.sourceUrlValid;
+  const missingJobContext = !draft.sourceUrlHasValue && !draft.cleanDescription;
+  const valid = !missing.length && !missingJobContext && !invalidSourceUrl;
+
+  let message = '';
+  if (invalidSourceUrl) {
+    message = 'Enter a valid posting URL, or leave it blank and add a job description.';
+  } else if (!valid) {
+    const parts = [...missing];
+    if (missingJobContext) parts.push('posting URL or job description');
+    message = `Add ${formatSavedJobValidationItems(parts)} before saving.`;
+  }
+
+  return {
+    valid,
+    message,
+    missingTitle: !draft.title,
+    missingCompany: !draft.company,
+    invalidSourceUrl,
+    missingJobContext,
+  };
+}
+
+function applySavedJobValidationState(validation) {
+  dom.fieldTitle.classList.toggle('field-invalid', validation.missingTitle);
+  dom.fieldCompany.classList.toggle('field-invalid', validation.missingCompany);
+  dom.fieldUrl.classList.toggle('field-invalid', validation.missingJobContext || validation.invalidSourceUrl);
+  dom.fieldDesc.classList.toggle('field-invalid', validation.missingJobContext);
+}
+
+function clearSavedJobValidationState() {
+  [dom.fieldTitle, dom.fieldCompany, dom.fieldUrl, dom.fieldDesc].forEach(field => {
+    field.classList.remove('field-invalid');
+  });
+  if (dom.jobInfoReview?.dataset.purpose === 'save-job-validation') {
+    delete dom.jobInfoReview.dataset.purpose;
+    hideJobInfoReviewNotice();
+  }
+}
+
+function showSavedJobValidationNotice(validation) {
+  showJobInfoReviewNotice(validation.message);
+  dom.jobInfoReview.dataset.purpose = 'save-job-validation';
+  applySavedJobValidationState(validation);
+}
+
+function refreshSavedJobValidationNotice() {
+  if (dom.jobInfoReview?.dataset.purpose !== 'save-job-validation') return;
+  const validation = getSavedJobValidation();
+  if (validation.valid) {
+    clearSavedJobValidationState();
+    return;
+  }
+  showSavedJobValidationNotice(validation);
 }
 
 function findSavedJobDuplicate(savedJobs, draft) {
@@ -3741,11 +3844,22 @@ function showAlreadySeenJobWarning(alreadySeen, { force = false } = {}) {
 
 async function saveCurrentJob() {
   const draft = getCurrentSavedJobDraft();
-
-  if (!draft.title && !draft.company && !draft.cleanDescription && !draft.sourceUrl) {
-    showToast('Add or scan a job before saving.');
+  const validation = getSavedJobValidation(draft);
+  if (!validation.valid) {
+    showSavedJobValidationNotice(validation);
+    if (validation.missingTitle) dom.fieldTitle.focus();
+    else if (validation.missingCompany) dom.fieldCompany.focus();
+    else if (validation.invalidSourceUrl) dom.fieldUrl.focus();
+    else if (validation.missingJobContext) dom.fieldUrl.focus();
     return;
   }
+  clearSavedJobValidationState();
+  if (draft.sourceUrl && dom.fieldUrl.value.trim() !== draft.sourceUrl) {
+    dom.fieldUrl.value = draft.sourceUrl;
+    state.jobData.sourceUrl = draft.sourceUrl;
+  }
+  delete draft.sourceUrlValid;
+  delete draft.sourceUrlHasValue;
 
   const data = await chrome.storage.local.get(SAVED_JOBS_KEY);
   const savedJobs = Array.isArray(data[SAVED_JOBS_KEY]) ? data[SAVED_JOBS_KEY] : [];
@@ -4584,6 +4698,7 @@ function restoreSavedDraft(saved) {
   dom.fieldCompany.value = state.jobData.company   || '';
   dom.fieldUrl.value     = state.jobData.sourceUrl || '';
   dom.fieldDesc.value     = state.jobData.description || '';
+  clearSavedJobValidationState();
 
   // Restore style controls
   dom.templateOptions.forEach(o => o.classList.toggle('active', o.dataset.template === state.templateId));
@@ -4672,6 +4787,7 @@ async function clearSession() {
   dom.fieldCompany.value = '';
   dom.fieldUrl.value = '';
   dom.fieldDesc.value = '';
+  clearSavedJobValidationState();
   dom.selectionNotice.classList.add('hidden');
   dom.sourceIndicator.textContent = '';
   dom.btnAiFitCheck.classList.add('hidden');

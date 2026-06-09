@@ -903,6 +903,10 @@ body {
 .job-info-review-action:hover {
   opacity: 0.75;
 }
+.field-invalid {
+  border-color: var(--color-warning) !important;
+  box-shadow: 0 0 0 2px oklch(from var(--color-warning) l c h / 0.14);
+}
 .scan-recovery-title {
   display: block;
   margin-bottom: 4px;
