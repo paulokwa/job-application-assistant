@@ -372,7 +372,6 @@ const dom = {
   btnTour:            $('btn-tour'),
   btnScan:            $('btn-scan-page'),
   btnAiFitCheck:      $('btn-ai-fit-check'),
-  btnDiscussJob:      $('btn-discuss-job'),
   btnAiJobInfo:       $('btn-ai-job-info'),
   applicationFormCard: $('card-application-form'),
   btnToggleAutofillTools: $('btn-toggle-autofill-tools'),
@@ -588,11 +587,6 @@ function refreshJobChatEntryPoints() {
     ? 'Discuss this job with AI'
     : 'Scan or load a job first';
 
-  dom.btnDiscussJob.disabled = !hasContext;
-  dom.btnDiscussJob.title = hasContext
-    ? 'Discuss this job'
-    : 'Scan or load a job first';
-  dom.btnDiscussJob.classList.toggle('hidden', !hasContext);
 }
 
 function openJobChat() {
@@ -2947,7 +2941,6 @@ function bindEvents() {
 
   // Job Discussion Chat
   dom.btnChat.addEventListener('click', openJobChat);
-  dom.btnDiscussJob.addEventListener('click', openJobChat);
   dom.btnCloseJobChat.addEventListener('click', closeJobChat);
   dom.btnClearJobChat.addEventListener('click', clearJobChat);
   dom.btnJobChatSend.addEventListener('click', () => {

@@ -450,6 +450,7 @@ body {
 }
 
 #left-col {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3863,30 +3864,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .hidden { display: none !important; }
 
 /* ══════════════════════════════════════════════
-   DISCUSS THIS JOB BUTTON
-   ══════════════════════════════════════════════ */
-.btn-discuss-job {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 6px;
-  background: none;
-  border: none;
-  color: var(--color-accent);
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 4px 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-align: left;
-}
-.btn-discuss-job:hover {
-  opacity: 0.8;
-}
-
-/* ══════════════════════════════════════════════
    JOB DISCUSSION CHAT
    ══════════════════════════════════════════════ */
 
@@ -4509,21 +4486,26 @@ body.preview-expanded {
 }
 /* Expanded: small icon button, right-aligned in the column */
 :root[data-dashboard-mode="panel"] .btn-toggle-left-col {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  z-index: 20;
   display: flex;
-  align-self: flex-end;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 46px;
   padding: 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   color: var(--color-ink-3);
   font-size: 15px;
   cursor: pointer;
   line-height: 1;
   flex-shrink: 0;
+  transform: translateX(50%);
+  box-shadow: 0 6px 18px oklch(0% 0 0 / 0.06);
   transition: background-color var(--dur-fast) var(--ease-std),
               color var(--dur-fast) var(--ease-std),
               border-color var(--dur-fast) var(--ease-std);
@@ -4550,6 +4532,7 @@ body.preview-expanded {
   grid-template-columns: 44px minmax(0, 1fr);
 }
 :root[data-dashboard-mode="panel"] #left-col.left-col-collapsed {
+  padding-right: 0;
   overflow: hidden;
 }
 :root[data-dashboard-mode="panel"] #left-col.left-col-collapsed > *:not(.btn-toggle-left-col):not(.left-col-rail-labels) {
@@ -4557,10 +4540,11 @@ body.preview-expanded {
   pointer-events: none;
 }
 :root[data-dashboard-mode="panel"] #left-col.left-col-collapsed .btn-toggle-left-col {
-  align-self: center;
-  width: 32px;
-  height: 32px;
-  margin-bottom: 4px;
+  top: 0;
+  right: 50%;
+  width: 28px;
+  height: 46px;
+  transform: translateX(50%);
 }
 :root[data-dashboard-mode="panel"] #left-col.left-col-collapsed .btn-toggle-left-col-collapse {
   display: none;
@@ -4574,7 +4558,7 @@ body.preview-expanded {
   flex-direction: column;
   align-items: center;
   gap: 18px;
-  padding-top: 4px;
+  padding-top: 58px;
   color: var(--color-ink-3);
   font-size: 10px;
   font-weight: 600;
