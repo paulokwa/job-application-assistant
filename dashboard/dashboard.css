@@ -724,16 +724,27 @@ body {
 }
 
 :root[data-dashboard-mode="full"] #card-revision,
-:root[data-dashboard-mode="full"] #card-ats,
 :root[data-dashboard-mode="full"] #card-save,
 :root[data-dashboard-mode="full"] #card-application-form {
   padding: 12px;
   background: var(--workspace-panel);
 }
 
-:root[data-dashboard-mode="full"] #card-revision,
-:root[data-dashboard-mode="full"] #card-ats {
+:root[data-dashboard-mode="full"] #card-revision {
   background: var(--color-raised);
+}
+
+:root[data-dashboard-mode="full"] #card-revision .refine-tools {
+  gap: 8px;
+}
+
+:root[data-dashboard-mode="full"] #card-revision .refine-block {
+  padding: 9px;
+  background: var(--color-surface);
+}
+
+:root[data-dashboard-mode="full"] #card-revision .revision-buttons {
+  gap: 6px;
 }
 
 :root[data-dashboard-mode="full"] #card-save .save-button-row {
@@ -751,6 +762,7 @@ body {
 
 :root[data-dashboard-mode="full"] #field-revision {
   min-height: 92px;
+  margin-bottom: 8px;
 }
 
 @media (min-width: 1440px) {
@@ -2051,6 +2063,27 @@ input:focus, textarea:focus, select:focus {
 
 textarea { resize: vertical; min-height: 40px; }
 
+.refine-tools {
+  display: grid;
+  gap: 10px;
+}
+
+.refine-block {
+  padding: 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.refine-block--ats {
+  display: grid;
+  gap: 8px;
+}
+
+.refine-block--ats .card-header {
+  margin-bottom: 0;
+}
+
 #field-revision {
   min-height: 80px;
   margin-bottom: 10px;
@@ -2579,13 +2612,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border-color: transparent;
 }
 
-:root[data-dashboard-mode="panel"] #card-revision,
-:root[data-dashboard-mode="panel"] #card-ats {
+:root[data-dashboard-mode="panel"] #card-revision {
   background: var(--color-raised);
 }
 
 :root[data-dashboard-mode="panel"] .tool-group--improve #card-revision,
-:root[data-dashboard-mode="panel"] .tool-group--improve #card-ats,
 :root[data-dashboard-mode="panel"] .tool-group--apply #card-save {
   border-color: var(--color-border-subtle);
   padding: 12px;

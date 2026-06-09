@@ -378,43 +378,46 @@
         <div class="card-header">
           <span class="card-title"><span class="step-badge" aria-hidden="true">5</span> Refine</span>
         </div>
-        <textarea
-          id="field-revision"
-          rows="2"
-          placeholder="e.g. Emphasise leadership experience… make the tone more direct…"
-          aria-label="Revision instructions"
-        ></textarea>
-        <div class="revision-buttons">
-          <button id="btn-apply-changes" class="btn-primary" disabled>Apply Changes</button>
-          <button id="btn-regenerate" class="btn-secondary" disabled aria-label="Revert to original draft">↩ Revert</button>
-        </div>
-      </section>
+        <div class="refine-tools">
+          <div class="refine-block">
+            <textarea
+              id="field-revision"
+              rows="2"
+              placeholder="e.g. Emphasise leadership experience… make the tone more direct…"
+              aria-label="Revision instructions"
+            ></textarea>
+            <div class="revision-buttons">
+              <button id="btn-apply-changes" class="btn-primary" disabled>Apply Changes</button>
+              <button id="btn-regenerate" class="btn-secondary" disabled aria-label="Revert to original draft">↩ Revert</button>
+            </div>
+          </div>
 
-      <!-- ATS Check Card -->
-      <section class="card workflow-section tool-card tool-card--improve" id="card-ats">
-        <div class="card-header">
-          <span class="card-title">ATS Check</span>
-          <button id="btn-ats-scan" class="btn-scan" type="button" disabled>Scan keywords</button>
-        </div>
-        <div id="ats-empty" class="ats-empty">
-          Generate a resume first, then scan for keyword gaps.
-        </div>
-        <div id="ats-status" class="gen-status hidden" role="status" aria-live="polite">
-          <div class="spinner" aria-hidden="true"></div>
-          <span>Scanning keywords…</span>
-        </div>
-        <div id="ats-results" class="ats-results hidden">
-          <div id="ats-score" class="ats-score"></div>
-          <div id="ats-matched-group" class="ats-keyword-group hidden">
-            <div class="ats-group-label ats-group-label--matched">Matched</div>
-            <div id="ats-matched-chips" class="ats-chips"></div>
-          </div>
-          <div id="ats-missing-group" class="ats-keyword-group hidden">
-            <div class="ats-group-label ats-group-label--missing">Missing — click to deselect</div>
-            <div id="ats-missing-chips" class="ats-chips"></div>
-          </div>
-          <div id="ats-apply-row" class="ats-apply-row hidden">
-            <button id="btn-ats-apply" class="btn-secondary btn-sm" type="button">Apply keywords to resume</button>
+          <div class="refine-block refine-block--ats" id="card-ats">
+            <div class="card-header">
+              <span class="card-title">ATS Check</span>
+              <button id="btn-ats-scan" class="btn-scan" type="button" disabled>Scan keywords</button>
+            </div>
+            <div id="ats-empty" class="ats-empty">
+              Generate a resume first, then scan for keyword gaps.
+            </div>
+            <div id="ats-status" class="gen-status hidden" role="status" aria-live="polite">
+              <div class="spinner" aria-hidden="true"></div>
+              <span>Scanning keywords…</span>
+            </div>
+            <div id="ats-results" class="ats-results hidden">
+              <div id="ats-score" class="ats-score"></div>
+              <div id="ats-matched-group" class="ats-keyword-group hidden">
+                <div class="ats-group-label ats-group-label--matched">Matched</div>
+                <div id="ats-matched-chips" class="ats-chips"></div>
+              </div>
+              <div id="ats-missing-group" class="ats-keyword-group hidden">
+                <div class="ats-group-label ats-group-label--missing">Missing — click to deselect</div>
+                <div id="ats-missing-chips" class="ats-chips"></div>
+              </div>
+              <div id="ats-apply-row" class="ats-apply-row hidden">
+                <button id="btn-ats-apply" class="btn-secondary btn-sm" type="button">Apply keywords to resume</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
