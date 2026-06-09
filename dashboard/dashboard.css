@@ -218,10 +218,17 @@ body {
 .header-right {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex: 2 1 420px;
   gap: 6px;
   min-width: 0;
+}
+
+.header-job-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
 }
 
 .header-link-btn {
@@ -439,6 +446,12 @@ body {
     flex: 1 1 100%;
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .header-job-controls {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    margin-right: 0;
   }
 
   .profile-strip {
@@ -2428,6 +2441,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 :root[data-dashboard-mode="panel"] #app-header {
   background: var(--workspace-panel);
   border-bottom-color: var(--color-border-subtle);
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 :root[data-dashboard-mode="panel"] .header-left {
@@ -3125,10 +3140,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 5px 10px;
+  padding: 6px 10px;
   min-width: 210px;
   max-width: 280px;
-  min-height: 32px;
 }
 
 .profile-strip-label {
