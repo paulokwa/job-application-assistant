@@ -258,6 +258,7 @@ let currentFitAnalysisController = null;
 let currentJobInfoController = null;
 let currentAiMatchController = null;
 let currentEmailController = null;
+let currentEmailResult = null;
 let currentRecruiterController = null;
 let currentRecruiterJob = null;
 let currentRecruiterRequestId = 0;
@@ -404,6 +405,7 @@ const dom = {
   emailDocsMissing:       $('email-docs-missing'),
   emailRecipientGroup:    $('email-recipient-group'),
   emailRecipientDisplay:  $('email-recipient-display'),
+  emailRecipientHelp:     $('email-recipient-help'),
   btnCopyRecipient:       $('btn-copy-recipient'),
   emailSubjectDisplay:    $('email-subject-display'),
   btnCopySubject:         $('btn-copy-subject'),
@@ -3165,6 +3167,7 @@ function bindEvents() {
   dom.btnEmailErrorRetry.addEventListener('click', runEmailGeneration);
   dom.btnCopySubject.addEventListener('click', () => copyEmailField(dom.emailSubjectDisplay.value, 'Subject copied'));
   dom.btnCopyRecipient.addEventListener('click', () => copyEmailField(dom.emailRecipientDisplay.value, 'Email address copied'));
+  dom.emailRecipientDisplay.addEventListener('input', refreshEmailMailtoFromFields);
   dom.btnCopyBody.addEventListener('click', () => copyEmailField(dom.emailBodyDisplay.value, 'Email body copied'));
   dom.btnCopyChecklist.addEventListener('click', copyEmailChecklist);
   dom.btnCloseRecruiterMessage.addEventListener('click', closeRecruiterMessage);
@@ -5087,6 +5090,7 @@ function openEmailAssistant() {
 
 function closeEmailAssistant() {
   dom.emailAssistantView.classList.remove('visible');
+  currentEmailResult = null;
   if (currentEmailController) {
     currentEmailController.abort();
     currentEmailController = null;
@@ -5105,6 +5109,7 @@ async function runEmailGeneration() {
 
   if (currentEmailController) currentEmailController.abort();
   currentEmailController = new AbortController();
+  currentEmailResult = null;
 
   setEmailState('loading');
 
@@ -5193,7 +5198,37 @@ function buildMailtoUrl(recipientEmail, subject, body) {
   return url.length <= 2000 ? url : null;
 }
 
+function normalizeRecipientEmail(value) {
+  const email = String(value || '').trim();
+  if (!email) return '';
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
+}
+
+function refreshEmailMailtoFromFields() {
+  if (!currentEmailResult) return;
+
+  const recipientEmail = normalizeRecipientEmail(dom.emailRecipientDisplay.value);
+  const mailtoUrl = buildMailtoUrl(recipientEmail, dom.emailSubjectDisplay.value, dom.emailBodyDisplay.value);
+  const methodAllowsEmail = currentEmailResult.applicationMethod === 'email' || Boolean(recipientEmail);
+
+  if (recipientEmail && methodAllowsEmail && mailtoUrl) {
+    dom.btnOpenEmailApp.href = mailtoUrl;
+    dom.btnOpenEmailApp.classList.remove('hidden');
+    dom.emailMailtoTooLong.classList.add('hidden');
+  } else if (recipientEmail && methodAllowsEmail && !mailtoUrl) {
+    dom.btnOpenEmailApp.classList.add('hidden');
+    dom.emailMailtoTooLong.textContent = 'This email is too long to open automatically. Copy the subject and body instead.';
+    dom.emailMailtoTooLong.classList.remove('hidden');
+  } else {
+    dom.btnOpenEmailApp.removeAttribute('href');
+    dom.btnOpenEmailApp.classList.add('hidden');
+    dom.emailMailtoTooLong.textContent = 'Paste a recipient email above to open your email app, or copy the subject and body manually.';
+    dom.emailMailtoTooLong.classList.remove('hidden');
+  }
+}
+
 function renderEmailPanel(result, options = {}) {
+  currentEmailResult = result;
   // Context banner
   const banner = dom.emailContextBanner;
   banner.className = 'email-context-banner';
@@ -5217,11 +5252,14 @@ function renderEmailPanel(result, options = {}) {
   }
 
   // Recipient
+  dom.emailRecipientDisplay.value = result.recipientEmail || '';
+  dom.emailRecipientGroup.classList.remove('hidden');
   if (result.recipientEmail) {
-    dom.emailRecipientDisplay.value = result.recipientEmail;
-    dom.emailRecipientGroup.classList.remove('hidden');
+    dom.emailRecipientHelp.textContent = 'Recipient email found in the posting. Review it before sending.';
+    dom.emailRecipientHelp.classList.add('email-field-help--ok');
   } else {
-    dom.emailRecipientGroup.classList.add('hidden');
+    dom.emailRecipientHelp.textContent = 'No recipient email was found in the posting. Paste one here to open your email app, or copy the subject and body manually.';
+    dom.emailRecipientHelp.classList.remove('email-field-help--ok');
   }
 
   // Subject and body
@@ -5267,26 +5305,16 @@ function renderEmailPanel(result, options = {}) {
   }
 
   // Warnings
-  if (result.warnings.length) {
-    dom.emailWarningsList.innerHTML = result.warnings
+  const visibleWarnings = result.warnings.filter(w => !/no recipient email/i.test(w));
+  if (visibleWarnings.length) {
+    dom.emailWarningsList.innerHTML = visibleWarnings
       .map(w => `<li>${esc(w)}</li>`).join('');
     dom.emailWarningsGroup.classList.remove('hidden');
   } else {
     dom.emailWarningsGroup.classList.add('hidden');
   }
 
-  // mailto button
-  if (result.mailtoRecommended && result.mailtoUrl) {
-    dom.btnOpenEmailApp.href = result.mailtoUrl;
-    dom.btnOpenEmailApp.classList.remove('hidden');
-    dom.emailMailtoTooLong.classList.add('hidden');
-  } else if (result.applicationMethod === 'email' && result.recipientEmail && !result.mailtoUrl) {
-    dom.btnOpenEmailApp.classList.add('hidden');
-    dom.emailMailtoTooLong.classList.remove('hidden');
-  } else {
-    dom.btnOpenEmailApp.classList.add('hidden');
-    dom.emailMailtoTooLong.classList.add('hidden');
-  }
+  refreshEmailMailtoFromFields();
 }
 
 function copyEmailField(text, label) {

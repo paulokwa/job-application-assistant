@@ -583,9 +583,10 @@
         <div id="email-recipient-group" class="email-field-group hidden">
           <div class="email-field-label">To</div>
           <div class="email-field-row">
-            <input id="email-recipient-display" type="text" class="email-field-input" readonly aria-label="Recipient email address" />
+            <input id="email-recipient-display" type="email" class="email-field-input" placeholder="Paste recipient email if applying by email" aria-label="Recipient email address" />
             <button id="btn-copy-recipient" class="btn-copy" type="button">Copy</button>
           </div>
+          <p id="email-recipient-help" class="email-field-help">No recipient email was found in the posting. Paste one here to open your email app, or copy the subject and body manually.</p>
         </div>
 
         <!-- Subject -->
@@ -646,7 +647,7 @@
             <span class="email-section-title">Before sending</span>
           </div>
           <div class="email-presend-items">
-            <label class="email-check-item"><input type="checkbox" class="email-check"> Confirm the recipient email is correct.</label>
+            <label class="email-check-item"><input type="checkbox" class="email-check"> If applying by email, confirm the recipient email is correct.</label>
             <label class="email-check-item"><input type="checkbox" class="email-check"> Confirm any screening answers.</label>
             <label class="email-check-item"><input type="checkbox" class="email-check"> Attach your resume.</label>
             <label class="email-check-item"><input type="checkbox" class="email-check"> Attach your cover letter, if required.</label>
