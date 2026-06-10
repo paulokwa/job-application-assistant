@@ -41,6 +41,14 @@ Do not tailor, modernize, re-title, infer, or replace these factual fields:
 The target job title may influence the headline, summary, skills emphasis, bullet wording, and ordering/emphasis of relevant experience.
 The target job title must never be inserted into a historical work experience title.`;
 
+const RESUME_NO_NEW_ENTRIES_RULE = `EXPERIENCE ENTRIES IN REVISION:
+The experience array in your output must contain only the entries already present in the current draft.
+Do NOT add new job entries, new employers, or new date ranges — even if the user profile contains
+jobs that are absent from the current draft. The only structural change allowed is reordering
+existing entries at the user's explicit request.
+If the user asks to add jobs or fill employment gaps, refuse and explain that they should
+regenerate the resume to pull in additional profile entries.`;
+
 const ATS_GROUNDING_RULE = `KEYWORD MODE — ATS ALIGNMENT:
 The user is asking you to improve keyword alignment in their draft.
 
@@ -248,9 +256,10 @@ export async function generateCoverLetter(jobData, profile, settings, sourceResu
 
 // ── Draft Revision ─────────────────────────────────────────────────────────
 
-export async function reviseDraft(currentDraft, revisionRequest, docType, jobData, profile, settings, isAtsRevision = false, signal) {
+export async function reviseDraft(currentDraft, revisionRequest, docType, jobData, profile, settings, isAtsRevision = false, signal, sourceResumeText = '') {
   if (isMock(settings)) return mockReviseDraft(currentDraft, revisionRequest, docType);
   const profileText = profileToPromptText(profile);
+  const truthBlock = buildSourceTruthBlock(profileText, sourceResumeText);
 
   const draftStr = typeof currentDraft === 'object' ? JSON.stringify(currentDraft, null, 2) : currentDraft;
 
@@ -268,6 +277,7 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
   if (docType === 'resume') {
     systemPromptParts.push(
       RESUME_FACTUAL_GROUNDING_RULE,
+      RESUME_NO_NEW_ENTRIES_RULE,
       'For resume revisions, improve bullets, summary, skills emphasis, and ordering unless the user explicitly requests a factual field correction.'
     );
   }
@@ -277,7 +287,7 @@ export async function reviseDraft(currentDraft, revisionRequest, docType, jobDat
     '=== JOB DESCRIPTION ===',
     jobData.description,
     '',
-    profileText,
+    truthBlock,
     '',
     `=== CURRENT ${docType.toUpperCase()} JSON DRAFT ===`,
     draftStr,

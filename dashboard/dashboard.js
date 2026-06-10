@@ -3580,6 +3580,7 @@ async function runGeneration(mode) {
   const generationStartedAt = Date.now();
 
   state.lastRunMode = mode;
+  state.profile = await loadProfile();
   setGenerating(true);
   hideError();
   await clearSavedGenerationReceipt();
@@ -4315,9 +4316,10 @@ async function applyRevision() {
   const { signal } = currentAbortController;
 
   try {
+    state.profile = await loadProfile();
     const isAts = state.atsRevision;
     state.atsRevision = false;
-    const raw = await reviseDraft(state.drafts[docType], request, docType, state.jobData, state.profile, state.settings, isAts, signal);
+    const raw = await reviseDraft(state.drafts[docType], request, docType, state.jobData, state.profile, state.settings, isAts, signal, state.sourceResumeText);
     const parsed = normalizeDraftContent(docType, tryParseJson(raw));
     if (parsed) {
       state.drafts[docType] = parsed;
