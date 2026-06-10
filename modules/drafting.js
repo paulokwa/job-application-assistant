@@ -24,7 +24,7 @@ If information needed for a section is missing, omit that section rather than fa
 Accuracy and honesty are non-negotiable.`;
 
 const RESUME_FACTUAL_GROUNDING_RULE = `RESUME FACTUAL FIELD RULE:
-For structured resume fields, copy factual history exactly from the user profile or source resume unless the user explicitly asks to change that factual field.
+For structured resume fields, copy factual history exactly from the user profile (primary source of truth). If a source resume is also provided, it is supplementary — the profile takes precedence for all factual fields. Do not override profile data with source resume data.
 Do not tailor, modernize, re-title, infer, or replace these factual fields:
 - experience jobTitle
 - experience employer/company
@@ -72,15 +72,18 @@ If a keyword cannot be incorporated honestly, omit it — do not force it in.`;
 
 function buildSourceTruthBlock(profileText, sourceResumeText) {
   const blocks = [];
-  if (sourceResumeText) {
-    blocks.push('=== USER SOURCE RESUME (GROUND TRUTH) ===');
-    blocks.push(sourceResumeText);
-    blocks.push('=== END SOURCE RESUME ===');
-    blocks.push('');
-  }
-  blocks.push('=== USER PROFILE DATA ===');
+  blocks.push('=== USER PROFILE DATA (PRIMARY SOURCE OF TRUTH) ===');
+  blocks.push('Use this for all factual fields: job titles, employers, dates, locations, education, certifications.');
   blocks.push(profileText);
   blocks.push('=== END USER PROFILE ===');
+  if (sourceResumeText) {
+    blocks.push('');
+    blocks.push('=== SOURCE RESUME (SUPPLEMENTARY CONTEXT) ===');
+    blocks.push('Use for writing style, phrasing, and additional bullet detail only.');
+    blocks.push('For any factual field (job title, employer, dates, location), defer to the profile above — do not override profile data with source resume data.');
+    blocks.push(sourceResumeText);
+    blocks.push('=== END SOURCE RESUME ===');
+  }
   return blocks.join('\n');
 }
 
